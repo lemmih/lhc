@@ -1,0 +1,183 @@
+cabal-version:       >= 1.6
+name:                lhc
+version:             0.11
+synopsis:            The Luxurious LHC Optimization System
+description:
+  LHC is a Whole Program Optimization backend for the Glorious Glasgow
+  Haskell Compiler (http://haskell.org/ghc).
+  .
+  LHC uses GHC's external core format as its intermediate representation. It
+  processes the external core GHC generates for your application and merges
+  it with the LHC base library, yielding a whole program. Finally, this whole
+  program is converted to the GRIN intermediate representation - a low level,
+  defunctionalized intermediate representation for compiling lazy functional
+  languages. For more information about GRIN, please consult Urban Boquist's
+  Ph.D thesis: http://www.cs.chalmers.se/~boquist/phd/
+  .
+  LHC is currently under very rapid development. While it will probably compile
+  most of the stuff GHC can compile, there's no guarantee the resulting executable
+  will work. Many things could be broken.
+  Notable things missing include:
+  .
+  * IEEE Floating point support
+  * FFI support
+  * Exception support
+  .
+  LHC requires a 64bit OS and 64bit GHC.
+  . 
+  If you would like to contribute, please visit the homepage at http://lhc.seize.it
+Tested-With:         GHC == 6.12.3, GHC == 6.12.2, GHC == 6.12.1
+category:            Compiler
+license:             PublicDomain
+author:              David Himmelstrup, Austin Seipp
+maintainer:          lhc@projects.haskell.org
+homepage:            http://lhc.seize.it/
+build-type:          Custom
+cabal-version:	     >= 1.6
+extra-source-files:
+  lib/base/base.cabal
+  lib/base/includes/CTypes.h
+  lib/base/includes/ieee-flpt.h
+  lib/base/includes/Typeable.h
+  lib/base/LICENSE
+  lib/base/Setup.hs
+  lib/base/src/Control/Exception/*.hs
+  lib/base/src/Control/*.hs
+  lib/base/src/Control/Monad/*.hs
+  lib/base/src/Control/Monad/ST/*.hs
+  lib/base/src/Data/*.hs
+  lib/base/src/Data/STRef/*.hs
+  lib/base/src/Data/*.hs-boot
+  lib/base/src/Foreign/C/*.hsc
+  lib/base/src/Foreign/C/*.hs
+  lib/base/src/Foreign/*.hs
+  lib/base/src/Foreign/Marshal/*.hs
+  lib/base/src/Debug/*.hs
+  lib/base/src/*.hs
+  lib/base/src/GHC/*.lhs
+  lib/base/src/GHC/*.lhs-boot
+  lib/base/src/GHC/*.hs
+  lib/base/src/GHC/*.hs-boot
+  lib/base/src/GHC/IO/*.hs
+  lib/base/src/GHC/IO/*.hs-boot
+  lib/base/src/GHC/IO/Encoding/*.hs
+  lib/base/src/GHC/IO/Encoding/CodePage/*.hs
+  lib/base/src/GHC/IO/Handle/*.hs
+  lib/base/src/GHC/IO/Handle/*.hs-boot  
+  lib/base/src/System/*.hs
+  lib/base/src/System/Console/*.hs
+  lib/base/src/System/Mem/*.hs
+  lib/base/src/System/IO/*.hs
+  lib/base/src/System/Posix/*.hs
+  lib/base/src/Text/ParserCombinators/*.hs
+  lib/base/src/Text/*.hs
+  lib/base/src/Text/Read/*.hs
+  lib/base/src/Text/Show/*.hs
+  lib/base/src/Unsafe/*.hs
+
+  lib/ghc-prim/GHC/*.hs
+  lib/ghc-prim/ghc-prim.cabal
+  lib/ghc-prim/LICENSE
+  lib/ghc-prim/Setup.hs
+
+  lib/integer-ltm/integer.cabal
+  lib/integer-ltm/LICENSE
+  lib/integer-ltm/Setup.hs
+  lib/integer-ltm/src/GHC/Integer.hs
+  lib/integer-ltm/src/GHC/Integer/Ltm.hs
+  lib/integer-ltm/src/GHC/Integer/Type.hs
+
+data-files:
+  rts/rts.ll
+  rts/*.c
+  rts/*.h
+  rts/ltm/*.c
+  rts/ltm/*.h
+
+
+flag hpc
+  default:            False
+flag threaded
+  default:            False
+flag lhc-regress
+  default:            False
+flag lhc-pkg
+  default:            True
+
+flag with-libs
+  default:            False
+
+Executable lhc
+ main-is:            Main.hs
+ Hs-Source-Dirs:     src
+ ghc-prof-options:   -auto-all
+ build-depends:      base == 4.*, mtl == 1.1.*, bytestring == 0.9.*, containers == 0.3.*, ansi-wl-pprint == 0.5.*, 
+                     binary == 0.5.*, digest == 0.0.0.8, bytestring-trie == 0.2.*, core == 0.5.*, 
+                     filepath == 1.1.*, directory == 1.0.*, derive == 2.3.0, unix == 2.4.*,
+                     xhtml == 3000.2.*, pretty == 1.0.*, time == 1.2.*, parallel == 2.2.*, process == 1.0.*,
+                     split == 0.1.2, GraphSCC == 1.0.*, hashmap == 1.0.*
+
+ other-modules:      Paths_lhc, GhcDriver, CompactString, Traverse,
+                     Grin.Eval.Compile, Grin.Eval.Methods, Grin.Eval.Primitives,
+                     Grin.Eval.Types, Grin.FromCore, Grin.HPT.Environment,
+                     Grin.HPT.Lower, Grin.HPT.Solve, Grin.HPT, Grin.HPT.Interface,
+                     Grin.HPT.FastSolve,
+                     Grin.HPT.QuickSolve,
+                     Grin.Lowering.Apply,
+                     Grin.Lowering.GHCism, Grin.Optimize.Simple, Grin.Pretty,
+                     Grin.Optimize.Inline,
+                     Grin.Optimize.Case,
+                     Grin.Transform,
+                     Grin.PreciseDeadCode, Grin.DeadCode,
+                     Grin.SimpleCore.DeadCode, Grin.SimpleCore.Types,
+                     Grin.SimpleCore, Grin.Types, Manager, Grin.Stage2.Rename,
+                     Grin.Stage2.DeadCode,
+                     Grin.Stage2.Pretty,
+                     Grin.Stage2.Transform,
+                     Grin.Stage2.Types,
+                     Grin.Stage2.Optimize.Case,
+                     Grin.Stage2.Optimize.Simple,
+                     Grin.Stage2.Backend.C,
+                     Grin.Stage2.Backend.LLVM,
+                     Grin.Stage2.FromStage1
+
+
+ ghc-options:        -fwarn-unused-imports -fwarn-unused-binds -fwarn-incomplete-patterns
+ Extensions:         ScopedTypeVariables
+ if flag(with-libs)
+   x-build-libs:     True
+ else
+   x-build-libs:     False
+ if flag(hpc)
+  ghc-options:       -fhpc -hisuf hpc_hi -osuf hpc_o
+ if flag(threaded)
+  ghc-options:       -threaded
+ if impl(ghc == 6.12.*) && arch(x86_64)
+  buildable:         True
+ else
+  buildable:         False
+
+Executable lhc-regress
+  if flag(lhc-regress) && impl(ghc == 6.12.*) && arch(x86_64)
+    Buildable:      True
+  else
+    Buildable:      False
+  main-is:          Main.hs
+  other-modules:    UnitTests, Properties, THUtil
+  hs-source-dirs:   lhc-regress/ src/
+  build-depends:    base >= 4 && < 5, process, extensible-exceptions, HUnit, QuickCheck, test-framework,
+                    test-framework-hunit, test-framework-quickcheck2, template-haskell, haskell-src-exts == 1.6.*
+
+Executable lhc-pkg
+  if flag(lhc-pkg) && impl(ghc == 6.12.*) && arch(x86_64)
+    Buildable:      True
+  else
+    Buildable:      False
+  hs-source-dirs: lhc-pkg/
+  main-is: Main.hs
+  Other-modules: Paths_lhc
+
+  Build-Depends: base >= 4 && < 5, directory, process, pretty, haskell98, filepath, Cabal
+  if !os(windows)
+      Build-Depends: unix
+

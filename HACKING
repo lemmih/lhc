@@ -1,0 +1,73 @@
+These are general notes for hacking on LHC so we can try and keep the
+code clean and maintainable as possible. Please expand on this as time
+goes on.
+
+=============================
+=== Coding conventions
+=============================
+
+TODO
+
+=============================
+=== Testing your changes
+=============================
+
+Before you submit any patches to LHC, it's important to make sure your
+changes don't break anything for anyone else. To help with this, we
+have a handy little program that mimics GHC's 'validate' script, to
+ensure your patch passes all tests before you may want to submit it.
+
+After making your changes, in order to run the test suite, do this in
+the following order (from the top-level lhc source directory):
+
+  $ cabal install -flhc-regress -fwith-libs -- installs your working copy of lhc
+  $ lhc-regress
+
+It's important you have installed your working copy
+of LHC before you run lhc-regress -- it checks both quickcheck properties
+(which are linked directly to the source code,) and hunit properties
+which just run the 'lhc' executable over the test files. Because of
+this, it's possible to have properties and hunit tests that are out of
+sync. So it's always necessary to make sure your local changes have
+been installed to trust the validity of the test suite.
+
+=============================
+=== Adding new tests
+=============================
+
+There are two kinds of tests:
+
+  * QuickCheck based compiler properties
+  * A regression suite for the compiler in the form of executable tests
+
+To add QuickCheck tests, simply write some properties into the
+'lhc-regress/Properties.hs' file, using the naming convention:
+
+  prop_TestGroupName_TestName = ...
+
+You must name your test in this manner. Both the test group name and
+test name are mandatory. You can use any part of the compiler you want.
+
+To add a regression test, simply drop a file somewhere under the
+'tests' directory in an appropriate folder (representing the kind of
+regression to test) and add some files describing the expected
+input/output from the test.
+
+TODO: describe the test file format for the regression suite
+
+=============================
+=== Patching other projects
+=============================
+
+We may regularly requires patches to cabal or some other project in
+order to work correctly. If this is the case, please put all your
+patches inside the 'patches' directory under a directory with the
+project's name. E.g. cabal patches should go into './patches/cabal'
+
+The first part of the filename should be a three digit number,
+e.g. '001', and this should be separated with underscores from the
+rest of the file name. These numbers should follow sequentially.
+
+If it is a darcs patch, put it under the extension
+'dpatch'. Otherwise, if it is git/hg/something, you may want to choose
+a different suffix, e.g. 'gpatch' or somesuch.
