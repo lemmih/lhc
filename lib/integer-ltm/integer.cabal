@@ -1,0 +1,22 @@
+name:           integer-gmp
+version:        0.1
+license:        BSD3
+license-file:   LICENSE
+maintainer:     lhc@haskell.org
+synopsis:       Integer library
+cabal-version:  >=1.2
+build-type:     Simple
+
+Library {
+   extensions: CPP, NoImplicitPrelude
+   build-depends: ghc-prim
+   ghc-options: -fglasgow-exts
+
+   Exposed-modules:
+      GHC.Integer
+      GHC.Integer.Ltm
+      GHC.Integer.Type
+
+   Hs-source-dirs: src
+   ghc-options: -package-name integer-gmp
+}
