@@ -1,0 +1,3 @@
+%module integerzmgmp:GHCziIntegerziType
+  %data integerzmgmp:GHCziIntegerziType.Integer =
+    {integerzmgmp:GHCziIntegerziType.Integer ghczmprim:GHCziPrim.Addrzh};

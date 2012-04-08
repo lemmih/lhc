@@ -1,0 +1,135 @@
+%module base:SimpleziIO
+  ar16g :: ghczmprim:GHCziTypes.Int ->
+           (ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld) ->
+           (ghczmprim:GHCziPrim.Z2H
+            ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+            ghczmprim:GHCziTypes.Int) =
+    \ (dsd15N::ghczmprim:GHCziTypes.Int)
+      (etaB1::(ghczmprim:GHCziPrim.Statezh
+               ghczmprim:GHCziPrim.RealWorld)) ->
+        %case ((ghczmprim:GHCziPrim.Z2H
+                ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                ghczmprim:GHCziTypes.Int)) dsd15N
+        %of (ds1d15O::ghczmprim:GHCziTypes.Int)
+          {ghczmprim:GHCziTypes.Izh (ds2d15P::ghczmprim:GHCziPrim.Intzh) ->
+             %case ((ghczmprim:GHCziPrim.Z2H
+                     ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                     ghczmprim:GHCziTypes.Int)) ((%external ccall "putchar"
+                                                  (ghczmprim:GHCziPrim.Intzh ->
+                                                   (ghczmprim:GHCziPrim.Statezh
+                                                    ghczmprim:GHCziPrim.RealWorld)
+                                                   ->
+                                                   (ghczmprim:GHCziPrim.Z2H
+                                                    ((ghczmprim:GHCziPrim.Statezh
+                                                      ghczmprim:GHCziPrim.RealWorld))
+                                                    ghczmprim:GHCziPrim.Intzh)))
+                                                 ds2d15P etaB1)
+             %of (wildXa::(ghczmprim:GHCziPrim.Z2H
+                           ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                           ghczmprim:GHCziPrim.Intzh))
+               {ghczmprim:GHCziPrim.Z2H
+                (ds3d15R::(ghczmprim:GHCziPrim.Statezh
+                           ghczmprim:GHCziPrim.RealWorld))
+                (ds4d15Q::ghczmprim:GHCziPrim.Intzh) ->
+                  ghczmprim:GHCziPrim.Z2H
+                  @ ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                  @ ghczmprim:GHCziTypes.Int ds3d15R
+                  (ghczmprim:GHCziTypes.Izh ds4d15Q)}};
+  base:SimpleziIO.czuputchar :: ghczmprim:GHCziTypes.Int ->
+                                (ghczmprim:GHCziTypes.IO ghczmprim:GHCziTypes.Int) =
+    %cast (ar16g)
+    (ghczmprim:GHCziTypes.Int ->
+     %sym ((ghczmprim:GHCziTypes.NTCoZCIO ghczmprim:GHCziTypes.Int)));
+  base:SimpleziIO.putChar1 :: ghczmprim:GHCziTypes.Char ->
+                              (ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld) ->
+                              (ghczmprim:GHCziPrim.Z2H
+                               ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                               ghczmprim:GHCziTuple.Z0T) =
+    \ (chara15r::ghczmprim:GHCziTypes.Char)
+      (sabM::(ghczmprim:GHCziPrim.Statezh
+              ghczmprim:GHCziPrim.RealWorld)) ->
+        %case ((ghczmprim:GHCziPrim.Z2H
+                ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                ghczmprim:GHCziTuple.Z0T)) chara15r
+        %of (wildX1C::ghczmprim:GHCziTypes.Char)
+          {ghczmprim:GHCziTypes.Czh (czhabl::ghczmprim:GHCziPrim.Charzh) ->
+             %case ((ghczmprim:GHCziPrim.Z2H
+                     ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                     ghczmprim:GHCziTuple.Z0T)) ((%external ccall "putchar"
+                                                  (ghczmprim:GHCziPrim.Intzh ->
+                                                   (ghczmprim:GHCziPrim.Statezh
+                                                    ghczmprim:GHCziPrim.RealWorld)
+                                                   ->
+                                                   (ghczmprim:GHCziPrim.Z2H
+                                                    ((ghczmprim:GHCziPrim.Statezh
+                                                      ghczmprim:GHCziPrim.RealWorld))
+                                                    ghczmprim:GHCziPrim.Intzh)))
+                                                 (ghczmprim:GHCziPrim.ordzh czhabl) sabM)
+             %of (wild1Xa::(ghczmprim:GHCziPrim.Z2H
+                            ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                            ghczmprim:GHCziPrim.Intzh))
+               {ghczmprim:GHCziPrim.Z2H
+                (dsd15R::(ghczmprim:GHCziPrim.Statezh
+                          ghczmprim:GHCziPrim.RealWorld))
+                (ds1d15Q::ghczmprim:GHCziPrim.Intzh) ->
+                  ghczmprim:GHCziPrim.Z2H
+                  @ ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                  @ ghczmprim:GHCziTuple.Z0T dsd15R ghczmprim:GHCziTuple.Z0T}};
+  base:SimpleziIO.putChar :: ghczmprim:GHCziTypes.Char ->
+                             (ghczmprim:GHCziTypes.IO ghczmprim:GHCziTuple.Z0T) =
+    %cast (base:SimpleziIO.putChar1)
+    (ghczmprim:GHCziTypes.Char ->
+     %sym ((ghczmprim:GHCziTypes.NTCoZCIO ghczmprim:GHCziTuple.Z0T)));
+  %rec
+  {base:SimpleziIO.putString1 :: (ghczmprim:GHCziTypes.ZMZN
+                                  ghczmprim:GHCziTypes.Char)
+                                 ->
+                                 (ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld) ->
+                                 (ghczmprim:GHCziPrim.Z2H
+                                  ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                                  ghczmprim:GHCziTuple.Z0T) =
+     \ (dsd15K::(ghczmprim:GHCziTypes.ZMZN ghczmprim:GHCziTypes.Char))
+       (etaB1::(ghczmprim:GHCziPrim.Statezh
+                ghczmprim:GHCziPrim.RealWorld)) ->
+         %case ((ghczmprim:GHCziPrim.Z2H
+                 ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                 ghczmprim:GHCziTuple.Z0T)) dsd15K
+         %of (wildX7::(ghczmprim:GHCziTypes.ZMZN ghczmprim:GHCziTypes.Char))
+           {ghczmprim:GHCziTypes.ZMZN ->
+              ghczmprim:GHCziPrim.Z2H
+              @ ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+              @ ghczmprim:GHCziTuple.Z0T etaB1 ghczmprim:GHCziTuple.Z0T;
+            ghczmprim:GHCziTypes.ZC
+            (xa15p::ghczmprim:GHCziTypes.Char)
+            (xsa15q::(ghczmprim:GHCziTypes.ZMZN ghczmprim:GHCziTypes.Char)) ->
+              %case ((ghczmprim:GHCziPrim.Z2H
+                      ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                      ghczmprim:GHCziTuple.Z0T)) xa15p
+              %of (wild1X1C::ghczmprim:GHCziTypes.Char)
+                {ghczmprim:GHCziTypes.Czh (czhabl::ghczmprim:GHCziPrim.Charzh) ->
+                   %case ((ghczmprim:GHCziPrim.Z2H
+                           ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                           ghczmprim:GHCziTuple.Z0T)) ((%external ccall "putchar"
+                                                        (ghczmprim:GHCziPrim.Intzh ->
+                                                         (ghczmprim:GHCziPrim.Statezh
+                                                          ghczmprim:GHCziPrim.RealWorld)
+                                                         ->
+                                                         (ghczmprim:GHCziPrim.Z2H
+                                                          ((ghczmprim:GHCziPrim.Statezh
+                                                            ghczmprim:GHCziPrim.RealWorld))
+                                                          ghczmprim:GHCziPrim.Intzh)))
+                                                       (ghczmprim:GHCziPrim.ordzh czhabl) etaB1)
+                   %of (wild2Xa::(ghczmprim:GHCziPrim.Z2H
+                                  ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+                                  ghczmprim:GHCziPrim.Intzh))
+                     {ghczmprim:GHCziPrim.Z2H
+                      (ds1d15R::(ghczmprim:GHCziPrim.Statezh
+                                 ghczmprim:GHCziPrim.RealWorld))
+                      (ds2d15Q::ghczmprim:GHCziPrim.Intzh) ->
+                        base:SimpleziIO.putString1 xsa15q ds1d15R}}}};
+  base:SimpleziIO.putString :: (ghczmprim:GHCziTypes.ZMZN
+                                ghczmprim:GHCziTypes.Char)
+                               -> (ghczmprim:GHCziTypes.IO ghczmprim:GHCziTuple.Z0T) =
+    %cast (base:SimpleziIO.putString1)
+    ((ghczmprim:GHCziTypes.ZMZN ghczmprim:GHCziTypes.Char) ->
+     %sym ((ghczmprim:GHCziTypes.NTCoZCIO ghczmprim:GHCziTuple.Z0T)));

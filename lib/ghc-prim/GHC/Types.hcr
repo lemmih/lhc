@@ -1,0 +1,29 @@
+%module ghczmprim:GHCziTypes
+  %data ghczmprim:GHCziTypes.Bool =
+    {ghczmprim:GHCziTypes.False;
+     ghczmprim:GHCziTypes.True};
+  %data ghczmprim:GHCziTypes.Char =
+    {ghczmprim:GHCziTypes.Czh ghczmprim:GHCziPrim.Charzh};
+  %data ghczmprim:GHCziTypes.Double =
+    {ghczmprim:GHCziTypes.Dzh ghczmprim:GHCziPrim.Doublezh};
+  %data ghczmprim:GHCziTypes.Float =
+    {ghczmprim:GHCziTypes.Fzh ghczmprim:GHCziPrim.Floatzh};
+  %data ghczmprim:GHCziTypes.Int =
+    {ghczmprim:GHCziTypes.Izh ghczmprim:GHCziPrim.Intzh};
+  %data ghczmprim:GHCziTypes.ZMZN aaE =
+    {ghczmprim:GHCziTypes.ZMZN;
+     ghczmprim:GHCziTypes.ZC aaE ((ghczmprim:GHCziTypes.ZMZN aaE))};
+  %data ghczmprim:GHCziTypes.Ordering =
+    {ghczmprim:GHCziTypes.LT;
+     ghczmprim:GHCziTypes.EQ;
+     ghczmprim:GHCziTypes.GT};
+  %data ghczmprim:GHCziTypes.z7eU aaB baC =
+    {ghczmprim:GHCziTypes.Eqzh ((ghczmprim:GHCziPrim.z7eUzh
+                                 ghczmprim:GHCziPrim.zt
+                                 aaB
+                                 baC))};
+  %newtype ghczmprim:GHCziTypes.IO ghczmprim:GHCziTypes.NTCoZCIO aaD
+    = (ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld) ->
+      (ghczmprim:GHCziPrim.Z2H
+       ((ghczmprim:GHCziPrim.Statezh ghczmprim:GHCziPrim.RealWorld))
+       aaD);

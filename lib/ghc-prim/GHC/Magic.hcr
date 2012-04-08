@@ -1,0 +1,3 @@
+%module ghczmprim:GHCziMagic
+  ghczmprim:GHCziMagic.inline :: %forall aa69d . aa69d -> aa69d =
+    \ @ aa69g (xa69e::aa69g) -> xa69e;
