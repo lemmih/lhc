@@ -23,6 +23,7 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 
 import Control.Parallel.Strategies
+import Control.DeepSeq
 
 type HeapPointer = Int
 data Lhs = HeapEntry HeapPointer

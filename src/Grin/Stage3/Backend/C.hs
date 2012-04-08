@@ -43,7 +43,7 @@ compile' cfg gccArgs grin target
          ltmFiles <- getCFiles ltmDir
          
          let rtsOptions = ["-I"++rtsDir]
-         let ltmOptions = ["-I"++ltmDir, "-DXMALLOC=GC_malloc", "-DXFREE=GC_free", "-DXREALLOC=GC_realloc"]
+         let ltmOptions = ["-I"++ltmDir, "-DXMALLOC=malloc", "-DXFREE=free", "-DXREALLOC=realloc"]
          let fullOpts = unwords $ ccLine ++ rtsOptions ++ ltmOptions ++ ltmFiles ++ rtsFiles ++ [cTarget]
          
          writeFile cTarget (show $ cCode fullOpts)
@@ -59,7 +59,7 @@ compile' cfg gccArgs grin target
           ccLine = [cCompiler
                    , "-DLHC_GC_BLOCK_SIZE="++show (optGCBlockSize (configOpt cfg))
                    , "-DLHC_GC_GRACE_BUFFER="++show (optSmallNodeSize (configOpt cfg))
-                   , "-w", "-lm", "-I/usr/include/gc/", "-lgc", "-o", target] ++ gccArgs
+                   , "-w", "-lm", "-o", target] ++ gccArgs
           cCompiler = configUseCc cfg
 
 

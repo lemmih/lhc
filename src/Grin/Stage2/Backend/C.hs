@@ -39,7 +39,7 @@ compile' gccArgs cCompiler grin target
          ltmFiles <- getCFiles ltmDir
          
          let rtsOptions = ["-I"++rtsDir]
-         let ltmOptions = ["-I"++ltmDir, "-DXMALLOC=GC_malloc", "-DXFREE=GC_free", "-DXREALLOC=GC_realloc"]
+         let ltmOptions = ["-I"++ltmDir, "-DXMALLOC=malloc", "-DXFREE=free", "-DXREALLOC=realloc"]
          let fullOpts = unwords $ ccLine ++ rtsOptions ++ ltmOptions ++ ltmFiles ++ rtsFiles ++ [cTarget]
          
          writeFile cTarget (show $ cCode fullOpts)
@@ -52,7 +52,7 @@ compile' gccArgs cCompiler grin target
                    exitWith ret
     where getCFiles dir = (map (dir </>) . filter (\f -> takeExtension f == ".c")) `liftM` (getDirectoryContents dir)
           cCode = grinToC grin
-          ccLine = [cCompiler, "-w", "-lm", "-I/usr/include/gc/", "-lgc", "-o", target] ++ gccArgs
+          ccLine = [cCompiler, "-w", "-lm", "-o", target] ++ gccArgs
 
 
 

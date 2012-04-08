@@ -53,8 +53,10 @@ compileHsToCoreFiles buildingLib noLink compileOpts depgenOpts sourceFiles
          -- putStrLn $ "running '" ++ compileCmd ++ "'"
          exitCode <- system compileCmd
          unless (exitCode == ExitSuccess) $ exitWith exitCode
+         
+         let noSourceFiles = not (any ((`elem` [".hs",".lhs"]) . takeExtension) sourceFiles)
 
-         if (noLink || buildingLib) then  -- only generate the makefile if we're building an executable
+         if (noLink || buildingLib || noSourceFiles) then  -- only generate the makefile if we're building an executable
              return []
           else do
              -- generate the makefile

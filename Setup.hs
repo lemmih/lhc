@@ -51,7 +51,7 @@ main = defaultMainWithHooks simpleUserHooks { postInst = myPostInst }
               extragccopts = ghcLibdir </> "extra-gcc-opts"
           putStr "Copying unlit and extra-gcc-opts..."
           system $ "cp "++unlit++" "++(udir </> "unlit")
-          system $ "cp "++extragccopts++" "++(udir </> "extra-gcc-opts")
+          --system $ "cp "++extragccopts++" "++(udir </> "extra-gcc-opts")
           putStrLn "Done"
           -- build libraries if -fwith-libs is passed
           when (withLibs customF) $ do

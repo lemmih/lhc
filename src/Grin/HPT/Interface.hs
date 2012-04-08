@@ -26,9 +26,15 @@ import Grin.Stage2.Pretty (ppNodeType)
 import Text.PrettyPrint.ANSI.Leijen
 
 import Control.Parallel.Strategies
+import Control.DeepSeq
 
-import qualified Data.HashMap as HT
+import qualified Data.HashMap.Strict as HT
 import qualified Data.Hashable as HT
+
+findWithDefault def key m
+  = case HT.lookup key m of
+      Nothing  -> def
+      Just val -> val
 
 type IsShared = Bool
 
@@ -140,8 +146,6 @@ instance Show HeapAnalysis where
 instance NFData HeapAnalysis where
     rnf hpt = rnf (hptBindings hpt) `seq` rnf (hptSharingMap hpt)
 
-instance (NFData key, NFData value) => NFData (HT.HashMap key value) where
-    rnf hmap = rnf (HT.toList hmap)
 
 mkHeapAnalysis :: Map.Map Lhs Rhs -> Map.Map Lhs IsShared -> HeapAnalysis
 mkHeapAnalysis binds smap
@@ -151,7 +155,7 @@ mkHeapAnalysis binds smap
 
 lookupLhs :: Lhs -> HeapAnalysis -> Rhs
 lookupLhs lhs hpt
-    = HT.findWithDefault Empty lhs (hptBindings hpt)
+    = findWithDefault Empty lhs (hptBindings hpt)
 
 
 rhsSize :: Rhs -> Int
@@ -170,7 +174,7 @@ rhsSize Heap{} = 1
 lookupHeap :: Renamed -> HeapAnalysis -> Rhs
 lookupHeap var hpt
     = case HT.lookup (VarEntry var) (hptBindings hpt) of
-        Just (Heap hp) -> mconcat [ HT.findWithDefault (errMsg pointer) (HeapEntry pointer) (hptBindings hpt) | pointer <- Set.toList hp ]
+        Just (Heap hp) -> mconcat [ findWithDefault (errMsg pointer) (HeapEntry pointer) (hptBindings hpt) | pointer <- Set.toList hp ]
         Just Empty     -> Empty
         Just rhs       -> error $ "Grin.HPT.Interface.lookupHeap: Invalid rhs: " ++ show (var, rhs)
         Nothing        -> error $ "Grin.HPT.Interface.lookupHeap: Couldn't find lhs: " ++ show var

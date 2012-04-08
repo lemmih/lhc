@@ -26,7 +26,7 @@ import qualified Data.Set as Set
 data TState = TState { stateGrin :: !Grin }
 
 newtype Transform a = Transform { unTransform :: State TState a }
-    deriving (Monad, MonadState TState)
+    deriving (Monad, MonadState TState, Functor)
 
 
 newVariable :: MonadState TState m => m Renamed

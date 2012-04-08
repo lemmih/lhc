@@ -7,8 +7,10 @@
 #include <string.h>
 #include <math.h>
 #include <errno.h>
-#include <gc.h>
+//#include <gc.h>
 #include <float.h>
+
+#define GC_MALLOC malloc
 
 /* TODO (austin s): maybe one day we'll be portable */
 #include <sys/types.h>

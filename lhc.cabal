@@ -111,11 +111,12 @@ Executable lhc
  main-is:            Main.hs
  Hs-Source-Dirs:     src
  ghc-prof-options:   -auto-all
- build-depends:      base == 4.*, mtl == 1.1.*, bytestring == 0.9.*, containers == 0.3.*, ansi-wl-pprint == 0.5.*, 
-                     binary == 0.5.*, digest == 0.0.0.8, bytestring-trie == 0.2.*, core == 0.5.*, 
-                     filepath == 1.1.*, directory == 1.0.*, derive == 2.3.0, unix == 2.4.*,
-                     xhtml == 3000.2.*, pretty == 1.0.*, time == 1.2.*, parallel == 2.2.*, process == 1.0.*,
-                     split == 0.1.2, GraphSCC == 1.0.*, hashmap == 1.0.*
+ build-depends:      base == 4.*, mtl, bytestring, containers, ansi-wl-pprint, 
+                     binary, digest, bytestring-trie, core == 0.6.*, 
+                     filepath, directory, derive, unix,
+                     xhtml, pretty, time , parallel, process,
+                     split, GraphSCC, unordered-containers, hashable,
+                     deepseq
 
  other-modules:      Paths_lhc, GhcDriver, CompactString, Traverse,
                      Grin.Eval.Compile, Grin.Eval.Methods, Grin.Eval.Primitives,
@@ -152,10 +153,6 @@ Executable lhc
   ghc-options:       -fhpc -hisuf hpc_hi -osuf hpc_o
  if flag(threaded)
   ghc-options:       -threaded
- if impl(ghc == 6.12.*) && arch(x86_64)
-  buildable:         True
- else
-  buildable:         False
 
 Executable lhc-regress
   if flag(lhc-regress) && impl(ghc == 6.12.*) && arch(x86_64)
@@ -165,11 +162,12 @@ Executable lhc-regress
   main-is:          Main.hs
   other-modules:    UnitTests, Properties, THUtil
   hs-source-dirs:   lhc-regress/ src/
-  build-depends:    base >= 4 && < 5, process, extensible-exceptions, HUnit, QuickCheck, test-framework,
-                    test-framework-hunit, test-framework-quickcheck2, template-haskell, haskell-src-exts == 1.6.*
+  build-depends:    base >= 4 && < 5, process, extensible-exceptions
+-- HUnit, QuickCheck, test-framework,
+--                    test-framework-hunit, test-framework-quickcheck2, template-haskell, haskell-src-exts == 1.6.*
 
 Executable lhc-pkg
-  if flag(lhc-pkg) && impl(ghc == 6.12.*) && arch(x86_64)
+  if flag(lhc-pkg) && impl(ghc == 7.4.*) && arch(x86_64)
     Buildable:      True
   else
     Buildable:      False
@@ -177,7 +175,7 @@ Executable lhc-pkg
   main-is: Main.hs
   Other-modules: Paths_lhc
 
-  Build-Depends: base >= 4 && < 5, directory, process, pretty, haskell98, filepath, Cabal
+  Build-Depends: base >= 4 && < 5, directory, process, pretty, filepath, Cabal
   if !os(windows)
       Build-Depends: unix
 

@@ -16,15 +16,15 @@ int main(int argc, char **argv) {
   sanity_check();
   init_stack();
   init_args(argc, argv);
-  GC_init();
+  //GC_init();
 
   __hs_xmain(); /* compiler generated code */
 
-  if (showGCInfo) {
+  /*if (showGCInfo) {
     fprintf(stderr, "Collections:       %d\n", GC_gc_no);
     fprintf(stderr, "Total allocations: %lu\n", GC_get_total_bytes());
     fprintf(stderr, "Heap size:         %ld\n", GC_get_heap_size());
-  }
+    }*/
 
   return 0;
 }

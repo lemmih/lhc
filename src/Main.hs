@@ -19,7 +19,7 @@ import Grin.SimpleCore
 import Grin.FromCore
 import Grin.Pretty
 import qualified Grin.SimpleCore.DeadCode as Simple
-import qualified Grin.SimpleCore.Specialize as Spec
+--import qualified Grin.SimpleCore.Specialize as Spec
 import qualified Grin.Optimize.Simple as Simple
 --import qualified Grin.Optimize.Case as Case
 --import qualified Grin.DeadCode as DeadCode
@@ -30,7 +30,7 @@ import qualified Grin.Optimize.CallPattern as CallPattern
 
 --import Grin.Rename
 import qualified Grin.HPT as HPT
-import qualified Grin.HPT.GraphSolve as SCC
+--import qualified Grin.HPT.GraphSolve as SCC
 import qualified Grin.Lowering.Apply as Apply
 
 import qualified Grin.Stage2.FromStage1 as Stage2
@@ -64,14 +64,17 @@ import Setup     ( getMode )
 
 
 
-defGhcCompileOpts = ["--make", "-c", "-fext-core", "-O"]
+defGhcCompileOpts = ["-no-link", "-fext-core", "-O"]
 
 -- Below are language options for Haskell 2010
+defGhcLangOpts    = ["-XHaskell2010"]
+{-
 defGhcLangOpts    = map ("-X"++) [ "PatternGuards"
                                  , "EmptyDataDecls"
                                  , "ForeignFunctionInterface"
                                  , "NoMonomorphismRestriction"
                                  , "NoNPlusKPatterns"]
+-}
 
 main :: IO ()
 main = do let numeric_ver = Version.showVersion version
@@ -142,7 +145,7 @@ build cfg files@(file:_)
                           foldr (\mod -> Map.insert (modulePackage mod, moduleName mod) mod) libs mods
                           -- libs
              (newTypes', tdefs', enums', defs') = Simple.removeDeadCode [("main","Main")]  ["main::Main.main"] allModules
-             (tdefs, enums, defs) = {-(tdefs',enums',defs') -}Spec.superSpecialize "main::Main.main" newTypes' tdefs' enums' defs'
+             (tdefs, enums, defs) = (tdefs',enums',defs')  --Spec.superSpecialize "main::Main.main" newTypes' tdefs' enums' defs'
              grin = coreToGrin tdefs enums defs
          let target = replaceExtension file "lhc"
 
@@ -162,8 +165,8 @@ build cfg files@(file:_)
              (evalLowered, hpt') = HPT.lower (configOpt cfg) hpt applyLowered
          timeIt "Lowering apply primitives" $ do let !lowered = applyLowered
                                                  when keepTmpFiles $ outputGrin target "_apply" lowered
-         timeIt "Strongly connected equations" $ do let scc = SCC.formatSCC (SCC.sccEquations hptEnv)
-                                                    writeFile (replaceExtension target "scc") scc
+         --timeIt "Strongly connected equations" $ do let scc = SCC.formatSCC (SCC.sccEquations hptEnv)
+         --                                           writeFile (replaceExtension target "scc") scc
          writeFile (replaceExtension target "eqs") (HPT.showEquations hptEnv)
          timeIt "Heap points-to analysis" $ do forM_ iterations $ \_ -> do putStr "."; hFlush stdout
                                                let !lowered = evalLowered
