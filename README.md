@@ -12,3 +12,22 @@ Planned pipeline:
  - LLVM.
 
 
+Features:
+
+Wish list:
+
+- Haskell2010.
+- Event driven IO manager.
+- Green threads.
+- Shared-nothing multitasking.
+- GADTs.
+- TemplateHaskell.
+- MultiParamTypeClasses.
+- TypeFamilies.
+- OverloadedStrings.
+- Generational garbage collection.
+- Immix GC.
+- Exceptions.
+- Superoptimization.
+
+
