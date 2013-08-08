@@ -1,33 +1,59 @@
-The Luxurious Haskell Compiler.
+# The Luxurious Haskell Compiler.
 
-Mission statement: Build a Haskell compiler using components published on hackage.
+LHC is an optimizing Haskell compiler.
 
-Planned pipeline:
+## Features.
 
- - Haskell-src-exts. (on github.)
- - Haskell-names. (on gibhub.)
- - Haskell-types. (not yet written.)
- - Haskell-supero. (not yet written.)
- - Grin. (not yet written.)
- - LLVM.
+TBD.
 
+## Wish list.
 
-Features:
+The wish list is ordered by priority.
 
-Wish list:
-
-- Haskell2010.
-- Event driven IO manager.
+- Single-threaded event driven IO manager.
 - Green threads.
+- Exceptions.
+- Generational garbage collection.
 - Shared-nothing multitasking.
+- Haskell2010.
 - GADTs.
 - TemplateHaskell.
 - MultiParamTypeClasses.
 - TypeFamilies.
 - OverloadedStrings.
-- Generational garbage collection.
-- Immix GC.
-- Exceptions.
 - Superoptimization.
+- User-friendly type-checking.
+- Whole-program optimization.
+- Immix GC.
 
+## Implementation overview.
 
+### Cabal integration and package management.
+
+LHC uses haskell-packages (part of the Haskell Suite) to seemlessly integrate with Cabal.
+
+### Exceptions.
+
+For reasons of simplicity, exception handling is not implemented through stack inspection. Rather, exceptional values are passed through the call stack like regular values. The overhead of checking for exceptional values after each function call should be minimal since returned values are not placed on the heap.
+
+### IO Manager.
+
+IO and concurrency primitives (forkIO, MVar, etc) are implemented via libuv. 
+
+### Shared-nothing asynchronous mesage passing.
+
+TBD.
+
+### Garbage collection.
+
+TBD.
+
+## Implementation details.
+
+### Throwing exceptions to threads.
+
+TBD.
+
+### IO Monad.
+
+TBD.

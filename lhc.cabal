@@ -4,18 +4,20 @@ version:             0.11
 synopsis:            The Luxurious LHC Optimization System
 description:
   LHC rewrite number 3.
-Tested-With:         GHC == 6.12.3, GHC == 6.12.2, GHC == 6.12.1
 category:            Compiler
 license:             PublicDomain
 author:              David Himmelstrup, Austin Seipp
-maintainer:          lhc@projects.haskell.org
-homepage:            http://lhc.seize.it/
+maintainer:          https://github.com/Lemmih/lhc/issues
+homepage:            https://github.com/Lemmih/lhc
 build-type:          Custom
 cabal-version:	     >= 1.6
 extra-source-files:
 
 data-files:
 
+Source-repository head
+  type:          git
+  location:      https://github.com/Lemmih/lhc.git
 
 flag hpc
   default:            False
