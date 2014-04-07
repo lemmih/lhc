@@ -1,0 +1,15 @@
+Inefficiencies in GHC:
+  Short-lived objects that could be placed on the stack.
+  No stepping in the GC.
+
+Interesting avenues to explore:
+  Immix.
+  Supercompilation.
+  Eager evaluation.
+
+Shared nothing concurrency.
+  Allocate a fixed number of isolated heaps per core.
+  Round-robin allocation of new actors in each core/heap pair.
+
+
+Stepping in generational garbage collectors:
