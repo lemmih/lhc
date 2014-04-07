@@ -1,0 +1,4 @@
+main =
+	ptr := @store (HelloWorld);
+	@print ptr;
+	@exit

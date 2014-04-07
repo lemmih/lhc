@@ -1,0 +1,69 @@
+getHead ptr =
+	list := @fetch ptr;
+	case list of
+		  Nil ->
+		  	@alloc 2;
+			e := @store (Error 1);
+			@throw e
+	  	| Cons head tail ->
+			@unit head
+
+getHeadCps ptr exh cont =
+	list := @fetch ptr;
+	case list of
+		  Nil ->
+		  	@alloc 2;
+		  	e := @store (Error 1);
+			@tail apply exh, e
+	  	| Cons head tail ->
+			@tail apply cont, head
+
+storeLength exh cont = 
+	@alloc 3;
+	p := @store (lengthCps);
+	@tail apply cont, Just p
+
+length listPtr =
+	list := @fetch listPtr;
+	case list of
+		Nil ->
+			@unit 0
+		| Cons head tail ->
+			v := length tail;
+			l := @add v 1;
+			@unit l
+
+lengthCps listPtr cont =
+	list := @fetch listPtr;
+	case list of
+		Nil ->
+			@tail apply cont, 0
+		| Cons head tail ->
+			@alloc 2;
+			newCont := @store (lengthCps cont);
+			@tail lengthCps tail, newCont
+
+lengthCps cont n =
+	l := @add v 1;
+	@tail apply cont, l
+
+apply partial arg =
+	fn := @fetch partial;
+	case fn of
+		lengthCps cont _ ->
+			@tail lengthCps cont, arg
+		| printResult _ ->
+			@tail printResult arg
+
+throw e cont =
+	case cont of
+		lengthCps cont2 _ ->
+			@tail throw e, cont2
+		| ExceptionHandler handler cont ->
+			@tail handler e,cont
+
+withExceptionHandler cont handler partial =
+	exh := @store (ExceptionHandler handler, cont);
+	@tail apply partial, exh
+
+

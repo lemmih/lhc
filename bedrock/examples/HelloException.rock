@@ -1,0 +1,22 @@
+main =
+    value, n := @withExceptionHandler exceptionHandler() throwException( (False) );
+    @print value;
+    @print n;
+	
+    value, n := @withExceptionHandler exceptionHandler() throwException( (True) );
+    @print value;
+    @print n;
+
+    @return()
+
+exceptionHandler exception =
+    @return (exception, 1)
+
+throwException input =
+	case input of
+		True ->
+			@throw (Exception)
+		| False ->
+			@return( (NoException), 0 )
+
+
