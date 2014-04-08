@@ -1,5 +1,6 @@
 Inefficiencies in GHC:
-  Short-lived objects that could be placed on the stack.
+  Objects are placed on the heap instead of the stack.
+  Each green thread has its own stack.
   No stepping in the GC.
 
 Interesting avenues to explore:
@@ -11,5 +12,75 @@ Shared nothing concurrency.
   Allocate a fixed number of isolated heaps per core.
   Round-robin allocation of new actors in each core/heap pair.
 
+Things to benchmark:
+  How much does it cost to limit the mutator with a fuel argument?
+  How does immix compare to an ordinary copying collector?
 
 Stepping in generational garbage collectors:
+  Problem: Not all objects in a generation will be given the same amount of
+  time to expire. If we promoted (moved to the next generation) all live
+  objects on each GC run then objects recently allocated would be promoted
+  too early.
+
+  Solution 1: Block-wise promotion.
+  Say our generation contains 10 numbered blocks. Now, when collecting, we can
+  selectively promote only those objects where were allocated in the first
+  five blocks. All other objects will be placed back into the current
+  generation, to be promoted in the next GC run.
+  GHC uses this solution.
+
+  Solution 2: Per-object stepping counter.
+  Each object notes down how many times it has survived a collection. Once it
+  has survived enough, it'll be promoted.
+
+Targeting LLVM for a functional language:
+  We need low-overhead allocation, tail calls, accurate GC, green threads, and
+  exception handling. LLVM tries to provide support for garbage collection and
+  exceptions but it falls woefully short of anything useful. Instead, LHC
+  solves all five issues by allocating stack frame on the heap and managing
+  them manually.
+  
+  Low-overhead allocation. Allocation is usually done by bumping a pointer
+  until it reaches some limit. Keeping this heap pointer and the heap limit
+  in registers has been shown to be significant for performance. Global
+  variables /can/ be used but nether GCC nor LLVM will try very hard at
+  keeping them in registers. A better approach is to pass them along as
+  arguments to all Haskell functions.
+  
+  Tail calls. Manually managing the stack passes the burden of doing
+  tail-call optimization on to our compiler. Fortunately, this is a trivial
+  burden and we're glad to take on the responsibility.
+  
+  Accurate GC. Finding all root pointers requires knowledge of the stack
+  layout. Even with knowledge of the stack layout, most compilers require
+  the stack to only contain pointers and not entire objects. In LHC, since
+  the stack is completely exposed, we can be much more aggressive about placing
+  objects on the stack. However, since stack frames are allocated on the heap,
+  the advantages are not huge. At the very least we'll minimize the number of
+  small allocations by grouping them together in the stack frame. And in a few
+  cases, notably when a function will neither throw exceptions nor call the
+  scheduler, we are able to allocate the stack frame on the system stack. LLVM
+  can then do register allocation freely.
+
+  Green threads. Green threads are suspended functions that are scheduled by
+  the RTS (usually written in user-space), not the OS. Suspending and resuming
+  is trivial when we're managing the stack manually. Additionally, green
+  threads go hand-in-hand with event driven IO.
+
+  Exception handling. Like green threads, exception handling is trivial with
+  an explicit stack. Just unroll the frames until an exception handling frame
+  is found.
+
+
+  I believe the move away from a linear stack is the principled and correct
+  approach for LHC. A linear stack is problematic for garbage collection and
+  exception handling, and downright wrong for green threads (having 1,000,000
+  stacks for 1,000,000 suspended functions is a drag on performance, especially
+  since the stacks are only used during execution and only a few of the
+  threads are ever executed at once). Having one stack per execution core and
+  the context of a suspended function as a linked list seems more appropriate.
+  Moving allocations from the heap onto the system stack is then an
+  optimization like any other.
+
+
+
