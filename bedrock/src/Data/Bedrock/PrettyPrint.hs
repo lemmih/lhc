@@ -16,20 +16,24 @@ ppName name =
 		else text (nameIdentifier name) <> char '^' <> int (nameUnique name)
 
 ppType :: Type -> Doc
-ppType NodePtr   = text ""
-ppType RawNode   = Doc.char ':' <> ppSyntax "node"
-ppType Primitive = Doc.char ':' <> ppSyntax "prim"
+ppType NodePtr   = Doc.char '*'
+ppType Node      = Doc.char '%'
+ppType Primitive = Doc.char '#'
+
+ppNodeDefinition :: NodeDefinition -> Doc
+ppNodeDefinition (NodeDefinition name args) =
+	text "node" <+> ppNode (ConstructorName name) (map ppType args)
 
 ppVariable :: Variable -> Doc
 ppVariable Variable{ variableName = name, variableType = ty } =
-	ppName name <> ppType ty
+	ppType ty <> ppName name
 
 ppArgument :: Argument -> Doc
 ppArgument arg =
 	case arg of
 		RefArg name       -> ppVariable name
 		LitArg lit        -> ppLiteral lit
-		NodeArg name args -> Doc.parens (ppNode name (map ppArgument args))
+		NodeArg name args -> Doc.parens (ppNode name (map ppVariable args))
 
 ppLiteral :: Literal -> Doc
 ppLiteral literal =
@@ -38,9 +42,9 @@ ppLiteral literal =
 
 ppNode :: NodeName -> [Doc] -> Doc
 ppNode (ConstructorName constructor) args =
-	Doc.hsep (ppName constructor : args)
+	Doc.hsep (Doc.magenta (ppName constructor) : args)
 ppNode (FunctionName fn blanks) args =
-	Doc.hsep (ppName fn : args ++ replicate blanks (Doc.char '_'))
+	Doc.hsep (Doc.magenta (ppName fn) : args ++ replicate blanks (Doc.char '_'))
 
 ppPattern :: Pattern -> Doc
 ppPattern pattern =
@@ -63,26 +67,40 @@ ppSimpleExpression simple =
 			ppSyntax "@alloc" <+> Doc.int n
 		Store node args ->
 			ppSyntax "@store" <+>
-			Doc.parens (ppNode node (map ppArgument args))
+			Doc.parens (ppNode node (map ppVariable args))
+		SizeOf node args ->
+			ppSyntax "@sizeOf" <+>
+			Doc.parens (ppNode node (map ppVariable args))
 		Fetch ptr ->
 			ppSyntax "@fetch" <+> ppVariable ptr
 		Print var ->
 			ppSyntax "@print" <+> ppVariable var
 		Add lhs rhs ->
-			ppSyntax "@add" <+> ppArgument lhs <+> ppArgument rhs
+			ppSyntax "@add" <+> ppVariable lhs <+> ppVariable rhs
 		Application fn args ->
-			ppName fn <> Doc.parens (ppList $ map ppArgument args)
+			ppName fn <> Doc.parens (ppList $ map ppVariable args)
 		WithExceptionHandler exh exhArgs fn args ->
 			ppSyntax "@withExceptionHandler" <+>
-			ppName exh <> Doc.parens (ppList $ map ppArgument exhArgs) <+>
-			ppName fn <> Doc.parens (ppList $ map ppArgument args)
+			ppName exh <> Doc.parens (ppList $ map ppVariable exhArgs) <+>
+			ppName fn <> Doc.parens (ppList $ map ppVariable args)
+		Unit args ->
+			ppSyntax "@unit" <> Doc.parens (ppList $ map ppArgument args)
+
+		GCAllocate n ->
+			ppSyntax "@gc_allocate" <+> Doc.int n
+		GCBegin ->
+			ppSyntax "@gc_begin"
+		GCEnd ->
+			ppSyntax "@gc_end"
+		GCMark var ->
+			ppSyntax "@gc_mark" <+> ppVariable var
 
 ppExpression :: Expression -> Doc
 ppExpression expression =
 	case expression of
 		Return args ->
 			ppSyntax "@return" <+>
-			ppList (map ppArgument args)
+			ppList (map ppVariable args)
 		Bind [] simple rest ->
 			ppSimpleExpression simple <> Doc.char ';' Doc.<$$>
 			ppExpression rest
@@ -91,19 +109,21 @@ ppExpression expression =
 			text ":=" <+>
 			ppSimpleExpression simple <> Doc.char ';' Doc.<$$>
 			ppExpression rest
-		Case scrut alts _defaultBranch ->
+		Case scrut _defaultBranch alts ->
 			ppSyntax "case" <+> ppVariable scrut <+> ppSyntax "of" Doc.<$$>
 			Doc.indent 2 (Doc.vsep $ map ppAlternative alts)
 		Throw obj ->
-			ppSyntax "@throw" <+> ppArgument obj
+			ppSyntax "@throw" <+> ppVariable obj
 		TailCall fn args ->
 			ppSyntax "@tail" <+>
-			ppName fn <> Doc.parens (ppList (map ppArgument args))
+			ppName fn <> Doc.parens (ppList (map ppVariable args))
 		Invoke cont args ->
 			ppSyntax "@invoke" <>
-			Doc.parens (ppList (ppVariable cont : map ppArgument args))
+			Doc.parens (ppList (ppVariable cont : map ppVariable args))
 		Exit ->
 			ppSyntax "@exit"
+		Panic msg ->
+			ppSyntax "@panic" <+> text (show msg)
 
 ppSyntax :: String -> Doc
 ppSyntax = Doc.green . text
@@ -118,6 +138,8 @@ ppFunction fn =
 	Doc.indent 2 (ppExpression (fnBody fn))
 
 ppModule :: Module -> Doc
-ppModule m = Doc.vsep (map ppFunction (functions m))
+ppModule m =
+	Doc.vsep (map ppNodeDefinition (nodes m)) Doc.<$$>
+	Doc.vsep (map ppFunction (functions m))
 
 

@@ -10,8 +10,11 @@ import Data.List
 
 import           Data.Bedrock
 import           Data.Bedrock.Exceptions
+import           Data.Bedrock.Storage
 import           Data.Bedrock.Parse
 import           Data.Bedrock.PrettyPrint
+import           Data.Bedrock.Invoke
+import           Data.Bedrock.Transform ( runGens )
 
 type HeapPtr = Int
 data Value
@@ -64,7 +67,7 @@ evaluateFromFile path entryPoint = do
     case ret of
         Left err -> print err
         Right m  -> do
-            let m' = runGen m $ cpsTransformation m
+            let m' = runGens m [cpsTransformation, lowerAlloc, mkInvoke]
             print (ppModule m')
             evaluate m' entryPoint
 
@@ -90,7 +93,7 @@ evalFunction name args = do
 evalExpression :: Expression -> Eval [Value]
 evalExpression expression =
     case expression of
-        Case scrut alternatives _defaultBranch -> do
+        Case scrut _defaultBranch alternatives -> do
             value <- queryScope scrut
             evalAlternative value alternatives
         Bind binds simple rest -> do
@@ -99,15 +102,18 @@ evalExpression expression =
             local (Map.union newScope) $
                 evalExpression rest
         TailCall fn args ->
-            evalFunction fn =<< mapM evalArgument args
+            evalFunction fn =<< mapM queryScope args
         Exit ->
             return []
-        Invoke cont args ->
-            evalApply cont args
+        --Invoke cont args ->
+        --    evalApply cont args
+        Return args ->
+            mapM queryScope args
+        Panic msg -> error $ "Panic: " ++ msg
         other -> error $ "Unhandled code: " ++ show other
 
 evalAlternative :: Value -> [Alternative] -> Eval [Value]
-evalAlternative _value [] = error "No matching branches"
+evalAlternative value [] = error $ "No matching branches: " ++ show value
 evalAlternative value (Alternative pattern branch:alts) =
     case (value, pattern) of
         (LitValue lit, LitPat litBranch) | lit == litBranch ->
@@ -122,11 +128,14 @@ evalSimple :: SimpleExpression -> Eval [Value]
 evalSimple simple =
     case simple of
         Literal lit -> return [LitValue lit]
-        --Application fn args -> undefined
+        Application fn args -> do
+            evalFunction fn =<< mapM queryScope args
         Store name args -> do
-            argValues <- mapM evalArgument args
+            argValues <- mapM queryScope args
             ptr <- pushHeapValue (NodeValue name argValues)
             return [HeapPtrValue ptr]
+        SizeOf _name _args ->
+            return [LitValue $ LiteralInt 0]
         Fetch var -> do
             HeapPtrValue ptr <- queryScope var
             value <- fetchHeapValue ptr
@@ -137,6 +146,24 @@ evalSimple simple =
             trace <- traceValue value
             liftIO $ putStrLn trace
             return []
+        Add lhs rhs -> do
+            LitValue (LiteralInt a) <- queryScope lhs
+            LitValue (LiteralInt b) <- queryScope rhs
+            return [LitValue (LiteralInt (a+b))]
+        Unit args -> mapM evalArgument args
+        GCAllocate{} -> return [LitValue (LiteralInt 0)]
+        GCBegin -> do
+            liftIO $ putStrLn "GC_Begin"
+            return []
+        GCEnd -> do
+            liftIO $ putStrLn "GC_End"
+            return []
+        GCMark var -> do
+            value <- queryScope var
+            liftIO $ putStr     "GCMark: "
+            trace <- traceValue value
+            liftIO $ putStrLn trace
+            return [value]
         _ -> error $ "Unhandled expr: " ++ show simple
 
 evalArgument :: Argument -> Eval Value
@@ -144,7 +171,7 @@ evalArgument argument =
     case argument of
         RefArg var -> queryScope var
         LitArg lit -> return (LitValue lit)
-        NodeArg name args -> NodeValue name <$> mapM evalArgument args
+        NodeArg name args -> NodeValue name <$> mapM queryScope args
 
 traceValue :: Value -> Eval String
 traceValue value =
@@ -152,14 +179,14 @@ traceValue value =
         LitValue lit        -> return $ show lit
         NodeValue name args -> do
             args' <- mapM traceValue args
-            return $ show $ ppNode name (map Doc.text args')
+            return $ show $ Doc.parens (ppNode name (map Doc.text args'))
         HeapPtrValue ptr    -> do
             trace <- traceValue =<< fetchHeapValue ptr
-            return $ "Heap (" ++ trace ++ ")"
+            return $ "(Heap^" ++ show ptr ++ " " ++ trace ++ ")"
 
-evalApply :: Variable -> [Argument] -> Eval [Value]
+evalApply :: Variable -> [Variable] -> Eval [Value]
 evalApply continuationVar args = do
-    args' <- mapM evalArgument args
+    args' <- mapM queryScope args
     continuation <- queryScope continuationVar
     activateFunctionFrame continuation args'
 
