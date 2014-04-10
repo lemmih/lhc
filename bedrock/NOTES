@@ -2,6 +2,7 @@ Inefficiencies in GHC:
   Objects are placed on the heap instead of the stack.
   Each green thread has its own stack.
   No stepping in the GC.
+  GCing CAFs.
 
 Interesting avenues to explore:
   Immix.
@@ -11,6 +12,29 @@ Interesting avenues to explore:
 Shared nothing concurrency.
   Allocate a fixed number of isolated heaps per core.
   Round-robin allocation of new actors in each core/heap pair.
+
+Garbage collection of CAFs.
+
+Constant objects.
+  GHC statically allocates a bag of small objects (ints and chars of small
+  value) because they're very common. Would it be worth it to generalize this
+  technique? 
+
+Garbage collection:
+  Copying collector:
+    Evacuate roots.
+    Scavenge to-space.
+
+  Mark/Sweep:
+    How is marking done without blowing the stack? It isn't. :(
+    The mark queue could be allocated on the heap. The smallest chain link
+    take up 2 words. Since the mark queue needs roughly 1 word per chain link,
+    we'd need to reserve 1/3 of the heap for marking.
+    By marking tail-recursively we can queue one child fewer. Thus making the
+    smallest chain link take up 3 words. Reserved space would then be 1/4 of
+    heap. If we use another 1/4 to allow for compaction then only half the
+    heap is available to the mutator before a GC is triggered.
+
 
 Things to benchmark:
   How much does it cost to limit the mutator with a fuel argument?
