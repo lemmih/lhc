@@ -1,0 +1,53 @@
+node Nothing
+node Just *
+node True
+node False
+node Int #
+
+main =
+    %tmp1 := @unit( (True) );
+    %v1 := nothingOrJust( %tmp1 );
+    @print %v1;
+
+    %tmp2 := @unit( (True) );
+    %v2 := nothingOrJust( %tmp2 );
+    @print %v2;
+
+    %s := sum( %v1, %v2 );
+    @print %s;
+
+    @exit
+
+nothingOrJust %boolean =
+    case %boolean of
+        True ->
+            @alloc 2;
+            #tmp3 := @unit( 0 );
+            *heapObj := @store (Int #tmp3);
+            %tmp4 := @unit( (Just *heapObj) );
+            @return( %tmp4 )
+        | False ->
+            %tmp5 := @unit( (Nothing) );
+            @return( %tmp5 )
+
+sum %mbA %mbB =
+    %nothing := @unit( (Nothing) );
+    case %mbA of
+        Nothing ->
+            @return( %nothing )
+        | Just *ptrA ->
+            case %mbB of
+                Nothing ->
+                    @return( %nothing )
+                | Just *ptrB ->
+                    %nodeA := @fetch *ptrA;
+                    %nodeB := @fetch *ptrB;
+                    case %nodeA of
+                        Int #lhs ->
+                            case %nodeB of
+                                Int #rhs ->
+                                    #s := @add #lhs #rhs;
+                                    @alloc 2;
+                                    *hp := @store (Int #s);
+                                    %ret := @unit( (Just *hp) );
+                                    @return( %ret )
