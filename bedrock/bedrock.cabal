@@ -17,9 +17,14 @@ cabal-version:       >=1.8
 library
   Hs-source-dirs:      src
   exposed-modules:     Data.Bedrock,
+                       Data.Bedrock.Parse,
+                       Data.Bedrock.PrettyPrint, 
                        Data.Bedrock.Exceptions,
+                       Data.Bedrock.Evaluate,
+                       Data.Bedrock.Invoke,
                        Data.Bedrock.TypeCheck,
-                       Data.Bedrock.Evaluate
+                       Data.Bedrock.HPT,
+                       Data.Bedrock.Storage
   -- other-modules:       
   build-depends:       base ==4.6.*, ansi-wl-pprint,
-                       parsec, containers, mtl
+                       parsec, containers, mtl, vector
