@@ -1,9 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MagicHash                  #-}
-{-# LANGUAGE PatternGuards              #-}
+{-# LANGUAGE Haskell2010                #-}
 module Data.Bedrock.HPT where
 
-import           Control.Applicative
+import           Control.Applicative ( (<$>) )
 import           Data.IntMap         (IntMap)
 import qualified Data.IntMap         as IntMap
 import           Data.IntSet         (IntSet)
@@ -16,40 +15,12 @@ import           Control.Monad.RWS.Strict
 import           Data.IORef
 import           Data.Vector         (Vector)
 import qualified Data.Vector         as Vector
-
+import  Data.Vector.Mutable ( MVector )
+import qualified Data.Vector.Mutable as MVector
+import qualified Data.Vector.Unboxed.Mutable as MUVector
 import           Data.Bedrock
 
 
-import           GHC.Exts
-
-class QuickEq a where
-    quickEq :: a -> a -> Bool
-
-instance (QuickEq a, QuickEq b) => QuickEq (a,b) where
-    quickEq (la,lb) (ra,rb) = quickEq la ra && quickEq lb rb
-
-instance QuickEq a => QuickEq [a] where
-    quickEq [] [] = True
-    quickEq (l:ls) (r:rs) = quickEq l r && quickEq ls rs
-    quickEq _ _ = False
-
-instance QuickEq (IntMap a) where
-    quickEq a b =
-        case reallyUnsafePtrEquality# a b of
-            0# -> False
-            _# -> True
-
-instance QuickEq (Map a b) where
-    quickEq a b =
-        case reallyUnsafePtrEquality# a b of
-            0# -> False
-            _# -> True
-
-instance QuickEq IntSet where
-    quickEq a b =
-        case reallyUnsafePtrEquality# a b of
-            0# -> False
-            _# -> True
 
 {- Steps:
 1. construct initial sharing map for variables.
@@ -65,20 +36,22 @@ sum [] = 0
 sum (x:xs) = x + sum xs
 -}
 
-data World = World
-    { worldFnArgs              :: !FnArgs
-    , worldFnRets              :: !FnRets
-    , worldSharedVariables     :: !PtrSharingMap
-    , worldSharedHeapLocations :: !HeapSharingMap
-    , worldNodeScope           :: !NodeScope
-    , worldPtrScope            :: !PtrScope
-    , worldHeap                :: !Heap
-    , worldHeapIndex           :: !HeapPtr -- Next available heap pointer
+data Env = Env
+    { envFnArgs              :: !FnArgs
+    , envFnRets              :: !FnRets
+    , envNodeScope           :: !NodeScope
+    , envPtrScope            :: !PtrScope
+    , envHeap                :: !Heap
+    , envSharedVariables     :: !PtrSharingMap
+    , envSharedHeapLocations :: !HeapSharingMap
     }
-newtype HPT a = HPT { unHPT :: RWST () (Endo (HPT ())) World IO a }
+data World = World
+    { worldHeapIndex           :: !HeapPtr -- Next available heap pointer
+    }
+newtype HPT a = HPT { unHPT :: RWST Env (Endo (HPT ())) World IO a }
     deriving
         ( Functor, Monad, MonadIO, MonadState World
-        , MonadWriter (Endo (HPT ())) )
+        , MonadWriter (Endo (HPT ())), MonadReader Env )
 
 type HeapPtr = Int
 -- Use newtypes?
@@ -93,23 +66,23 @@ type FnRets = IntMap [Variable]
 -- Variables are shared if they're used more than once.
 -- Heap locations are shared if referred to by a shared variable or
 -- if they are updated into a shared heap location.
-type PtrSharingMap = NameSet
+type PtrSharingMap = MVector Bool
 -- Set Name
-type HeapSharingMap = HeapPtrSet
+type HeapSharingMap = MVector Bool
 -- Set HeapPtr
 
 -- XXX: Use HashMap?
 type Objects = Map NodeName (Vector NameSet)
-type PtrScope = IntMap HeapPtrSet
--- Map Name (Set HeapPtr)
-type NodeScope = IntMap Objects
--- Map Name Objects
-type Heap = IntMap Objects
--- Map HeapPtr Objects
+type PtrScope = MVector HeapPtrSet
+type NodeScope = MVector Objects
+type Heap = MVector Objects
+
+--type DirtyScope = MVector Bool
+--type DirtyHeap  = MVector Bool
 
 getFunctionReturnRegisters :: Name -> HPT [Variable]
 getFunctionReturnRegisters name = do
-    rets <- gets worldFnRets
+    rets <- asks envFnRets
     case IntMap.lookup (nameUnique name) rets of
         Nothing    -> error $ "Return registers not defined for: " ++
                               show name
@@ -117,7 +90,7 @@ getFunctionReturnRegisters name = do
 
 getFunctionArgumentRegisters :: Name -> HPT [Variable]
 getFunctionArgumentRegisters name = do
-    args <- gets worldFnArgs
+    args <- asks envFnArgs
     case IntMap.lookup (nameUnique name) args of
         Nothing    -> error $ "Function arguments not defined for: " ++
                               show name
@@ -144,17 +117,23 @@ newHeapPtr = do
     return hp
 
 getNodeScope :: Variable -> HPT Objects
-getNodeScope var = do
+getNodeScope = getNodeScope' . variableIndex
+
+getNodeScope' :: Int -> HPT Objects
+getNodeScope' index = do
     scope <- gets worldNodeScope
-    case IntMap.lookup (variableIndex var) scope of
-        Nothing      -> error $ "Missing variable: " ++ show var
+    case IntMap.lookup index scope of
+        Nothing      -> error $ "Missing variable: " ++ show index
         Just objects -> return objects
 
 getPtrScope :: Variable -> HPT HeapPtrSet
-getPtrScope var = do
+getPtrScope = getPtrScope' . variableIndex
+
+getPtrScope' :: Int -> HPT HeapPtrSet
+getPtrScope' index = do
     scope <- gets worldPtrScope
-    case IntMap.lookup (variableIndex var) scope of
-        Nothing   -> error $ "Missing variable: " ++ show var
+    case IntMap.lookup index scope of
+        Nothing   -> error $ "Missing variable: " ++ show index
         Just ptrs -> return ptrs
 
 getHeapObjects :: HeapPtr -> HPT Objects
@@ -197,15 +176,6 @@ eachIteration action = do
     action
     tell (Endo (action >>))
 
-mkDependency :: (QuickEq a, Monoid a) => HPT (a -> HPT () -> HPT ())
-mkDependency = do
-    ref <- liftIO $ newIORef mempty
-    return $ \newValue action -> do
-        oldValue <- liftIO $ readIORef ref
-        if oldValue `quickEq` newValue
-            then liftIO (writeIORef ref newValue) >> action
-            else return ()
-
 -- assert (variableType src == variableType dst)
 hptCopyVariables :: Variable -> Variable -> HPT ()
 hptCopyVariables src dst | variableIndex src == variableIndex dst =
@@ -214,22 +184,47 @@ hptCopyVariables src dst =
     case variableType src of
         Primitive -> return ()
         NodePtr -> do
-            dep <- mkDependency
             eachIteration $ do
                 ptrs <- getPtrScope src
-                dep ptrs $
-                    setPtrScope dst ptrs 
+                setPtrScope dst ptrs
         Node -> do
-            dep <- mkDependency
             eachIteration $ do
                 objects <- getNodeScope src
-                dep objects $
-                    setNodeScope dst objects
+                setNodeScope dst objects
+
+extract :: Objects -> NodeName -> Int -> NameSet
+extract objs name nth =
+    case Map.lookup name objs of
+        Nothing    -> IntSet.empty
+        Just names -> names Vector.! nth
+
+hptAlternative :: Variable -> Alternative -> HPT ()
+hptAlternative scrut (Alternative pattern branch) = do
+    case pattern of
+        LitPat{} -> return ()
+        NodePat name args ->
+            forM_ (zip [0..] args) $ \(nth, arg) -> eachIteration $ do
+                objects <- getNodeScope scrut
+                let vals = IntSet.toList (extract objects name nth)
+                case variableType arg of
+                    Primitive -> return ()
+                    NodePtr   ->
+                        forM_ vals $ \ptr -> do
+                            setOfPtrs <- getPtrScope' ptr
+                            setPtrScope arg setOfPtrs
+                    Node      ->
+                        forM_ vals $ \var -> do
+                            nodes <- getNodeScope' var
+                            setNodeScope arg nodes
 
 hptExpression :: Function -> Expression -> HPT ()
 hptExpression origin expr =
     case expr of
-        Case scrut _defaultBranch alternatives -> undefined scrut alternatives
+        Case scrut defaultBranch alternatives -> do
+            case defaultBranch of
+                Nothing -> return ()
+                Just branch -> hptExpression origin branch
+            mapM_ (hptAlternative scrut) alternatives
         Bind binds simple rest -> do
             hptSimpleExpression binds simple
             hptExpression origin rest
@@ -260,13 +255,10 @@ hptSimpleExpression binds simple =
             setHeapObjects hp $ singletonObject node vars
             setPtrScope ptr (IntSet.singleton hp)
         Fetch ptrRef | [node] <- binds -> do
-            dep <- mkDependency
             eachIteration $ do
                 ptrs <- IntSet.toList <$> getPtrScope ptrRef
                 objects <- mapM getHeapObjects ptrs
-                -- If the objects haven't changed, do not update the scope.
-                dep objects $
-                    setNodeScope node (mergeObjectList objects)
+                setNodeScope node (mergeObjectList objects)
         Unit args -> forM_ (zip binds args) $ \(bind, arg) -> do
             case arg of
                 -- All such simple renamings should have been removed
@@ -301,26 +293,27 @@ dependencies (ptrs, newPtrs) $
 %node := Fetch *ptr
 objects <- getHeap *ptr
 dependency objects $ -- Don't run setScope if objects haven't changed.
-    setScope (Variable %node) (Object objects)  
+    setScope (Variable %node) (Object objects)
 
 case %scrut of
-    Pointer *ptr -> ...
-    Prim #prim -> ...
-    Node %node -> ...
+    0 -> prim alts are ignored.
+    Object *ptr #prim %node -> ...
 objects <- queryNodeScope %scrut
-let firsts = extract first args objects
+for each alternative:
+    for each binding:
+        let vals = extract nth from objects where nodename = alternative
 
--- method for ptrs
-for firsts $ \ptr ->
-    setOfPtrs <- queryPtrScope ptr
-    setPtrScope %obj setOfPtrs
+        -- method for ptrs
+        for vals $ \ptr ->
+            setOfPtrs <- queryPtrScope ptr
+            setPtrScope binding setOfPtrs
 
--- prim is ignored.
+        -- prim is ignored.
 
--- method for nodes
-for firsts $ \objectRef ->
-    objects <- queryNodeScope objectRef
-    setScope %node objects
+        -- method for nodes
+        for vals $ \objectRef ->
+            objects <- queryNodeScope objectRef
+            setNodeScope binding objects
 
 -}
 
