@@ -18,7 +18,7 @@ main =
 
     @exit
 
-nothingOrJust %boolean =
+% nothingOrJust %boolean =
     case %boolean of
         True ->
             @alloc 2;
@@ -30,7 +30,7 @@ nothingOrJust %boolean =
             %tmp5 := @unit( (Nothing) );
             @return( %tmp5 )
 
-sum %mbA %mbB =
+% sum %mbA %mbB  =
     %nothing := @unit( (Nothing) );
     case %mbA of
         Nothing ->

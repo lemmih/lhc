@@ -39,11 +39,12 @@ parseNodeDefinition = try $ do
 
 parseFunction :: Parser Function
 parseFunction = do
+	retTypes <- many parseType <* spaces
 	name <- parseName isLower <* spaces
 	args <- parseVariable `endBy` spaces
 	char '='; spaces
 	body <- parseExpression
-	return (Function name args body)
+	return (Function name args retTypes body)
 
 -- FIXME: Parse nodes
 parseArgument :: Parser Argument

@@ -11,13 +11,15 @@ import           Data.Map            (Map)
 import qualified Data.Map     as Map
 --import           Data.Set            (Set)
 --import qualified Data.Set     as Set
-import           Control.Monad.RWS.Strict
+--import           Control.Monad.RWS.Strict
+import           Control.Monad.Reader
+import           Control.Monad.Writer
 import           Data.IORef
 import           Data.Vector         (Vector)
 import qualified Data.Vector         as Vector
-import  Data.Vector.Mutable ( MVector )
+import  Data.Vector.Mutable ( IOVector )
 import qualified Data.Vector.Mutable as MVector
-import qualified Data.Vector.Unboxed.Mutable as MUVector
+--import qualified Data.Vector.Unboxed.Mutable as MUVector
 import           Data.Bedrock
 
 
@@ -36,21 +38,33 @@ sum [] = 0
 sum (x:xs) = x + sum xs
 -}
 
+runHPT :: Module -> IO ()
+runHPT m = do
+    -- ensure uniqueness
+    -- count number of stores
+    -- allocate heap ptrs to match
+    -- create initial ptr sharing map
+    let env = undefined
+        hpt = hptModule m
+    iterEndo <- runReaderT (execWriterT (unHPT hpt)) env
+    let _iter = appEndo iterEndo (return ()) :: HPT ()
+    return ()
+
+
 data Env = Env
     { envFnArgs              :: !FnArgs
     , envFnRets              :: !FnRets
+    , envNodeArgs            :: !NodeArgs
     , envNodeScope           :: !NodeScope
     , envPtrScope            :: !PtrScope
     , envHeap                :: !Heap
     , envSharedVariables     :: !PtrSharingMap
     , envSharedHeapLocations :: !HeapSharingMap
+    , envFreeHeapPtr         :: !(IORef HeapPtr)
     }
-data World = World
-    { worldHeapIndex           :: !HeapPtr -- Next available heap pointer
-    }
-newtype HPT a = HPT { unHPT :: RWST Env (Endo (HPT ())) World IO a }
+newtype HPT a = HPT { unHPT :: WriterT (Endo (HPT ())) (ReaderT Env IO) a }
     deriving
-        ( Functor, Monad, MonadIO, MonadState World
+        ( Functor, Monad, MonadIO
         , MonadWriter (Endo (HPT ())), MonadReader Env )
 
 type HeapPtr = Int
@@ -62,20 +76,21 @@ type NameSet = IntSet
 -- created once, used once. Not used in iterations.
 type FnArgs = IntMap [Variable]
 type FnRets = IntMap [Variable]
+type NodeArgs = IntMap NameSet
 
 -- Variables are shared if they're used more than once.
 -- Heap locations are shared if referred to by a shared variable or
 -- if they are updated into a shared heap location.
-type PtrSharingMap = MVector Bool
+type PtrSharingMap = IOVector Bool
 -- Set Name
-type HeapSharingMap = MVector Bool
+type HeapSharingMap = IOVector Bool
 -- Set HeapPtr
 
 -- XXX: Use HashMap?
 type Objects = Map NodeName (Vector NameSet)
-type PtrScope = MVector HeapPtrSet
-type NodeScope = MVector Objects
-type Heap = MVector Objects
+type PtrScope = IOVector HeapPtrSet
+type NodeScope = IOVector Objects
+type Heap = IOVector Objects
 
 --type DirtyScope = MVector Bool
 --type DirtyHeap  = MVector Bool
@@ -112,8 +127,9 @@ variableIndex = nameUnique . variableName
 
 newHeapPtr :: HPT HeapPtr
 newHeapPtr = do
-    hp <- gets worldHeapIndex
-    modify $ \st -> st{ worldHeapIndex = hp+1 }
+    hpRef <- asks envFreeHeapPtr
+    hp <- liftIO $ readIORef hpRef
+    liftIO $ modifyIORef hpRef succ
     return hp
 
 getNodeScope :: Variable -> HPT Objects
@@ -121,41 +137,44 @@ getNodeScope = getNodeScope' . variableIndex
 
 getNodeScope' :: Int -> HPT Objects
 getNodeScope' index = do
-    scope <- gets worldNodeScope
-    case IntMap.lookup index scope of
-        Nothing      -> error $ "Missing variable: " ++ show index
-        Just objects -> return objects
+    scope <- asks envNodeScope
+    liftIO $ MVector.read scope index
 
 getPtrScope :: Variable -> HPT HeapPtrSet
 getPtrScope = getPtrScope' . variableIndex
 
 getPtrScope' :: Int -> HPT HeapPtrSet
 getPtrScope' index = do
-    scope <- gets worldPtrScope
-    case IntMap.lookup index scope of
-        Nothing   -> error $ "Missing variable: " ++ show index
-        Just ptrs -> return ptrs
+    scope <- asks envPtrScope
+    liftIO $ MVector.read scope index
 
 getHeapObjects :: HeapPtr -> HPT Objects
 getHeapObjects hp = do
-    heap <- gets worldHeap
-    case IntMap.lookup hp heap of
-        Nothing      -> error $ "Invalid heap pointer: " ++ show hp
-        Just objects -> return objects
+    heap <- asks envHeap
+    liftIO $ MVector.read heap hp
 
 setHeapObjects :: HeapPtr -> Objects -> HPT ()
-setHeapObjects hp objects = modify $ \st -> st{ worldHeap =
-    IntMap.insertWith mergeObjects hp objects (worldHeap st) }
+setHeapObjects hp objects = do
+    heap <- asks envHeap
+    liftIO $ do
+        oldObjects <- MVector.read heap hp
+        MVector.write heap hp (mergeObjects objects oldObjects)
 
 setNodeScope :: Variable -> Objects -> HPT ()
-setNodeScope var objects = modify $ \st -> st{ worldNodeScope =
-    IntMap.insertWith mergeObjects index objects (worldNodeScope st) }
+setNodeScope var objects = do
+    scope <- asks envNodeScope
+    liftIO $ do
+        oldObjects <- MVector.read scope index
+        MVector.write scope index (mergeObjects objects oldObjects)
   where
     index = variableIndex var
 
 setPtrScope :: Variable -> HeapPtrSet -> HPT ()
-setPtrScope var heapPtrs = modify $ \st -> st{ worldPtrScope =
-    IntMap.insertWith IntSet.union index heapPtrs (worldPtrScope st) }
+setPtrScope var heapPtrs = do
+    scope <- asks envPtrScope
+    liftIO $ do 
+        oldPtrs <- MVector.read scope index
+        MVector.write scope index (IntSet.union heapPtrs oldPtrs)
   where
     index = variableIndex var
 
@@ -198,8 +217,8 @@ extract objs name nth =
         Nothing    -> IntSet.empty
         Just names -> names Vector.! nth
 
-hptAlternative :: Variable -> Alternative -> HPT ()
-hptAlternative scrut (Alternative pattern branch) = do
+hptAlternative :: Function -> Variable -> Alternative -> HPT ()
+hptAlternative origin scrut (Alternative pattern branch) = do
     case pattern of
         LitPat{} -> return ()
         NodePat name args ->
@@ -214,8 +233,14 @@ hptAlternative scrut (Alternative pattern branch) = do
                             setPtrScope arg setOfPtrs
                     Node      ->
                         forM_ vals $ \var -> do
-                            nodes <- getNodeScope' var
-                            setNodeScope arg nodes
+                            setNodeScope arg =<< getNodeScope' var
+    hptExpression origin branch
+
+hptModule :: Module -> HPT ()
+hptModule = mapM_ hptFunction . functions
+
+hptFunction :: Function -> HPT ()
+hptFunction fn = hptExpression fn (fnBody fn)
 
 hptExpression :: Function -> Expression -> HPT ()
 hptExpression origin expr =
@@ -224,7 +249,7 @@ hptExpression origin expr =
             case defaultBranch of
                 Nothing -> return ()
                 Just branch -> hptExpression origin branch
-            mapM_ (hptAlternative scrut) alternatives
+            mapM_ (hptAlternative origin scrut) alternatives
         Bind binds simple rest -> do
             hptSimpleExpression binds simple
             hptExpression origin rest

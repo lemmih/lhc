@@ -24,7 +24,8 @@ library
                        Data.Bedrock.Invoke,
                        Data.Bedrock.TypeCheck,
                        Data.Bedrock.HPT,
-                       Data.Bedrock.Storage
+                       Data.Bedrock.Storage,
+                       Data.Bedrock.Rename
   -- other-modules:       
   build-depends:       base ==4.6.*, ansi-wl-pprint,
                        parsec, containers, mtl, vector

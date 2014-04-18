@@ -85,7 +85,6 @@ ppSimpleExpression simple =
 			ppName fn <> Doc.parens (ppList $ map ppVariable args)
 		Unit args ->
 			ppSyntax "@unit" <> Doc.parens (ppList $ map ppArgument args)
-
 		GCAllocate n ->
 			ppSyntax "@gc_allocate" <+> Doc.int n
 		GCBegin ->
@@ -94,6 +93,8 @@ ppSimpleExpression simple =
 			ppSyntax "@gc_end"
 		GCMark var ->
 			ppSyntax "@gc_mark" <+> ppVariable var
+		GCMarkNode var ->
+			ppSyntax "@gc_mark_node" <+> ppVariable var
 
 ppExpression :: Expression -> Doc
 ppExpression expression =
@@ -131,8 +132,13 @@ ppSyntax = Doc.green . text
 ppFnName :: Name -> Doc
 ppFnName = Doc.blue . ppName
 
+ppTypes :: [Type] -> Doc
+ppTypes [] = text "void"
+ppTypes lst = Doc.hsep $ map ppType lst
+
 ppFunction :: Function -> Doc
 ppFunction fn =
+	ppTypes (fnResults fn) <+>
 	ppFnName (fnName fn) <+> Doc.hsep (map ppVariable (fnArguments fn)) <+>
 	Doc.char '=' Doc.<$$>
 	Doc.indent 2 (ppExpression (fnBody fn))

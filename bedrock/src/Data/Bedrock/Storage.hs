@@ -25,7 +25,8 @@ lowerAlloc :: Gen ()
 lowerAlloc = do
     fs <- gets (Map.elems . envFunctions)
     mapM_ transformFunction fs
-    mkMarkNode
+    --mkMarkNode
+    return ()
 
 transformFunction :: Function -> Gen ()
 transformFunction fn = do
@@ -58,54 +59,55 @@ transformAlternative :: Function -> Alternative -> Gen Alternative
 transformAlternative origin (Alternative pat expr) =
     Alternative pat <$> transformExpression origin expr
 
-gcMarkNodeName :: Name
-gcMarkNodeName = Name [] "mark_node" 0
+--gcMarkNodeName :: Name
+--gcMarkNodeName = Name [] "mark_node" 0
 
-mkMarkNode :: Gen ()
-mkMarkNode = do
-    nodeDefs <- gets (nodes . envModule)
-    fns <- gets (functions . envModule)
+--mkMarkNode :: Gen ()
+--mkMarkNode = do
+--    nodeDefs <- gets (nodes . envModule)
+--    fns <- gets (functions . envModule)
 
-    node <- newVariable "node" Node
+--    node <- newVariable "node" Node
 
-    let markArg (var, markedVar) = Bind [markedVar] $
-            case variableType var of
-                NodePtr   -> GCMark var
-                Node      -> Application gcMarkNodeName [var]
-                Primitive -> Unit [RefArg var]
+--    let markArg (var, markedVar) = Bind [markedVar] $
+--            case variableType var of
+--                NodePtr   -> GCMark var
+--                Node      -> Application gcMarkNodeName [var]
+--                Primitive -> Unit [RefArg var]
 
-    alts <- forM nodeDefs $ \(NodeDefinition name tys) -> do
-        args <- mapM (newVariable "arg") tys
-        markedArgs <- mapM (tagVariable "marked") args
-        let zippedArgs = zip args markedArgs
-        ret <- newVariable "ret" Node
-        return $
-            Alternative (NodePat (ConstructorName name) args) $
-            flip (foldr markArg) zippedArgs $
-            Bind [ret] (Unit [NodeArg (ConstructorName name) markedArgs]) $
-            Return [ret]
+--    alts <- forM nodeDefs $ \(NodeDefinition name tys) -> do
+--        args <- mapM (newVariable "arg") tys
+--        markedArgs <- mapM (tagVariable "marked") args
+--        let zippedArgs = zip args markedArgs
+--        ret <- newVariable "ret" Node
+--        return $
+--            Alternative (NodePat (ConstructorName name) args) $
+--            flip (foldr markArg) zippedArgs $
+--            Bind [ret] (Unit [NodeArg (ConstructorName name) markedArgs]) $
+--            Return [ret]
 
-    fnAlts <- forM fns $ \fn ->
-        forM [0 .. length (fnArguments fn)] $ \blanks -> do
-            let args = reverse . drop blanks . reverse $ fnArguments fn
-            markedArgs <- mapM (tagVariable "marked") args
-            ret <- newVariable "ret" Node
-            let retNode = NodeArg (FunctionName (fnName fn) blanks) markedArgs
-            return $ Alternative
-                (NodePat
-                    (FunctionName (fnName fn) blanks)
-                    (reverse . drop blanks . reverse $ fnArguments fn)) $
-                flip (foldr markArg) (zip args markedArgs) $
-                Bind [ret] (Unit [retNode]) $
-                Return [ret]
+--    fnAlts <- forM fns $ \fn ->
+--        forM [0 .. length (fnArguments fn)] $ \blanks -> do
+--            let args = reverse . drop blanks . reverse $ fnArguments fn
+--            markedArgs <- mapM (tagVariable "marked") args
+--            ret <- newVariable "ret" Node
+--            let retNode = NodeArg (FunctionName (fnName fn) blanks) markedArgs
+--            return $ Alternative
+--                (NodePat
+--                    (FunctionName (fnName fn) blanks)
+--                    (reverse . drop blanks . reverse $ fnArguments fn)) $
+--                flip (foldr markArg) (zip args markedArgs) $
+--                Bind [ret] (Unit [retNode]) $
+--                Return [ret]
 
-    let body =
-            Case node Nothing (alts ++ concat fnAlts)
+--    let body =
+--            Case node Nothing (alts ++ concat fnAlts)
 
-    pushFunction Function
-        { fnName = gcMarkNodeName
-        , fnArguments = [ node ]
-        , fnBody = body }
+--    pushFunction Function
+--        { fnName = gcMarkNodeName
+--        , fnArguments = [ node ]
+--        , fnResults = [ Node ]
+--        , fnBody = body }
 
 transformSimpleExpresion
     :: Function -> [Variable] -> SimpleExpression
@@ -124,7 +126,8 @@ transformSimpleExpresion origin binds simple rest =
                 markScope (var, markedVar) = Bind [markedVar] $
                     case variableType var of
                         NodePtr   -> GCMark var
-                        Node      -> Application gcMarkNodeName [var]
+                        Node      -> GCMarkNode var
+                        -- Application gcMarkNodeName [var]
                         Primitive -> Unit [RefArg var]
 
                 divertBody =
@@ -136,10 +139,12 @@ transformSimpleExpresion origin binds simple rest =
             pushFunction Function
                 { fnName = continueName
                 , fnArguments = scope
+                , fnResults = []
                 , fnBody = rest }
             pushFunction Function
                 { fnName = divertName
                 , fnArguments = scope
+                , fnResults = []
                 , fnBody = divertBody }
             return $
                 Bind [check] (GCAllocate n) $

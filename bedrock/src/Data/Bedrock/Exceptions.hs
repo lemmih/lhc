@@ -55,6 +55,7 @@ _mkThrowTo = do
     pushFunction Function
         { fnName = throwToName
         , fnArguments = [thisContinuation, exception]
+        , fnResults = []
         , fnBody = body }
 
 throwToName :: Name
@@ -64,6 +65,7 @@ cpsFunction :: Function -> Gen ()
 cpsFunction fn = do
     body <- cpsExpression fn (fnBody fn)
     let fn' = fn{fnArguments = fnArguments fn ++ [stdContinuation]
+                ,fnResults = []
                 ,fnBody = body}
     pushFunction fn'
 
@@ -135,6 +137,7 @@ cpsSimpleExpresion origin binds simple rest =
         pushFunction $
             Function { fnName      = contFnName
                      , fnArguments = continuationArgs ++ binds
+                     , fnResults   = []
                      , fnBody      = rest }
         return $
             Bind [stdContinuationFrame]

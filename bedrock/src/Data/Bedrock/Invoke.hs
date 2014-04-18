@@ -37,7 +37,7 @@ mkInvokeInstance fs pattern = do
     let blanks = length pattern
         lastN n lst = drop (length lst - n) lst
         dropLast n = reverse . drop n . reverse
-    let exhAlternative =
+    let _exhAlternative =
             Alternative
                 (NodePat
                     (ConstructorName exhFrameName)
@@ -57,10 +57,11 @@ mkInvokeInstance fs pattern = do
                     dropLast blanks (fnArguments fn) ++ args
         body =
             Case thunk Nothing
-                (exhAlternative : map invokeFunction matchingFunctions)
+                ({-exhAlternative :-} map invokeFunction matchingFunctions)
     pushFunction Function
         { fnName = invokeName pattern
         , fnArguments = thunk : args
+        , fnResults = []
         , fnBody = body }
 
 traverseExpression :: Function -> Expression -> Gen Expression

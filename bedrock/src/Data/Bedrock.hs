@@ -30,6 +30,7 @@ data NodeDefinition = NodeDefinition Name [Type]
 data Function = Function
 	{ fnName      :: Name
 	, fnArguments :: [Variable]
+	, fnResults   :: [Type]
 	, fnBody      :: Expression
 	} deriving (Show)
 
@@ -70,6 +71,7 @@ data SimpleExpression
 	| GCBegin
 	| GCEnd
 	| GCMark Variable
+	| GCMarkNode Variable
 	deriving (Show)
 
 data Expression
