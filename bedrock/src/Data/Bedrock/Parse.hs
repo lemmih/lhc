@@ -208,4 +208,5 @@ parseModule =
 	Module
 		<$> many parseNodeDefinition
 		<*> many parseFunction
+		<*> pure (error "next free unique not defined")
 		<* eof

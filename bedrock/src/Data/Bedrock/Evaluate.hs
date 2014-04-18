@@ -16,6 +16,7 @@ import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.Invoke
 import           Data.Bedrock.Rename
 import           Data.Bedrock.Transform ( runGens )
+import           Data.Bedrock.HPT
 
 type HeapPtr = Int
 data Value
@@ -71,6 +72,7 @@ evaluateFromFile path entryPoint = do
             let m' = unique $ runGens m
                     [cpsTransformation, lowerAlloc, mkInvoke]
             print (ppModule m')
+            runHPT m'
             evaluate m' entryPoint
 
 

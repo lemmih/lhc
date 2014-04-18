@@ -1,13 +1,13 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Bedrock.Rename (unique) where
 
+import           Control.Applicative  (Applicative, pure, (<$>), (<*>))
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.Map             (Map)
 import qualified Data.Map             as Map
-import Control.Applicative ( (<$>), (<*>), Applicative, pure )
 
-import Data.Bedrock
+import           Data.Bedrock
 
 type Env = Map Name Name
 
@@ -32,7 +32,7 @@ newUnique = do
 newName :: Name -> Uniq Name
 newName name = do
     u <- newUnique
-    return name{ nameUnique = u } 
+    return name{ nameUnique = u }
 
 rename :: Name -> Uniq a -> Uniq a
 rename old action = do
@@ -82,9 +82,11 @@ uniqModule m =
     renameAll (map fnName (functions m)) $ do
         ns  <- mapM uniqNode (nodes m)
         fns <- mapM uniqFunction (functions m)
+        u   <- newUnique
         return Module
             { nodes = ns
-            , functions = fns }
+            , functions = fns
+            , freeUnique = u }
 
 uniqNode :: NodeDefinition -> Uniq NodeDefinition
 uniqNode (NodeDefinition name args) =

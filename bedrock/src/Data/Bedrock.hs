@@ -13,8 +13,9 @@ data Variable = Variable
 	} deriving (Show, Eq, Ord)
 
 data Module = Module
-	{ nodes     :: [NodeDefinition]
-	, functions :: [Function]
+	{ nodes      :: [NodeDefinition]
+	, functions  :: [Function]
+	, freeUnique :: Int
 	-- CAFs?
 	}
 
