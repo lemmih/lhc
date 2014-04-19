@@ -56,7 +56,7 @@ mkEval hpt origin bind var = do
     evalName <- tagName "eval" (fnName origin)
     arg <- tagVariable "ptr" var
 
-    let Left ptrs = hptScope hpt Vector.! variableIndex var
+    let ptrs = hptPtrScope hpt Vector.! variableIndex var
         objects = mergeObjectList $ map (hptHeap hpt Vector.!) (IntSet.toList ptrs)
         maxArgs = maximum (map Vector.length (Map.elems objects))
     preEvalObject <- newVariable "node" (StaticNode (maxArgs+1))
@@ -92,7 +92,7 @@ mkApply hpt origin bind obj arg = do
     applyObj <- newVariable "node" (StaticNode (sizeOfNode hpt obj))
     applyArg <- tagVariable "ptr" arg
     applyRet <- newVariable "ret" (StaticNode (sizeOfNode hpt bind))
-    let Right objects = hptScope hpt Vector.! variableIndex obj
+    let objects = hptNodeScope hpt Vector.! variableIndex obj
         names = Map.keys objects
         body =
             Case applyObj Nothing (map mkAlt names)

@@ -16,7 +16,7 @@ import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.Invoke
 import           Data.Bedrock.Rename
 import           Data.Bedrock.Transform ( runGens )
-import           Data.Bedrock.HPT ( runHPT )
+import           Data.Bedrock.HPT ( runHPT, ppHPTResult )
 import           Data.Bedrock.EvalApply
 import           Data.Bedrock.RegisterIntroduction
 
@@ -78,6 +78,7 @@ evaluateFromFile path = do
             let m' = unique m
             print (ppModule m')
             let hpt1 = runHPT m'
+            ppHPTResult hpt1
             let m'' = unique $ runGens m'
                     [ lowerEvalApply hpt1
                     , cpsTransformation
@@ -85,6 +86,7 @@ evaluateFromFile path = do
                     ]
             print (ppModule m'')
             let hpt2 = runHPT m''
+            ppHPTResult hpt2
             let m''' = registerIntroduction $ runGens m''
                         [ mkInvoke hpt2
                         ]

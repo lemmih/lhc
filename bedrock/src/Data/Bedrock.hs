@@ -13,11 +13,17 @@ data Variable = Variable
 	, variableType :: Type
 	} deriving (Show, Eq, Ord)
 
+data AvailableNamespace = AvailableNamespace
+	{ nsNextPointerId   :: Int
+	, nsNextNodeId      :: Int
+	, nsNextPrimitiveId :: Int
+	, nsNextGlobalId    :: Int }
+
 data Module = Module
 	{ nodes      :: [NodeDefinition]
 	, entryPoint :: Name
 	, functions  :: [Function]
-	, freeUnique :: Int
+	, moduleNamespace :: AvailableNamespace
 	-- CAFs?
 	}
 

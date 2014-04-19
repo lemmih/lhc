@@ -8,43 +8,54 @@ import           Data.Map             (Map)
 import qualified Data.Map             as Map
 
 import           Data.Bedrock
+import           Data.Bedrock.Misc
 
 type Env = Map Name Name
 
-newtype Uniq a = Uniq { unUniq :: ReaderT Env (State Int) a }
-    deriving ( Monad, MonadReader Env, MonadState Int, Functor
-             , Applicative )
+newtype Uniq a = Uniq { unUniq :: ReaderT Env (State AvailableNamespace) a }
+    deriving ( Monad, MonadReader Env, MonadState AvailableNamespace
+             , Functor, Applicative )
 
 unique :: Module -> Module
 unique m = evalState (runReaderT (unUniq (uniqModule m)) env) st
   where
     env = Map.empty
-    st = 0
+    st = AvailableNamespace
+        { nsNextPointerId = 0
+        , nsNextNodeId = 0
+        , nsNextPrimitiveId = 0
+        , nsNextGlobalId = 0 }
 
 
 
-newUnique :: Uniq Int
-newUnique = do
-    u <- get
-    put $ u+1
-    return u
+newUnique :: Maybe Type -> Uniq Int
+newUnique mbTy = do
+    ns <- get
+    let (idNum, ns') = case mbTy of
+            Nothing -> newGlobalID ns
+            Just ty -> newIDByType ns ty
+    put $ ns'
+    return idNum
 
-newName :: Name -> Uniq Name
-newName name = do
-    u <- newUnique
+newName :: Maybe Type -> Name -> Uniq Name
+newName mbTy name = do
+    u <- newUnique mbTy
     return name{ nameUnique = u }
 
-rename :: Name -> Uniq a -> Uniq a
-rename old action = do
-    new <- newName old
+rename :: Maybe Type -> Name -> Uniq a -> Uniq a
+rename mbTy old action = do
+    new <- newName mbTy old
     local (Map.insert old new) action
 
 renameAll :: [Name] -> Uniq a -> Uniq a
 renameAll [] action = action
-renameAll (x:xs) action = rename x (renameAll xs action)
+renameAll (x:xs) action = rename Nothing x (renameAll xs action)
 
 renameVariables :: [Variable] -> Uniq a -> Uniq a
-renameVariables = renameAll . map variableName
+renameVariables [] action     = action
+renameVariables (v:vs) action =
+    rename (Just (variableType v)) (variableName v) $
+    renameVariables vs action
 
 resolveName :: Name -> Uniq Name
 resolveName name = do
@@ -83,12 +94,13 @@ uniqModule m =
         ns  <- mapM uniqNode (nodes m)
         fns <- mapM uniqFunction (functions m)
         entry <- resolveName (entryPoint m)
-        u   <- newUnique
+        namespace <- get
         return Module
             { nodes = ns
             , entryPoint = entry
             , functions = fns
-            , freeUnique = u }
+            , moduleNamespace = namespace
+            }
 
 uniqNode :: NodeDefinition -> Uniq NodeDefinition
 uniqNode (NodeDefinition name args) =

@@ -32,7 +32,7 @@ traverseExpression hpt origin expr =
                 <$> pure defaultBranch
                 <*> mapM (traverseAlternative hpt origin) alternatives
         Invoke obj args -> do
-            let Right objects = hptScope hpt Vector.! variableIndex obj
+            let objects = hptNodeScope hpt Vector.! variableIndex obj
                 names = Map.keys objects
                 mkAlt name@(FunctionName fn blanks) | blanks == length args =
                     let partialArgs = dropLast blanks $ hptFnArgs hpt Map.! fn in

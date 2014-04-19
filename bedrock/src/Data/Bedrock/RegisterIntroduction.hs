@@ -9,37 +9,41 @@ import           Data.Map             (Map)
 import qualified Data.Map             as Map
 
 import           Data.Bedrock
+import           Data.Bedrock.Misc
 
 type Env = Map Variable [Variable]
 
-newtype Uniq a = Uniq { unUniq :: ReaderT Env (State Int) a }
-    deriving ( Monad, MonadReader Env, MonadState Int, Functor
-             , Applicative )
+newtype Uniq a = Uniq { unUniq :: ReaderT Env (State AvailableNamespace) a }
+    deriving ( Monad, MonadReader Env, MonadState AvailableNamespace
+             , Functor, Applicative )
 
 registerIntroduction :: Module -> Module
 registerIntroduction m = evalState (runReaderT (unUniq (uniqModule m)) env) st
   where
     env = Map.empty
-    st = freeUnique m
+    st = moduleNamespace m
 
 
 
-newUnique :: Uniq Int
-newUnique = do
-    u <- get
-    put $ u+1
-    return u
+newUnique :: Maybe Type -> Uniq Int
+newUnique mbTy = do
+    ns <- get
+    let (idNum, ns') = case mbTy of
+            Nothing -> newGlobalID ns
+            Just ty -> newIDByType ns ty
+    put $ ns'
+    return idNum
 
-newName :: Name -> Uniq Name
-newName name = do
-    u <- newUnique
+newName :: Maybe Type -> Name -> Uniq Name
+newName mbTy name = do
+    u <- newUnique mbTy
     return name{ nameUnique = u }
 
 lower :: Variable -> Uniq a -> Uniq a
 lower old action =
     case variableType old of
         StaticNode n -> do
-            newNames <- replicateM n (newName (variableName old))
+            newNames <- replicateM n (newName (Just Node) (variableName old))
             let newVars =
                     [ Variable name Primitive | name <- newNames ]
             local (Map.insert old newVars) action
@@ -61,12 +65,13 @@ uniqModule m =
     do
         ns  <- mapM uniqNode (nodes m)
         fns <- mapM uniqFunction (functions m)
-        u   <- newUnique
+        namespace <- get
         return Module
             { nodes = ns
             , entryPoint = entryPoint m
             , functions = fns
-            , freeUnique = u }
+            , moduleNamespace = namespace
+            }
 
 uniqNode :: NodeDefinition -> Uniq NodeDefinition
 uniqNode x = return x {-
