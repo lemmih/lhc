@@ -19,10 +19,11 @@ import qualified Data.Map                     as Map
 --import           Control.Monad.RWS.Strict
 import           Control.Monad.Reader
 import           Control.Monad.Writer
-import           Data.IORef
+import           Data.STRef
+import Control.Monad.ST
 import           Data.Vector                  (Vector)
 import qualified Data.Vector                  as Vector
-import           Data.Vector.Mutable          (IOVector)
+import           Data.Vector.Mutable          (IOVector,MVector)
 import qualified Data.Vector.Mutable          as MVector
 --import qualified Data.Vector.Unboxed.Mutable as MUVector
 import           Data.List
@@ -52,16 +53,16 @@ sum (x:xs) = x + sum xs
 -}
 
 -- All identifiers are required to be unique.
-runHPT :: Module -> IO HPTResult
-runHPT mOrigin = do
+runHPT :: Module -> HPTResult
+runHPT mOrigin = runST (do
     let m = unique mOrigin
         nStores = countStores m
         fnArgs = Map.fromList
             [ (fnName fn, fnArguments fn) | fn <- functions m ]
         (fnRets, nextFree) = mkFnRets (freeUnique m) m
         (nodeArgs, highestUnique) = mkNodeArgs nextFree m
-    heapVector <- MVector.replicate nStores Map.empty :: IO Heap
-    heapPtr <- newIORef 0
+    heapVector <- MVector.replicate nStores Map.empty
+    heapPtr <- newSTRef 0
 
     scope <- MVector.replicate highestUnique (Right Map.empty)
     let env = HPTState
@@ -77,19 +78,19 @@ runHPT mOrigin = do
     iterEndo <- runReaderT (execWriterT (unHPT hpt)) env
     initHeap <- Vector.freeze (envHeap env)
     initScope <- Vector.freeze (envScope env)
-    let iter = appEndo iterEndo (return ()) :: HPT ()
-    runHPTLoop initHeap initScope env iter
+    let iter = appEndo iterEndo (return ())
+    runHPTLoop initHeap initScope env iter)
 
-runHPTLoop :: Vector Objects -> Vector (Either HeapPtrSet Objects) -> HPTState
-           -> HPT () -> IO HPTResult
+runHPTLoop :: Vector Objects -> Vector (Either HeapPtrSet Objects)
+           -> HPTState s -> HPT s () -> ST s HPTResult
 runHPTLoop oldHeap oldScope env iter = do
-    putStrLn "Iteration..."
+    -- putStrLn "Iteration..."
     _ <- runReaderT (execWriterT (unHPT iter)) env
     newHeap <- Vector.freeze (envHeap env)
     newScope <- Vector.freeze (envScope env)
     if oldHeap == newHeap && oldScope == newScope
         then do
-            ppEnv newHeap newScope
+            -- ppEnv newHeap newScope
             return HPTResult
                 { hptFnArgs = envFnArgs env
                 , hptFnRets = envFnRets env
@@ -161,20 +162,21 @@ data HPTResult = HPTResult
     , hptHeap     :: !(Vector Objects)
     }
 
-data HPTState = HPTState
+data HPTState s = HPTState
     { envFnArgs              :: !FnArgs
     , envFnRets              :: !FnRets
     , envNodeArgs            :: !NodeArgs
-    , envScope               :: !Scope
-    , envHeap                :: !Heap
+    , envScope               :: !(Scope s)
+    , envHeap                :: !(Heap s)
     , envSharedVariables     :: PtrSharingMap
     , envSharedHeapLocations :: HeapSharingMap
-    , envFreeHeapPtr         :: !(IORef HeapPtr)
+    , envFreeHeapPtr         :: !(STRef s HeapPtr)
     }
-newtype HPT a = HPT { unHPT :: WriterT (Endo (HPT ())) (ReaderT HPTState IO) a }
+newtype HPT s a = HPT
+    { unHPT :: WriterT (Endo (HPT s ())) (ReaderT (HPTState s) (ST s)) a }
     deriving
-        ( Functor, Monad, MonadIO
-        , MonadWriter (Endo (HPT ())), MonadReader HPTState )
+        ( Functor, Monad
+        , MonadWriter (Endo (HPT s ())), MonadReader (HPTState s) )
 
 type HeapPtr = Int
 -- Use newtypes?
@@ -196,8 +198,8 @@ type HeapSharingMap = IOVector Bool
 -- Set HeapPtr
 
 type Objects = Map NodeName (Vector NameSet)
-type Scope = IOVector (Either HeapPtrSet Objects)
-type Heap = IOVector Objects
+type Scope s = MVector s (Either HeapPtrSet Objects)
+type Heap s = MVector s Objects
 
 --type DirtyScope = MVector Bool
 --type DirtyHeap  = MVector Bool
@@ -215,7 +217,7 @@ setVariableSize hpt var =
         _    -> var
 
 
-getFunctionReturnRegisters :: Name -> HPT [Variable]
+getFunctionReturnRegisters :: Name -> HPT s [Variable]
 getFunctionReturnRegisters name = do
     rets <- asks envFnRets
     case Map.lookup name rets of
@@ -223,7 +225,7 @@ getFunctionReturnRegisters name = do
                               show name
         Just names -> return names
 
-getFunctionArgumentRegisters :: Name -> HPT [Variable]
+getFunctionArgumentRegisters :: Name -> HPT s [Variable]
 getFunctionArgumentRegisters name = do
     args <- asks envFnArgs
     case Map.lookup name args of
@@ -231,7 +233,7 @@ getFunctionArgumentRegisters name = do
                               show name
         Just names -> return names
 
-getNodeArgumentRegisters :: Name -> HPT [Variable]
+getNodeArgumentRegisters :: Name -> HPT s [Variable]
 getNodeArgumentRegisters name = do
     args <- asks envNodeArgs
     case Map.lookup name args of
@@ -252,63 +254,68 @@ singletonNameSet var
 variableIndex :: Variable -> Int
 variableIndex = nameUnique . variableName
 
-newHeapPtr :: HPT HeapPtr
+liftST :: ST s a -> HPT s a
+liftST action = HPT $ WriterT $ ReaderT $ \_ -> do
+    ret <- action
+    return (ret, mempty)
+
+newHeapPtr :: HPT s HeapPtr
 newHeapPtr = do
     hpRef <- asks envFreeHeapPtr
-    hp <- liftIO $ readIORef hpRef
-    liftIO $ modifyIORef hpRef succ
+    hp <- liftST $ readSTRef hpRef
+    liftST $ modifySTRef hpRef succ
     return hp
 
-getNodeScope :: Variable -> HPT Objects
+getNodeScope :: Variable -> HPT s Objects
 getNodeScope = getNodeScope' . variableIndex
 
-getNodeScope' :: Int -> HPT Objects
+getNodeScope' :: Int -> HPT s Objects
 getNodeScope' index = do
     scope <- asks envScope
-    addr <- liftIO $ MVector.read scope index
+    addr <- liftST $ MVector.read scope index
     case addr of
         Right objects -> return objects
         _             -> error $ "HPT: Var should have been a node: " ++ show index
 
-getPtrScope :: Variable -> HPT HeapPtrSet
+getPtrScope :: Variable -> HPT s HeapPtrSet
 getPtrScope = getPtrScope' . variableIndex
 
-getPtrScope' :: Int -> HPT HeapPtrSet
+getPtrScope' :: Int -> HPT s HeapPtrSet
 getPtrScope' index = do
     scope <- asks envScope
-    addr <- liftIO $ MVector.read scope index
+    addr <- liftST $ MVector.read scope index
     case addr of
         Left ptrs -> return ptrs
         Right objs
             | Map.null objs -> return IntSet.empty
             | otherwise     -> error $ "Ptr not referring to heap objects: " ++ show index
 
-getHeapObjects :: HeapPtr -> HPT Objects
+getHeapObjects :: HeapPtr -> HPT s Objects
 getHeapObjects hp = do
     heap <- asks envHeap
-    liftIO $ MVector.read heap hp
+    liftST $ MVector.read heap hp
 
-setHeapObjects :: HeapPtr -> Objects -> HPT ()
+setHeapObjects :: HeapPtr -> Objects -> HPT s ()
 setHeapObjects hp objects = do
     heap <- asks envHeap
-    liftIO $ do
+    liftST $ do
         oldObjects <- MVector.read heap hp
         MVector.write heap hp (mergeObjects objects oldObjects)
 
-setNodeScope :: Variable -> Objects -> HPT ()
+setNodeScope :: Variable -> Objects -> HPT s ()
 setNodeScope = setNodeScope' . variableIndex
 
-setNodeScope' :: Int -> Objects -> HPT ()
+setNodeScope' :: Int -> Objects -> HPT s ()
 setNodeScope' index objects = do
     scope <- asks envScope
-    liftIO $ do
+    liftST $ do
         Right oldObjects <- MVector.read scope index
         MVector.write scope index (Right $ mergeObjects objects oldObjects)
 
-setPtrScope :: Variable -> HeapPtrSet -> HPT ()
+setPtrScope :: Variable -> HeapPtrSet -> HPT s ()
 setPtrScope var heapPtrs = do
     scope <- asks envScope
-    liftIO $ do
+    liftST $ do
         addr <- MVector.read scope index
         let oldPtrs = case addr of
                 Left ptrs -> ptrs
@@ -317,10 +324,10 @@ setPtrScope var heapPtrs = do
   where
     index = variableIndex var
 
-initPtrScope :: Variable -> HeapPtrSet -> HPT ()
+initPtrScope :: Variable -> HeapPtrSet -> HPT s ()
 initPtrScope var heapPtrs = do
     scope <- asks envScope
-    liftIO $ MVector.write scope index (Left heapPtrs)
+    liftST $ MVector.write scope index (Left heapPtrs)
   where
     index = variableIndex var
 
@@ -335,7 +342,7 @@ mergeObjectList = Map.unionsWith merge
   where
     merge = Vector.zipWith IntSet.union
 
-eachIteration :: HPT () -> HPT ()
+eachIteration :: HPT s () -> HPT s ()
 eachIteration action = do
     -- Run the action once and the schedule it to be part of the
     -- fix-point iteration.
@@ -343,7 +350,7 @@ eachIteration action = do
     tell (Endo (action >>))
 
 -- assert (variableType src == variableType dst)
-hptCopyVariables :: Variable -> Variable -> HPT ()
+hptCopyVariables :: Variable -> Variable -> HPT s ()
 hptCopyVariables src dst | variableIndex src == variableIndex dst =
     return ()
 hptCopyVariables src dst =
@@ -365,7 +372,7 @@ extract objs name nth =
         Nothing    -> IntSet.empty
         Just names -> names Vector.! nth
 
-hptAlternative :: Function -> Variable -> Alternative -> HPT ()
+hptAlternative :: Function -> Variable -> Alternative -> HPT s ()
 hptAlternative origin scrut (Alternative pattern branch) = do
     case pattern of
         LitPat{} -> return ()
@@ -384,13 +391,13 @@ hptAlternative origin scrut (Alternative pattern branch) = do
                             setNodeScope arg =<< getNodeScope' var
     hptExpression origin branch
 
-hptModule :: Module -> HPT ()
+hptModule :: Module -> HPT s ()
 hptModule = mapM_ hptFunction . functions
 
-hptFunction :: Function -> HPT ()
+hptFunction :: Function -> HPT s ()
 hptFunction fn = hptExpression fn (fnBody fn)
 
-hptExpression :: Function -> Expression -> HPT ()
+hptExpression :: Function -> Expression -> HPT s ()
 hptExpression origin expr =
     case expr of
         Case scrut defaultBranch alternatives -> do
@@ -430,7 +437,7 @@ hptExpression origin expr =
         Exit -> return ()
         Panic{} -> return ()
 
-hptSimpleExpression :: [Variable] -> SimpleExpression -> HPT ()
+hptSimpleExpression :: [Variable] -> SimpleExpression -> HPT s ()
 hptSimpleExpression binds simple =
     case simple of
         Store node vars | [ptr] <- binds -> do

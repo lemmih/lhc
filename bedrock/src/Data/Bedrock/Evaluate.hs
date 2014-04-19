@@ -77,14 +77,14 @@ evaluateFromFile path = do
         Right m  -> do
             let m' = unique m
             print (ppModule m')
-            hpt1 <- runHPT m'
+            let hpt1 = runHPT m'
             let m'' = unique $ runGens m'
                     [ lowerEvalApply hpt1
                     , cpsTransformation
                     , lowerAlloc
                     ]
             print (ppModule m'')
-            hpt2 <- runHPT m''
+            let hpt2 = runHPT m''
             let m''' = registerIntroduction $ runGens m''
                         [ mkInvoke hpt2
                         ]
