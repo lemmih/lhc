@@ -146,7 +146,7 @@ cpsSimpleExpresion origin binds simple rest =
                      , fnBody      = rest }
         return $
             Bind [stdContinuationFrame]
-                (Frame (FunctionName contFnName (length binds))
+                (Store (FunctionName contFnName (length binds))
                     continuationArgs) $
             use stdContinuationFrame
 

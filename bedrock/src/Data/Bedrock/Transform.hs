@@ -138,8 +138,6 @@ freeVariablesSimple simple =
             id
         Store _constructor args ->
             Set.union (Set.fromList args)
-        Frame _constructor args ->
-            Set.union (Set.fromList args)
         Fetch ptr ->
             Set.insert ptr
         Load ptr _idx ->

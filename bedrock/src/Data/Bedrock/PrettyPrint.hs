@@ -69,9 +69,6 @@ ppSimpleExpression simple =
 		Store node args ->
 			ppSyntax "@store" <+>
 			Doc.parens (ppNode node (map ppVariable args))
-		Frame node args ->
-			ppSyntax "@frame" <+>
-			Doc.parens (ppNode node (map ppVariable args))
 		SizeOf node args ->
 			ppSyntax "@sizeOf" <+>
 			Doc.parens (ppNode node (map ppVariable args))

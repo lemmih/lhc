@@ -173,8 +173,6 @@ uniqSimple simple =
         SizeOf{} -> error "uniqSimple: SizeOf"
         Store nodeName vars ->
             Store <$> resolveNodeName nodeName <*> mapM resolve vars
-        Frame nodeName vars ->
-            Frame <$> resolveNodeName nodeName <*> mapM resolve vars
         Fetch var ->
             Fetch <$> resolve var
         Load{} -> error "uniqSimple: Load"

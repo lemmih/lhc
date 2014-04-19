@@ -160,10 +160,6 @@ evalSimple simple =
             argValues <- mapM queryScope args
             ptr <- pushHeapValue (NodeValue name argValues)
             return [HeapPtrValue ptr]
-        Frame name args -> do
-            argValues <- mapM queryScope args
-            ptr <- pushHeapValue (NodeValue name argValues)
-            return [HeapPtrValue ptr]
         SizeOf _name _args ->
             return [LitValue $ LiteralInt 0]
         Fetch var -> do

@@ -213,7 +213,6 @@ countStores = getSum . execWriter . mapM_ countFn . functions
     countSimple simple =
         case simple of
             Store{} -> tell (Sum 1)
-            Frame{} -> tell (Sum 1)
             _       -> return ()
 
 
@@ -436,17 +435,6 @@ hptSimpleExpression :: [Variable] -> SimpleExpression -> HPT s ()
 hptSimpleExpression binds simple =
     case simple of
         Store node vars | [ptr] <- binds -> do
-            hp <- newHeapPtr
-            setHeapObjects hp $ singletonObject node vars
-            setPtrScope ptr (IntSet.singleton hp)
-            case node of
-                FunctionName fn _ -> do
-                    args <- getFunctionArgumentRegisters fn
-                    forM_ (zip vars args) $ uncurry hptCopyVariables
-                ConstructorName name -> do
-                    args <- getNodeArgumentRegisters name
-                    forM_ (zip vars args) $ uncurry hptCopyVariables
-        Frame node vars | [ptr] <- binds -> do
             hp <- newHeapPtr
             setHeapObjects hp $ singletonObject node vars
             setPtrScope ptr (IntSet.singleton hp)

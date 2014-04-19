@@ -68,7 +68,6 @@ data SimpleExpression
 	| Alloc Int
 	| SizeOf NodeName [Variable]
 	| Store NodeName [Variable]
-	| Frame NodeName [Variable]
 	| Fetch Variable
 	| Load Variable Int
 	| Add Variable Variable
