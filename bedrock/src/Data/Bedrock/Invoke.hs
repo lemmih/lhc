@@ -1,91 +1,56 @@
 module Data.Bedrock.Invoke
-    ( invokeName, mkInvoke ) where
+    ( mkInvoke ) where
 
 import           Control.Applicative           (pure, (<$>), (<*>))
 import           Control.Monad.State
 import qualified Data.Map                      as Map
 import Data.List
+import qualified  Data.Map as Map
+import qualified Data.Vector as Vector
+import qualified Data.IntSet as IntSet
+
 
 import           Data.Bedrock
 import           Data.Bedrock.Transform
 import           Data.Bedrock.Exceptions
+import Data.Bedrock.HPT
+import Data.Bedrock.Misc
 
 
-invokeName :: [Type] -> Name
-invokeName pattern =
-    Name [] ("invoke_" ++ patternName) 0
-  where
-    patternName = map tyKey pattern
-    tyKey NodePtr   = 'p'
-    tyKey Node      = 'n'
-    tyKey Primitive = 'u'
-
-mkInvoke :: Gen ()
-mkInvoke = do
+mkInvoke :: HPTResult -> Gen ()
+mkInvoke hpt = do
     fs <- gets (Map.elems . envFunctions)
     forM_ fs $ \fn -> do
-        body' <- traverseExpression fn (fnBody fn)
+        body' <- traverseExpression hpt fn (fnBody fn)
         pushFunction fn{fnBody = body'}
-    let tyPatterns = nub $ sort $
-            concatMap (tails . map variableType . fnArguments) fs
-    forM_ tyPatterns $ mkInvokeInstance fs
+    return ()
 
-mkInvokeInstance :: [Function] -> [Type] -> Gen ()
-mkInvokeInstance fs pattern = do
-    thunk <- newVariable "thunk" Node
-    args <- forM pattern $ newVariable "arg"
-    let blanks = length pattern
-        lastN n lst = drop (length lst - n) lst
-        dropLast n = reverse . drop n . reverse
-    let _exhAlternative =
-            Alternative
-                (NodePat
-                    (ConstructorName exhFrameName)
-                    [])
-                (Panic "Exception handling is temporarily disabled.")
-        matchingFunctions =
-            [ fn
-            | fn <- fs
-            , let argTys = map variableType (fnArguments fn)
-            , pattern == lastN blanks argTys ]
-        invokeFunction fn =
-            Alternative
-                (NodePat
-                    (FunctionName (fnName fn) blanks)
-                    (dropLast blanks (fnArguments fn))) $
-                TailCall (fnName fn) $
-                    dropLast blanks (fnArguments fn) ++ args
-        body =
-            Case thunk Nothing
-                ({-exhAlternative :-} map invokeFunction matchingFunctions)
-    pushFunction Function
-        { fnName = invokeName pattern
-        , fnArguments = thunk : args
-        , fnResults = []
-        , fnBody = body }
 
-traverseExpression :: Function -> Expression -> Gen Expression
-traverseExpression origin expr =
+traverseExpression :: HPTResult -> Function -> Expression -> Gen Expression
+traverseExpression hpt origin expr =
     case expr of
         Bind binds simple rest ->
-            Bind binds simple <$> traverseExpression origin rest
+            Bind (map (setVariableSize hpt) binds) simple <$> traverseExpression hpt origin rest
         Case scrut defaultBranch alternatives ->
             Case scrut
                 <$> pure defaultBranch
-                <*> mapM (traverseAlternative origin) alternatives
+                <*> mapM (traverseAlternative hpt origin) alternatives
         Invoke obj args -> do
-            node <- newVariable "node" Node
+            let Right objects = hptScope hpt Vector.! variableIndex obj
+                names = Map.keys objects
+                mkAlt name@(FunctionName fn blanks) | blanks == length args =
+                    let partialArgs = dropLast blanks $ hptFnArgs hpt Map.! fn in
+                    Alternative (NodePat name partialArgs) $
+                    TailCall fn (map (setVariableSize hpt) $ partialArgs ++ args)
             return $
-                Bind [node] (Fetch obj) $
-                TailCall
-                    (invokeName (map variableType args)) (node : args)
+                Case (setVariableSize hpt obj) Nothing (map mkAlt names)
         other -> return other
 
-traverseAlternative :: Function -> Alternative -> Gen Alternative
-traverseAlternative origin alternative =
+traverseAlternative :: HPTResult -> Function -> Alternative -> Gen Alternative
+traverseAlternative hpt origin alternative =
     case alternative of
         Alternative pattern branch ->
-            Alternative pattern <$> traverseExpression origin branch
+            Alternative pattern <$> traverseExpression hpt origin branch
 
 
 

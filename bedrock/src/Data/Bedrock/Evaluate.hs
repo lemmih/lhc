@@ -16,7 +16,9 @@ import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.Invoke
 import           Data.Bedrock.Rename
 import           Data.Bedrock.Transform ( runGens )
-import           Data.Bedrock.HPT
+import           Data.Bedrock.HPT ( runHPT )
+import           Data.Bedrock.EvalApply
+import           Data.Bedrock.RegisterIntroduction
 
 type HeapPtr = Int
 data Value
@@ -39,6 +41,10 @@ pushHeapValue val = do
     modify $ \st -> st{ envHeapPtr = ptr+1
                       , envHeap = Map.insert ptr val (envHeap st) }
     return ptr
+
+updateHeapValue :: HeapPtr -> Value -> Eval ()
+updateHeapValue ptr val = do
+    modify $ \st -> st{ envHeap = Map.insert ptr val (envHeap st) }
 
 fetchHeapValue :: HeapPtr -> Eval Value
 fetchHeapValue ptr = do
@@ -63,17 +69,27 @@ lookupFunction name = do
 
 
 
-evaluateFromFile :: FilePath -> Name -> IO ()
-evaluateFromFile path entryPoint = do
+evaluateFromFile :: FilePath -> IO ()
+evaluateFromFile path = do
     ret <- parseFromFile parseModule path
     case ret of
         Left err -> print err
         Right m  -> do
-            let m' = unique $ runGens m
-                    [cpsTransformation, lowerAlloc, mkInvoke]
+            let m' = unique m
             print (ppModule m')
-            runHPT m'
-            evaluate m' entryPoint
+            result <- runHPT m'
+            let m'' = unique $ runGens m'
+                    [ lowerEvalApply result
+                    , cpsTransformation
+                    , lowerAlloc
+                    ]
+            print (ppModule m'')
+            result <- runHPT m''
+            let m''' = registerIntroduction $ runGens m''
+                        [ mkInvoke result
+                        ]
+            print (ppModule m''')
+            evaluate m''' (entryPoint m''')
 
 
 evaluate :: Module -> Name -> IO ()
@@ -128,6 +144,10 @@ evalAlternative value (Alternative pattern branch:alts) =
                 (evalExpression branch)
         _ -> evalAlternative value alts
 
+loadNth :: Value -> Int -> Value
+loadNth (NodeValue name args) 0 = NodeValue name []
+loadNth (NodeValue _ args) n    = args!!(n-1)
+
 evalSimple :: SimpleExpression -> Eval [Value]
 evalSimple simple =
     case simple of
@@ -138,12 +158,20 @@ evalSimple simple =
             argValues <- mapM queryScope args
             ptr <- pushHeapValue (NodeValue name argValues)
             return [HeapPtrValue ptr]
+        Frame name args -> do
+            argValues <- mapM queryScope args
+            ptr <- pushHeapValue (NodeValue name argValues)
+            return [HeapPtrValue ptr]
         SizeOf _name _args ->
             return [LitValue $ LiteralInt 0]
         Fetch var -> do
             HeapPtrValue ptr <- queryScope var
             value <- fetchHeapValue ptr
             return [value]
+        Load var nth -> do
+            HeapPtrValue ptr <- queryScope var
+            value <- fetchHeapValue ptr
+            return [loadNth value nth]
         Print var -> do
             value <- queryScope var
             liftIO $ putStr (show (ppVariable var) ++ " = ")
@@ -155,6 +183,24 @@ evalSimple simple =
             LitValue (LiteralInt b) <- queryScope rhs
             return [LitValue (LiteralInt (a+b))]
         Unit args -> mapM evalArgument args
+        Eval var -> do
+            HeapPtrValue ptr <- queryScope var
+            value <- fetchHeapValue ptr
+            case value of
+                NodeValue (FunctionName fn 0) args -> do
+                    [node] <- evalFunction fn args
+                    updateHeapValue ptr node
+                    return [node]
+                _ -> return [value]
+        Apply node arg -> do
+            value <- queryScope node
+            argValue <- queryScope arg
+            case value of
+                NodeValue (FunctionName fn 1) args -> do
+                    evalFunction fn (args ++ [argValue])
+                NodeValue (FunctionName fn n) args | n > 1 -> do
+                    return [NodeValue (FunctionName fn (n-1)) (args ++ [argValue])]
+                _ -> error $ "evaluate: invalid apply: " ++ show value
         GCAllocate{} -> return [LitValue (LiteralInt 0)]
         GCBegin -> do
             liftIO $ putStrLn "GC_Begin"

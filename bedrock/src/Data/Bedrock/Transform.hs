@@ -138,6 +138,8 @@ freeVariablesSimple simple =
             id
         Store _constructor args ->
             Set.union (Set.fromList args)
+        Frame _constructor args ->
+            Set.union (Set.fromList args)
         Fetch ptr ->
             Set.insert ptr
         Load ptr _idx ->
@@ -148,6 +150,10 @@ freeVariablesSimple simple =
             Set.insert var
         Unit args ->
             freeVariablesArguments args
+        Eval var ->
+            Set.insert var
+        Apply obj arg ->
+            Set.insert obj . Set.insert arg
 
 freeVariablesArguments :: [Argument] -> Set Variable -> Set Variable
 freeVariablesArguments = flip (foldr freeVariablesArgument)

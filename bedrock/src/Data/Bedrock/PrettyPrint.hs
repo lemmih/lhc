@@ -16,9 +16,10 @@ ppName name =
 		else text (nameIdentifier name) <> char '^' <> int (nameUnique name)
 
 ppType :: Type -> Doc
-ppType NodePtr   = Doc.char '*'
-ppType Node      = Doc.char '%'
-ppType Primitive = Doc.char '#'
+ppType NodePtr        = Doc.char '*'
+ppType Node           = Doc.char '%'
+ppType (StaticNode n) = Doc.char '%' <> Doc.int n <> Doc.char '%'
+ppType Primitive      = Doc.char '#'
 
 ppNodeDefinition :: NodeDefinition -> Doc
 ppNodeDefinition (NodeDefinition name args) =
@@ -68,11 +69,16 @@ ppSimpleExpression simple =
 		Store node args ->
 			ppSyntax "@store" <+>
 			Doc.parens (ppNode node (map ppVariable args))
+		Frame node args ->
+			ppSyntax "@frame" <+>
+			Doc.parens (ppNode node (map ppVariable args))
 		SizeOf node args ->
 			ppSyntax "@sizeOf" <+>
 			Doc.parens (ppNode node (map ppVariable args))
 		Fetch ptr ->
 			ppSyntax "@fetch" <+> ppVariable ptr
+		Load ptr nth ->
+			ppSyntax "@load" <+> ppVariable ptr <> Doc.brackets (Doc.int nth)
 		Print var ->
 			ppSyntax "@print" <+> ppVariable var
 		Add lhs rhs ->
@@ -85,6 +91,10 @@ ppSimpleExpression simple =
 			ppName fn <> Doc.parens (ppList $ map ppVariable args)
 		Unit args ->
 			ppSyntax "@unit" <> Doc.parens (ppList $ map ppArgument args)
+		Eval var ->
+			ppSyntax "@eval" <+> ppVariable var
+		Apply a b ->
+			ppSyntax "@apply" <+> ppVariable a <+> ppVariable b
 		GCAllocate n ->
 			ppSyntax "@gc_allocate" <+> Doc.int n
 		GCBegin ->
@@ -143,9 +153,13 @@ ppFunction fn =
 	Doc.char '=' Doc.<$$>
 	Doc.indent 2 (ppExpression (fnBody fn))
 
+ppEntryPoint :: Name -> Doc
+ppEntryPoint entry = text "entrypoint:" <+> ppName entry
+
 ppModule :: Module -> Doc
 ppModule m =
 	Doc.vsep (map ppNodeDefinition (nodes m)) Doc.<$$>
+	ppEntryPoint (entryPoint m) Doc.<$$>
 	Doc.vsep (map ppFunction (functions m))
 
 

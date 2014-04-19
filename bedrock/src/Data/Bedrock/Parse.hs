@@ -143,6 +143,15 @@ parseSimpleExpression = choice
 		ptr <- parseVariable <* spaces
 		return $ Fetch ptr
 	, do
+		try (string "@eval"); spaces
+		ptr <- parseVariable <* spaces
+		return $ Eval ptr
+	, do
+		try (string "@apply"); spaces
+		ptr <- parseVariable <* spaces
+		val <- parseVariable <* spaces
+		return $ Apply ptr val
+	, do
 		try (string "@print"); spaces
 		var <- parseVariable <* spaces
 		return $ Print var
@@ -203,10 +212,17 @@ parseExpression = spaces *> choice (map try
 		return $ TailCall fn args
 	]) <?> "expression"
 
+parseEntryPoint :: Parser Name
+parseEntryPoint = do
+	string "entrypoint"; spaces
+	char ':'; spaces
+	parseName isLower
+
 parseModule :: Parser Module
 parseModule =
 	Module
 		<$> many parseNodeDefinition
+		<*> parseEntryPoint
 		<*> many parseFunction
 		<*> pure (error "next free unique not defined")
 		<* eof

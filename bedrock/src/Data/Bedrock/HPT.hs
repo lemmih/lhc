@@ -1,31 +1,39 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE Haskell2010                #-}
-module Data.Bedrock.HPT ( runHPT ) where
+module Data.Bedrock.HPT
+    ( runHPT
+    , HPTResult(..)
+    , setVariableSize
+    , sizeOfNode
+    , variableIndex
+    , mergeObjectList
+    ) where
 
-import           Control.Applicative  ((<$>))
-import           Data.IntSet          (IntSet)
-import qualified Data.IntSet          as IntSet
-import           Data.Map             (Map)
-import qualified Data.Map             as Map
+import           Control.Applicative          ((<$>))
+import           Data.IntSet                  (IntSet)
+import qualified Data.IntSet                  as IntSet
+import           Data.Map                     (Map)
+import qualified Data.Map                     as Map
 --import           Data.Set            (Set)
 --import qualified Data.Set     as Set
 --import           Control.Monad.RWS.Strict
 import           Control.Monad.Reader
 import           Control.Monad.Writer
 import           Data.IORef
-import           Data.Vector          (Vector)
-import qualified Data.Vector          as Vector
-import           Data.Vector.Mutable  (IOVector)
-import qualified Data.Vector.Mutable  as MVector
+import           Data.Vector                  (Vector)
+import qualified Data.Vector                  as Vector
+import           Data.Vector.Mutable          (IOVector)
+import qualified Data.Vector.Mutable          as MVector
 --import qualified Data.Vector.Unboxed.Mutable as MUVector
-import Text.Printf
-import Data.List
+import           Data.List
 import qualified Text.PrettyPrint.ANSI.Leijen as Doc
+import           Text.Printf
 
 
 import           Data.Bedrock
-import           Data.Bedrock.Rename
 import           Data.Bedrock.PrettyPrint
+import           Data.Bedrock.Rename
+import           Data.Bedrock.Misc
 
 
 
@@ -43,7 +51,7 @@ sum [] = 0
 sum (x:xs) = x + sum xs
 -}
 
-runHPT :: Module -> IO ()
+runHPT :: Module -> IO HPTResult
 runHPT mOrigin = do
     -- ensure uniqueness
     -- count number of stores
@@ -52,16 +60,17 @@ runHPT mOrigin = do
     let m = unique mOrigin
         nStores = countStores m
         fnArgs = Map.fromList
-            [ (fnName fn, fnArguments fn) | fn <- functions m ] 
-        (fnRets, highestUnique) = mkFnRets m
+            [ (fnName fn, fnArguments fn) | fn <- functions m ]
+        (fnRets, nextFree) = mkFnRets (freeUnique m) m
+        (nodeArgs, highestUnique) = mkNodeArgs nextFree m
     heapVector <- MVector.replicate nStores Map.empty :: IO Heap
     heapPtr <- newIORef 0
 
     scope <- MVector.replicate highestUnique (Right Map.empty)
-    let env = Env
+    let env = HPTState
             { envFnArgs = fnArgs
             , envFnRets = fnRets
-            , envNodeArgs = error "node args"
+            , envNodeArgs = nodeArgs
             , envScope = scope
             , envHeap = heapVector
             , envSharedVariables = error "shared vars"
@@ -74,7 +83,8 @@ runHPT mOrigin = do
     let iter = appEndo iterEndo (return ()) :: HPT ()
     runHPTLoop initHeap initScope env iter
 
-runHPTLoop :: Vector Objects -> Vector (Either HeapPtrSet Objects) -> Env -> HPT () -> IO ()
+runHPTLoop :: Vector Objects -> Vector (Either HeapPtrSet Objects) -> HPTState
+           -> HPT () -> IO HPTResult
 runHPTLoop oldHeap oldScope env iter = do
     putStrLn "Iteration..."
     _ <- runReaderT (execWriterT (unHPT iter)) env
@@ -83,6 +93,12 @@ runHPTLoop oldHeap oldScope env iter = do
     if oldHeap == newHeap && oldScope == newScope
         then do
             ppEnv newHeap newScope
+            return HPTResult
+                { hptFnArgs = envFnArgs env
+                , hptFnRets = envFnRets env
+                , hptNodeArgs = envNodeArgs env
+                , hptScope = newScope
+                , hptHeap = newHeap }
         else runHPTLoop newHeap newScope env iter
 
 ppEnv :: Vector Objects -> Vector (Either HeapPtrSet Objects) -> IO ()
@@ -104,14 +120,23 @@ ppEnv heap scope = do
         show (ppNode nodeName (map (Doc.text . show . IntSet.toList) (Vector.toList args)))
 
 
-mkFnRets :: Module -> (FnRets, Int)
-mkFnRets m = worker (freeUnique m) [] (functions m)
+mkFnRets :: Int -> Module -> (FnRets, Int)
+mkFnRets free m = worker free [] (functions m)
   where
     worker n acc [] = (Map.fromList acc, n)
     worker n acc (fn:fns) =
         let rets = [ Variable (Name [] "ret" idNum) ty | (idNum, ty) <- zip [n..] (fnResults fn) ]
             acc' = (fnName fn, rets) : acc
         in worker (n+length (fnResults fn)) acc' fns
+
+mkNodeArgs :: Int -> Module -> (NodeArgs, Int)
+mkNodeArgs free m = worker free [] (nodes m)
+  where
+    worker n acc [] = (Map.fromList acc, n)
+    worker n acc (NodeDefinition name tys:ns) =
+        let rets = [ Variable (Name [] "arg" idNum) ty | (idNum, ty) <- zip [n..] tys ]
+            acc' = (name, rets) : acc
+        in worker (n+length tys) acc' ns
 
 countStores :: Module -> Int
 countStores = getSum . execWriter . mapM_ countFn . functions
@@ -128,22 +153,31 @@ countStores = getSum . execWriter . mapM_ countFn . functions
     countSimple simple =
         case simple of
             Store{} -> tell (Sum 1)
+            Frame{} -> tell (Sum 1)
             _       -> return ()
 
-data Env = Env
+data HPTResult = HPTResult
+    { hptFnArgs   :: !FnArgs
+    , hptFnRets   :: !FnRets
+    , hptNodeArgs :: !NodeArgs
+    , hptScope    :: !(Vector (Either HeapPtrSet Objects))
+    , hptHeap     :: !(Vector Objects)
+    }
+
+data HPTState = HPTState
     { envFnArgs              :: !FnArgs
     , envFnRets              :: !FnRets
-    , envNodeArgs            :: NodeArgs
+    , envNodeArgs            :: !NodeArgs
     , envScope               :: !Scope
     , envHeap                :: !Heap
     , envSharedVariables     :: PtrSharingMap
     , envSharedHeapLocations :: HeapSharingMap
     , envFreeHeapPtr         :: !(IORef HeapPtr)
     }
-newtype HPT a = HPT { unHPT :: WriterT (Endo (HPT ())) (ReaderT Env IO) a }
+newtype HPT a = HPT { unHPT :: WriterT (Endo (HPT ())) (ReaderT HPTState IO) a }
     deriving
         ( Functor, Monad, MonadIO
-        , MonadWriter (Endo (HPT ())), MonadReader Env )
+        , MonadWriter (Endo (HPT ())), MonadReader HPTState )
 
 type HeapPtr = Int
 -- Use newtypes?
@@ -154,7 +188,7 @@ type NameSet = IntSet
 -- created once, used once. Not used in iterations.
 type FnArgs = Map Name [Variable]
 type FnRets = Map Name [Variable]
-type NodeArgs = Map Name NameSet
+type NodeArgs = Map Name [Variable]
 
 -- Variables are shared if they're used more than once.
 -- Heap locations are shared if referred to by a shared variable or
@@ -171,6 +205,19 @@ type Heap = IOVector Objects
 --type DirtyScope = MVector Bool
 --type DirtyHeap  = MVector Bool
 
+sizeOfNode :: HPTResult -> Variable -> Int
+sizeOfNode hpt var =
+    maximum (map Vector.length (Map.elems objects)) + 1
+  where
+    Right objects = hptScope hpt Vector.! variableIndex var
+
+setVariableSize :: HPTResult -> Variable -> Variable
+setVariableSize hpt var =
+    case variableType var of
+        Node -> var{variableType = StaticNode (sizeOfNode hpt var)}
+        _    -> var
+
+
 getFunctionReturnRegisters :: Name -> HPT [Variable]
 getFunctionReturnRegisters name = do
     rets <- asks envFnRets
@@ -185,6 +232,13 @@ getFunctionArgumentRegisters name = do
     case Map.lookup name args of
         Nothing    -> error $ "Function arguments not defined for: " ++
                               show name
+        Just names -> return names
+
+getNodeArgumentRegisters :: Name -> HPT [Variable]
+getNodeArgumentRegisters name = do
+    args <- asks envNodeArgs
+    case Map.lookup name args of
+        Nothing -> error "Node argument not defined"
         Just names -> return names
 
 singletonObject :: NodeName -> [Variable] -> Objects
@@ -214,8 +268,10 @@ getNodeScope = getNodeScope' . variableIndex
 getNodeScope' :: Int -> HPT Objects
 getNodeScope' index = do
     scope <- asks envScope
-    Right objects <- liftIO $ MVector.read scope index
-    return objects
+    addr <- liftIO $ MVector.read scope index
+    case addr of
+        Right objects -> return objects
+        _             -> error $ "HPT: Var should have been a node: " ++ show index
 
 getPtrScope :: Variable -> HPT HeapPtrSet
 getPtrScope = getPtrScope' . variableIndex
@@ -228,7 +284,7 @@ getPtrScope' index = do
         Left ptrs -> return ptrs
         Right objs
             | Map.null objs -> return IntSet.empty
-            | otherwise     -> error "Ptr not referring to heap objects"
+            | otherwise     -> error $ "Ptr not referring to heap objects: " ++ show index
 
 getHeapObjects :: HeapPtr -> HPT Objects
 getHeapObjects hp = do
@@ -243,13 +299,14 @@ setHeapObjects hp objects = do
         MVector.write heap hp (mergeObjects objects oldObjects)
 
 setNodeScope :: Variable -> Objects -> HPT ()
-setNodeScope var objects = do
+setNodeScope = setNodeScope' . variableIndex
+
+setNodeScope' :: Int -> Objects -> HPT ()
+setNodeScope' index objects = do
     scope <- asks envScope
     liftIO $ do
         Right oldObjects <- MVector.read scope index
         MVector.write scope index (Right $ mergeObjects objects oldObjects)
-  where
-    index = variableIndex var
 
 setPtrScope :: Variable -> HeapPtrSet -> HPT ()
 setPtrScope var heapPtrs = do
@@ -296,7 +353,6 @@ hptCopyVariables src dst =
     case variableType src of
         Primitive -> return ()
         NodePtr -> do
-            initPtrScope dst IntSet.empty
             eachIteration $ do
                 ptrs <- getPtrScope src
                 setPtrScope dst ptrs
@@ -304,6 +360,7 @@ hptCopyVariables src dst =
             eachIteration $ do
                 objects <- getNodeScope src
                 setNodeScope dst objects
+        StaticNode n -> return ()
 
 extract :: Objects -> NodeName -> Int -> NameSet
 extract objs name nth =
@@ -363,6 +420,53 @@ hptExpression origin expr =
             foreignArgs <- getFunctionArgumentRegisters fn
             forM_ (zip foreignRets originRets) $ uncurry hptCopyVariables
             forM_ (zip vars foreignArgs) $ uncurry hptCopyVariables
+        {-TailEval ptrRef cont -> eachIteration $ do
+            ptrs <- IntSet.toList <$> getPtrScope ptrRef
+            objects <- mergeObjectList <$> mapM getHeapObjects ptrs
+            contPtrs <- IntSet.toList <$> getPtrScope cont
+            contObjects <- mergeObjectList <$> mapM getHeapObjects contPtrs
+            forM_ (Map.toList objects) $ \(nodeName, args) -> do
+                case nodeName of
+                    FunctionName name 1 -> do
+                        fnArgs <- getFunctionArgumentRegisters name
+                        hptCopyVariables cont (last fnArgs)
+
+                        forM_ (Map.keys contObjects) $ \frame -> do
+                            case frame of
+                                FunctionName fName 1 -> do
+                                    fArgs <- getFunctionArgumentRegisters fName
+                                    updatedObj <- getNodeScope (last fArgs)
+                                    liftIO $ print (ptrRef, last fArgs, updatedObj)
+                                    -- FIXME: We only need to update the ptrs if
+                                    --   there is sharing.
+                                    forM_ ptrs $ \ptr -> setHeapObjects ptr updatedObj
+                    _ -> return () -- setNodeScope objRef (Map.singleton nodeName args)
+                    -}
+        --TailApply obj arg cont -> eachIteration $ do
+        --    objects <- getNodeScope obj
+        --    forM_ (Map.toList objects) $ \(nodeName, args) -> do
+        --        case nodeName of
+        --            FunctionName name 2 -> do
+        --                fnArgs <- getFunctionArgumentRegisters name
+        --                hptCopyVariables cont (last fnArgs)
+        --                hptCopyVariables arg (last (init fnArgs))
+
+        --            FunctionName name n | n > 2 -> do
+        --                let newObjects = Map.singleton (FunctionName name (n-1)) (Vector.snoc args (IntSet.singleton (variableIndex arg)))
+        --                setNodeScope objRef newObjects
+        --                fnArgs <- getFunctionArgumentRegisters name
+        --                hptCopyVariables arg (fnArgs!!(length fnArgs-n))
+        --            _ -> error $ "invalid apply: " ++ show (objRef, nodeName)
+        Invoke obj args -> do
+            objects <- getNodeScope obj
+            forM_ (Map.toList objects) $ \(name, partialArgs) -> do
+                case name of
+                    FunctionName fn blanks | blanks == length args -> do
+                        fnArgs <- getFunctionArgumentRegisters fn
+                        let missingArgs = takeLast blanks fnArgs
+                        forM_ (zip args missingArgs) $
+                            uncurry hptCopyVariables
+                    _ -> error $ "HPT Invoke: " ++ show name
         Exit -> return ()
         Panic{} -> return ()
 
@@ -373,6 +477,24 @@ hptSimpleExpression binds simple =
             hp <- newHeapPtr
             setHeapObjects hp $ singletonObject node vars
             initPtrScope ptr (IntSet.singleton hp)
+            case node of
+                FunctionName fn _ -> do
+                    args <- getFunctionArgumentRegisters fn
+                    forM_ (zip vars args) $ uncurry hptCopyVariables
+                ConstructorName name -> do
+                    args <- getNodeArgumentRegisters name
+                    forM_ (zip vars args) $ uncurry hptCopyVariables
+        Frame node vars | [ptr] <- binds -> do
+            hp <- newHeapPtr
+            setHeapObjects hp $ singletonObject node vars
+            initPtrScope ptr (IntSet.singleton hp)
+            case node of
+                FunctionName fn _ -> do
+                    args <- getFunctionArgumentRegisters fn
+                    forM_ (zip vars args) $ uncurry hptCopyVariables
+                ConstructorName name -> do
+                    args <- getNodeArgumentRegisters name
+                    forM_ (zip vars args) $ uncurry hptCopyVariables
         Fetch ptrRef | [node] <- binds -> do
             eachIteration $ do
                 ptrs <- IntSet.toList <$> getPtrScope ptrRef
@@ -391,6 +513,38 @@ hptSimpleExpression binds simple =
             foreignArgs <- getFunctionArgumentRegisters fn
             forM_ (zip vars foreignArgs) $ uncurry hptCopyVariables
             forM_ (zip foreignRets binds) $ uncurry hptCopyVariables
+        Eval ptrRef | [objRef] <- binds -> eachIteration $ do
+            ptrs <- IntSet.toList <$> getPtrScope ptrRef
+            objects <- mergeObjectList <$> mapM getHeapObjects ptrs
+            forM_ (Map.toList objects) $ \(nodeName, args) -> do
+                case nodeName of
+                    FunctionName name 0 -> do
+                        [foreignRet] <- getFunctionReturnRegisters name
+                        foreignObjs <- getNodeScope foreignRet
+                        setNodeScope objRef foreignObjs
+                        -- FIXME: We only need to update the ptrs if
+                        --   there is sharing.
+                        forM_ ptrs $ \ptr -> setHeapObjects ptr foreignObjs
+                    _ -> setNodeScope objRef (Map.singleton nodeName args)
+        Apply fn arg | [objRef] <- binds -> eachIteration $ do
+            -- fn is node
+            -- arg is nodePtr
+            -- objRef is node
+            objects <- getNodeScope fn
+            forM_ (Map.toList objects) $ \(nodeName, args) -> do
+                case nodeName of
+                    FunctionName name 1 -> do
+                        [foreignRet] <- getFunctionReturnRegisters name
+                        foreignObjs <- getNodeScope foreignRet
+                        setNodeScope objRef foreignObjs
+                        fnArgs <- getFunctionArgumentRegisters name
+                        hptCopyVariables arg (last fnArgs)
+                    FunctionName name n | n > 1 -> do
+                        let newObjects = Map.singleton (FunctionName name (n-1)) (Vector.snoc args (IntSet.singleton (variableIndex arg)))
+                        setNodeScope objRef newObjects
+                        fnArgs <- getFunctionArgumentRegisters name
+                        hptCopyVariables arg (fnArgs!!(length fnArgs-n))
+                    _ -> error $ "invalid apply: " ++ show (objRef, nodeName)
         Add{} -> return ()
         Print{} -> return ()
         GCAllocate{} -> return ()

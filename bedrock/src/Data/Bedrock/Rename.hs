@@ -82,9 +82,11 @@ uniqModule m =
     renameAll (map fnName (functions m)) $ do
         ns  <- mapM uniqNode (nodes m)
         fns <- mapM uniqFunction (functions m)
+        entry <- resolveName (entryPoint m)
         u   <- newUnique
         return Module
             { nodes = ns
+            , entryPoint = entry
             , functions = fns
             , freeUnique = u }
 
@@ -159,11 +161,17 @@ uniqSimple simple =
         SizeOf{} -> error "uniqSimple: SizeOf"
         Store nodeName vars ->
             Store <$> resolveNodeName nodeName <*> mapM resolve vars
+        Frame nodeName vars ->
+            Frame <$> resolveNodeName nodeName <*> mapM resolve vars
         Fetch var ->
             Fetch <$> resolve var
         Load{} -> error "uniqSimple: Load"
         Add a b ->
             Add <$> resolve a <*> resolve b
+        Eval var ->
+            Eval <$> resolve var
+        Apply a b ->
+            Apply <$> resolve a <*> resolve b
         Print var ->
             Print <$> resolve var
         ReadGlobal{} -> error "uniqSimple: ReadGlobal"

@@ -5,7 +5,8 @@ data Name = Name
 	, nameIdentifier :: String
 	, nameUnique     :: Int
 	} deriving (Show, Eq, Ord)
-data Type = NodePtr | Node | Primitive
+type NodeSize = Int
+data Type = NodePtr | Node | StaticNode NodeSize | Primitive
 	deriving (Show, Eq, Ord)
 data Variable = Variable
 	{ variableName :: Name
@@ -14,6 +15,7 @@ data Variable = Variable
 
 data Module = Module
 	{ nodes      :: [NodeDefinition]
+	, entryPoint :: Name
 	, functions  :: [Function]
 	, freeUnique :: Int
 	-- CAFs?
@@ -60,6 +62,7 @@ data SimpleExpression
 	| Alloc Int
 	| SizeOf NodeName [Variable]
 	| Store NodeName [Variable]
+	| Frame NodeName [Variable]
 	| Fetch Variable
 	| Load Variable Int
 	| Add Variable Variable
@@ -67,6 +70,9 @@ data SimpleExpression
 	| ReadGlobal String
 	| WriteGlobal String Variable
 	| Unit [Argument]
+	-- Eval/Apply
+	| Eval Variable
+	| Apply Variable Variable
 	-- GC
 	| GCAllocate Int
 	| GCBegin

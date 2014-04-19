@@ -75,8 +75,11 @@ cpsExpression origin expression =
         Bind binds simple rest ->
             cpsSimpleExpresion origin binds simple =<<
                 cpsExpression origin rest
-        Return args ->
-            return $ Invoke stdContinuation args
+        Return args -> do
+            node <- newVariable "contNode" Node
+            return $
+                Bind [node] (Fetch stdContinuation) $
+                Invoke node args
         Case scrut defaultBranch alternatives ->
             Case scrut
                 <$> pure defaultBranch
@@ -84,6 +87,8 @@ cpsExpression origin expression =
         Throw exception ->
             --return $ ThrowTo stdContinuation exception
             return $ TailCall throwToName [stdContinuation, exception]
+        TailCall fn args ->
+            pure $ TailCall fn (args ++ [stdContinuation])
         other -> return other
 
 exhFrameName :: Name
@@ -141,15 +146,18 @@ cpsSimpleExpresion origin binds simple rest =
                      , fnBody      = rest }
         return $
             Bind [stdContinuationFrame]
-                (Store (FunctionName contFnName (length binds))
+                (Frame (FunctionName contFnName (length binds))
                     continuationArgs) $
             use stdContinuationFrame
 
 cpsAlternative :: Function -> Alternative -> Gen Alternative
-cpsAlternative origin alternative =
-    case alternative of
-        Alternative pattern expr ->
-            Alternative pattern <$> cpsExpression origin expr
+cpsAlternative origin (Alternative pattern expr) =
+    case pattern of
+        NodePat (FunctionName fn n) args ->
+            Alternative
+                (NodePat (FunctionName fn (n+1)) args)
+                <$> cpsExpression origin expr
+        _ -> Alternative pattern <$> cpsExpression origin expr
 
 
 

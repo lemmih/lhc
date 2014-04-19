@@ -126,7 +126,7 @@ transformSimpleExpresion origin binds simple rest =
                 markScope (var, markedVar) = Bind [markedVar] $
                     case variableType var of
                         NodePtr   -> GCMark var
-                        Node      -> GCMarkNode var
+                        Node{}    -> GCMarkNode var
                         -- Application gcMarkNodeName [var]
                         Primitive -> Unit [RefArg var]
 
