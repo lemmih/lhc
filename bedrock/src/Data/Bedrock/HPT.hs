@@ -51,12 +51,9 @@ sum [] = 0
 sum (x:xs) = x + sum xs
 -}
 
+-- All identifiers are required to be unique.
 runHPT :: Module -> IO HPTResult
 runHPT mOrigin = do
-    -- ensure uniqueness
-    -- count number of stores
-    -- allocate heap ptrs to match
-    -- create initial ptr sharing map
     let m = unique mOrigin
         nStores = countStores m
         fnArgs = Map.fromList
@@ -360,7 +357,7 @@ hptCopyVariables src dst =
             eachIteration $ do
                 objects <- getNodeScope src
                 setNodeScope dst objects
-        StaticNode n -> return ()
+        StaticNode{} -> return ()
 
 extract :: Objects -> NodeName -> Int -> NameSet
 extract objs name nth =
@@ -420,46 +417,9 @@ hptExpression origin expr =
             foreignArgs <- getFunctionArgumentRegisters fn
             forM_ (zip foreignRets originRets) $ uncurry hptCopyVariables
             forM_ (zip vars foreignArgs) $ uncurry hptCopyVariables
-        {-TailEval ptrRef cont -> eachIteration $ do
-            ptrs <- IntSet.toList <$> getPtrScope ptrRef
-            objects <- mergeObjectList <$> mapM getHeapObjects ptrs
-            contPtrs <- IntSet.toList <$> getPtrScope cont
-            contObjects <- mergeObjectList <$> mapM getHeapObjects contPtrs
-            forM_ (Map.toList objects) $ \(nodeName, args) -> do
-                case nodeName of
-                    FunctionName name 1 -> do
-                        fnArgs <- getFunctionArgumentRegisters name
-                        hptCopyVariables cont (last fnArgs)
-
-                        forM_ (Map.keys contObjects) $ \frame -> do
-                            case frame of
-                                FunctionName fName 1 -> do
-                                    fArgs <- getFunctionArgumentRegisters fName
-                                    updatedObj <- getNodeScope (last fArgs)
-                                    liftIO $ print (ptrRef, last fArgs, updatedObj)
-                                    -- FIXME: We only need to update the ptrs if
-                                    --   there is sharing.
-                                    forM_ ptrs $ \ptr -> setHeapObjects ptr updatedObj
-                    _ -> return () -- setNodeScope objRef (Map.singleton nodeName args)
-                    -}
-        --TailApply obj arg cont -> eachIteration $ do
-        --    objects <- getNodeScope obj
-        --    forM_ (Map.toList objects) $ \(nodeName, args) -> do
-        --        case nodeName of
-        --            FunctionName name 2 -> do
-        --                fnArgs <- getFunctionArgumentRegisters name
-        --                hptCopyVariables cont (last fnArgs)
-        --                hptCopyVariables arg (last (init fnArgs))
-
-        --            FunctionName name n | n > 2 -> do
-        --                let newObjects = Map.singleton (FunctionName name (n-1)) (Vector.snoc args (IntSet.singleton (variableIndex arg)))
-        --                setNodeScope objRef newObjects
-        --                fnArgs <- getFunctionArgumentRegisters name
-        --                hptCopyVariables arg (fnArgs!!(length fnArgs-n))
-        --            _ -> error $ "invalid apply: " ++ show (objRef, nodeName)
         Invoke obj args -> do
             objects <- getNodeScope obj
-            forM_ (Map.toList objects) $ \(name, partialArgs) -> do
+            forM_ (Map.keys objects) $ \name -> do
                 case name of
                     FunctionName fn blanks | blanks == length args -> do
                         fnArgs <- getFunctionArgumentRegisters fn

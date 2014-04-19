@@ -77,23 +77,23 @@ evaluateFromFile path = do
         Right m  -> do
             let m' = unique m
             print (ppModule m')
-            result <- runHPT m'
+            hpt1 <- runHPT m'
             let m'' = unique $ runGens m'
-                    [ lowerEvalApply result
+                    [ lowerEvalApply hpt1
                     , cpsTransformation
                     , lowerAlloc
                     ]
             print (ppModule m'')
-            result <- runHPT m''
+            hpt2 <- runHPT m''
             let m''' = registerIntroduction $ runGens m''
-                        [ mkInvoke result
+                        [ mkInvoke hpt2
                         ]
             print (ppModule m''')
-            evaluate m''' (entryPoint m''')
+            evaluate m'''
 
 
-evaluate :: Module -> Name -> IO ()
-evaluate m entryPoint = do
+evaluate :: Module -> IO ()
+evaluate m = do
     _ <- evalRWST entry Map.empty env
     return ()
   where
@@ -101,7 +101,7 @@ evaluate m entryPoint = do
         { envFunctions = Map.fromList [ (fnName fn, fn) | fn <- functions m ]
         , envHeap      = Map.empty
         , envHeapPtr   = 0 }
-    entry = evalFunction entryPoint [LitValue $ LiteralInt 0]
+    entry = evalFunction (entryPoint m) [LitValue $ LiteralInt 0]
 
 evalFunction :: Name -> [Value] -> Eval [Value]
 evalFunction name args = do
@@ -145,8 +145,8 @@ evalAlternative value (Alternative pattern branch:alts) =
         _ -> evalAlternative value alts
 
 loadNth :: Value -> Int -> Value
-loadNth (NodeValue name args) 0 = NodeValue name []
-loadNth (NodeValue _ args) n    = args!!(n-1)
+loadNth (NodeValue name _args) 0 = NodeValue name []
+loadNth (NodeValue _ args) n     = args!!(n-1)
 
 evalSimple :: SimpleExpression -> Eval [Value]
 evalSimple simple =

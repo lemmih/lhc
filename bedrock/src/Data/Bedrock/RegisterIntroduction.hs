@@ -35,11 +35,6 @@ newName name = do
     u <- newUnique
     return name{ nameUnique = u }
 
-newVariable :: String -> Type -> Uniq Variable
-newVariable name ty = do
-    u <- newUnique
-    return (Variable (Name [] name u) ty)
-
 lower :: Variable -> Uniq a -> Uniq a
 lower old action =
     case variableType old of
@@ -98,8 +93,11 @@ uniqExpression expr =
         Bind binds (Unit args) rest -> lowerMany binds $ do
             rocks <- forM (zip binds args) $ \(bind, arg) ->
                 case arg of
-                    RefArg var -> Bind <$> resolve bind <*> (Unit <$> fmap (map RefArg) (resolve var))
-                    LitArg lit -> return $ Bind [bind] (Unit [arg])
+                    RefArg var ->
+                        Bind
+                            <$> resolve bind
+                            <*> (Unit <$> fmap (map RefArg) (resolve var))
+                    LitArg{} -> return $ Bind [bind] (Unit [arg])
                     NodeArg nodeName nodeArgs -> do
                         (tag:nodeBinds) <- resolve bind
                         return $
