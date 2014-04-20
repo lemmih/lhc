@@ -34,7 +34,21 @@ Shared nothing concurrency.
           overhead than an MVar.
     SChan: Like Chan but can be shared.
 
+Holes
+  How to compile this: let ones = 1 : ones
+
+  ptr <- store (Cons 1 hole)
+  update ptr[2] ptr
+
+  ptr <- alloc
+  update ptr (Cons 1 ptr)
+
+  Implicit fix-point? Lowered to alloc+update later.
+  ptr <- store (Cons 1 ptr)
+
 Garbage collection of CAFs.
+  Trivial. We statically know which CAFs are referrable by all
+  suspended functions.
 
 Constant objects.
   GHC statically allocates a bag of small objects (ints and chars of small
