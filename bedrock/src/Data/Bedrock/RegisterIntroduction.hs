@@ -31,7 +31,7 @@ newUnique mbTy = do
     let (idNum, ns') = case mbTy of
             Nothing -> newGlobalID ns
             Just ty -> newIDByType ns ty
-    put $ ns'
+    put ns'
     return idNum
 
 newName :: Maybe Type -> Name -> Uniq Name
@@ -50,8 +50,7 @@ lower old action =
         _  -> action
 
 lowerMany :: [Variable] -> Uniq a -> Uniq a
-lowerMany [] action = action
-lowerMany (x:xs) action = lower x (lowerMany xs action)
+lowerMany xs action = foldr lower action xs
 
 resolve :: Variable -> Uniq [Variable]
 resolve var = asks $ Map.findWithDefault [var] var
@@ -75,7 +74,7 @@ uniqModule m =
             }
 
 uniqNode :: NodeDefinition -> Uniq NodeDefinition
-uniqNode x = return x {-
+uniqNode = return {-
 uniqNode (NodeDefinition name args) = 
     NodeDefinition <$> resolveName name <*> pure args
 -}

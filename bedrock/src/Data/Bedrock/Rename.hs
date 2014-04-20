@@ -34,7 +34,7 @@ newUnique mbTy = do
     let (idNum, ns') = case mbTy of
             Nothing -> newGlobalID ns
             Just ty -> newIDByType ns ty
-    put $ ns'
+    put ns'
     return idNum
 
 newName :: Maybe Type -> Name -> Uniq Name
@@ -48,8 +48,7 @@ rename mbTy old action = do
     local (Map.insert old new) action
 
 renameAll :: [Name] -> Uniq a -> Uniq a
-renameAll [] action = action
-renameAll (x:xs) action = rename Nothing x (renameAll xs action)
+renameAll xs action = foldr (rename Nothing) action xs
 
 renameVariables :: [Variable] -> Uniq a -> Uniq a
 renameVariables [] action     = action
@@ -144,7 +143,7 @@ uniqAlternative (Alternative pattern branch) =
     case pattern of
         LitPat{} -> Alternative pattern <$> uniqExpression branch
         NodePat nodeName vars ->
-            renameVariables vars $ do
+            renameVariables vars $
                 Alternative
                     <$> (NodePat
                         <$> resolveNodeName nodeName

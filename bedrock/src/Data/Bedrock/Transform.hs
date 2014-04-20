@@ -1,6 +1,7 @@
 module Data.Bedrock.Transform where
 
 import           Control.Monad.State
+import           Data.List           (foldl')
 import           Data.Map            (Map)
 import qualified Data.Map            as Map
 import           Data.Set            (Set)
@@ -75,8 +76,7 @@ runGen initModule gen =
         }
 
 runGens :: Module -> [Gen ()] -> Module
-runGens m [] = m
-runGens m (gen:gens) = runGens (runGen m gen) gens
+runGens = foldl' runGen
 
 
 --usedNodes :: Expression -> Set NodeName
