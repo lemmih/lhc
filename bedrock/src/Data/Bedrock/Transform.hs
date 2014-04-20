@@ -136,6 +136,8 @@ freeVariablesSimple simple =
             Set.union (Set.fromList (exhArgs ++ fnArgs))
         Alloc{} ->
             id
+        GCAllocate{} ->
+            id
         Store _constructor args ->
             Set.union (Set.fromList args)
         Fetch ptr ->

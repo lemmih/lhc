@@ -175,6 +175,8 @@ uniqSimple simple =
             Store <$> resolveNodeName nodeName <*> mapM resolve vars
         Fetch var ->
             Fetch <$> resolve var
+        Load var idx ->
+            Load <$> resolve var <*> pure idx
         Load{} -> error "uniqSimple: Load"
         Add a b ->
             Add <$> resolve a <*> resolve b

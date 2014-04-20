@@ -19,6 +19,7 @@ import           Data.Bedrock.Transform ( runGens )
 import           Data.Bedrock.HPT ( runHPT, ppHPTResult )
 import           Data.Bedrock.EvalApply
 import           Data.Bedrock.RegisterIntroduction
+import           Data.Bedrock.LLVM as LLVM
 
 type HeapPtr = Int
 data Value
@@ -82,16 +83,18 @@ evaluateFromFile path = do
             let m'' = unique $ runGens m'
                     [ lowerEvalApply hpt1
                     , cpsTransformation
-                    , lowerAlloc
+                    -- , lowerAlloc
                     ]
             print (ppModule m'')
             let hpt2 = runHPT m''
             ppHPTResult hpt2
-            let m''' = registerIntroduction $ runGens m''
+            let m3 = registerIntroduction $ runGens m''
                         [ mkInvoke hpt2
                         ]
-            print (ppModule m''')
-            evaluate m'''
+                m4 = unique $ runGens m3 [ lowerAlloc ]
+            print (ppModule m4)
+            evaluate m4
+            LLVM.compile m4
 
 
 evaluate :: Module -> IO ()
@@ -199,18 +202,18 @@ evalSimple simple =
                 NodeValue (FunctionName fn n) args | n > 1 -> do
                     return [NodeValue (FunctionName fn (n-1)) (args ++ [argValue])]
                 _ -> error $ "evaluate: invalid apply: " ++ show value
-        GCAllocate{} -> return [LitValue (LiteralInt 0)]
+        GCAllocate{} -> return [LitValue (LiteralInt 1)]
         GCBegin -> do
-            liftIO $ putStrLn "GC_Begin"
+            --liftIO $ putStrLn "GC_Begin"
             return []
         GCEnd -> do
-            liftIO $ putStrLn "GC_End"
+            --liftIO $ putStrLn "GC_End"
             return []
         GCMark var -> do
             value <- queryScope var
-            liftIO $ putStr     "GCMark: "
-            trace <- traceValue value
-            liftIO $ putStrLn trace
+            --liftIO $ putStr     "GCMark: "
+            --trace <- traceValue value
+            --liftIO $ putStrLn trace
             return [value]
         _ -> error $ "Unhandled expr: " ++ show simple
 

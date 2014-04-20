@@ -114,6 +114,12 @@ uniqExpression expr =
             binds' <- resolveMany binds
             rest' <- uniqExpression rest
             return $ foldr (\(n,b) -> Bind [b] (Load ptr n)) rest' (zip [0..] binds')
+        Bind [bind] (Store nodeName args) rest -> do
+            args' <- resolveMany args
+            rest' <- uniqExpression rest
+            return $
+                Bind [] (Alloc $ 1 + length args) $
+                Bind [bind] (Store nodeName args') rest'
         Bind binds simple rest -> lowerMany binds $
             Bind
                 <$> resolveMany binds

@@ -31,4 +31,4 @@ library
   -- other-modules:       
   build-depends:       base ==4.*, ansi-wl-pprint,
                        parsec, containers, mtl, vector,
-                       llvm
+                       llvm-base
