@@ -70,6 +70,11 @@ Garbage collection:
     heap. If we use another 1/4 to allow for compaction then only half the
     heap is available to the mutator before a GC is triggered.
 
+  Trivial collectors:
+    NoGC, fixed. Allocate a single chunk, never grow it.
+    NoGC, growing. Allocate as needed, never GC.
+    Boehm.
+
 
 Things to benchmark:
   How much does it cost to limit the mutator with a fuel argument?
