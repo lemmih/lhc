@@ -96,10 +96,11 @@ uniqModule m =
         entry <- resolveName (entryPoint m)
         namespace <- get
         return Module
-            { nodes = ns
+            { modForeigns = modForeigns m
+            , nodes = ns
             , entryPoint = entry
             , functions = fns
-            , moduleNamespace = namespace
+            , modNamespace = namespace
             }
 
 uniqNode :: NodeDefinition -> Uniq NodeDefinition
@@ -173,11 +174,14 @@ uniqSimple simple =
         SizeOf{} -> error "uniqSimple: SizeOf"
         Store nodeName vars ->
             Store <$> resolveNodeName nodeName <*> mapM resolve vars
+        Write ptr idx arg ->
+            Write <$> resolve ptr <*> pure idx <*> resolveArgument arg
+        Address var idx ->
+            Address <$> resolve var <*> pure idx
         Fetch var ->
             Fetch <$> resolve var
         Load var idx ->
             Load <$> resolve var <*> pure idx
-        Load{} -> error "uniqSimple: Load"
         Add a b ->
             Add <$> resolve a <*> resolve b
         Eval var ->
@@ -186,6 +190,9 @@ uniqSimple simple =
             Apply <$> resolve a <*> resolve b
         Print var ->
             Print <$> resolve var
+        ReadRegister{} -> return simple
+        WriteRegister reg var ->
+            WriteRegister reg <$> resolve var
         ReadGlobal{} -> error "uniqSimple: ReadGlobal"
         WriteGlobal{} -> error "uniqSimple: WriteGlobal"
         Unit args ->

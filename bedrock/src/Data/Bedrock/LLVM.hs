@@ -53,8 +53,12 @@ compile bedrock = do
             Just entryFn <- liftIO $ LLVM.getNamedFunction m (uniqueName $ entryPoint bedrock)
         
             liftIO $ LLVM.positionAtEnd bld entry
-            zero <- constWord 0
-            call <- buildCall entryFn [zero] ""
+            wordTy <- asks envWordTy
+            heapSize <- constWord (1024*1024)
+            heapPtr <- buildArrayMalloc wordTy heapSize ""
+            heapWord <- castPtrToWord heapPtr
+            zeroes <- replicateM (nMainArgs-1) (constWord 0)
+            call <- buildCall entryFn (heapWord:zeroes) ""
             liftIO $ LLVM.setInstructionCallConv call LLVM.Fast
             buildRetVoid
             return ()
@@ -63,6 +67,8 @@ compile bedrock = do
     LLVM.writeBitcodeToFile m "output.bc"
     --LLVM.destroyModule m
     return ()
+  where
+    nMainArgs = head [ length (fnArguments fn) | fn <- functions bedrock, fnName fn == entryPoint bedrock ]
 
 prepareFunctions :: [Function] -> ([Value] -> Gen a) -> Gen a
 prepareFunctions fs0 action = worker [] fs0
@@ -100,16 +106,25 @@ compileFunction fn llvmFn = do
 compileExpression :: Expression -> Gen ()
 compileExpression expr =
     case expr of
-        Bind [bind] (Unit [arg]) rest ->
-            compileBind bind arg $
-            compileExpression rest
+        Bind [bind] (Unit [arg]) rest -> do
+            value <- compileBind arg
+            bindVariable bind value $ compileExpression rest
         Bind [bind] (Load ptr nth) rest ->
             compileLoad bind ptr nth $
             compileExpression rest
         Bind [bind] (Store node args) rest ->
             compileStore bind node args $
             compileExpression rest
-        
+        Bind [] (Write word nth arg) rest -> do
+            compileWrite word nth arg
+            compileExpression rest
+        Bind [bind] (Address word nth) rest -> do
+            wordValue <- resolve word
+            ptr <- asPointer wordValue
+            offset <- constWord (fromIntegral nth)
+            offsetPtr <- buildGEP ptr [offset] ""
+            bindVariable bind offsetPtr $ compileExpression rest
+
         -- Ignore GCAllocate and Alloc for now
         Bind [bind] GCAllocate{} rest -> do
             value <- constWord 1
@@ -161,7 +176,7 @@ compileExpression expr =
             return ()
         TailCall fn args -> do
             llvmFn <- resolveFunction fn
-            llvmArgs <- mapM resolve args
+            llvmArgs <- mapM asWord =<< mapM resolve args
             llvmCall <- buildCall llvmFn llvmArgs ""
             liftIO $ LLVM.setTailCall llvmCall True
             liftIO $ LLVM.setInstructionCallConv llvmCall LLVM.Fast
@@ -175,6 +190,15 @@ compileAdd a b = do
     a' <- resolve a
     b' <- resolve b
     buildAdd a' b' ""
+
+compileWrite :: Variable -> Int -> Argument -> Gen Value
+compileWrite word nth arg = do
+    argValue <- compileBind arg
+    wordValue <- resolve word
+    ptr <- asPointer wordValue
+    offset <- constWord (fromIntegral nth)
+    offsetPtr <- buildGEP ptr [offset] ""
+    buildStore argValue offsetPtr
 
 compileStore :: Variable -> NodeName -> [Variable] -> Gen a -> Gen a
 compileStore bind nodeName args action = do
@@ -193,11 +217,9 @@ compileStore bind nodeName args action = do
 
 compileLoad :: Variable -> Variable -> Int -> Gen a -> Gen a
 compileLoad bind ptr nth action = do
-    wordTy <- asks envWordTy
     wordValue <- resolve ptr
-    let pType = LLVM.pointerType wordTy 0
     
-    ptrValue    <- buildIntToPtr wordValue pType ""
+    ptrValue    <- asPointer wordValue
     offset      <- constWord (fromIntegral nth)
     offsetValue <- buildGEP ptrValue [offset] ""
     load        <- buildLoad offsetValue (uniqueVariable bind)
@@ -209,13 +231,12 @@ compilePattern pattern = do
         LitPat (LiteralInt i) -> constWord i
         NodePat name []       -> resolveNodeName name
 
-compileBind :: Variable -> Argument -> Gen a -> Gen a
-compileBind variable arg action = do
-    value <- case arg of
+compileBind :: Argument -> Gen Value
+compileBind arg = do
+    case arg of
         RefArg ref            -> resolve ref
         LitArg (LiteralInt i) -> constWord i
         NodeArg name _args    -> resolveNodeName name
-    bindVariable variable value action
 
 
 
@@ -297,6 +318,35 @@ uniqueVariable = uniqueName . variableName
 
 -------------------------------------------------
 -- LLVM Wrappers
+
+asWord :: Value -> Gen Value
+asWord value = do
+    ty <- liftIO $ LLVM.typeOf value
+    kind <- liftIO $ LLVM.getTypeKind ty
+    case kind of
+        LLVM.IntegerTypeKind -> return value
+        LLVM.PointerTypeKind -> castPtrToWord value
+
+asPointer :: Value -> Gen Value
+asPointer value = do
+    ty <- liftIO $ LLVM.typeOf value
+    kind <- liftIO $ LLVM.getTypeKind ty
+    case kind of
+        LLVM.IntegerTypeKind -> castWordToPtr value
+        LLVM.PointerTypeKind -> return value
+
+
+castWordToPtr :: Value -> Gen Value
+castWordToPtr value = do
+    wordTy <- asks envWordTy
+    let pType = LLVM.pointerType wordTy 0
+    buildIntToPtr value pType ""
+
+castPtrToWord :: Value -> Gen Value
+castPtrToWord value = do
+    wordTy <- asks envWordTy
+    buildPtrToInt value wordTy ""
+
 
 buildRetVoid :: Gen Value
 buildRetVoid = withBuilder $ \bld -> do

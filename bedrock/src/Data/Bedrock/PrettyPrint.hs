@@ -40,6 +40,7 @@ ppLiteral :: Literal -> Doc
 ppLiteral literal =
 	case literal of
 		LiteralInt i -> Doc.integer i
+		LiteralString str -> Doc.text (show str)
 
 ppNode :: NodeName -> [Doc] -> Doc
 ppNode (ConstructorName constructor) args =
@@ -69,6 +70,11 @@ ppSimpleExpression simple =
 		Store node args ->
 			ppSyntax "@store" <+>
 			Doc.parens (ppNode node (map ppVariable args))
+		Write ptr idx arg ->
+			ppSyntax "@write" <+>
+			ppVariable ptr <> Doc.brackets (Doc.int idx) <+> ppArgument arg
+		Address ptr idx ->
+			ppSyntax "&" <> ppVariable ptr <> Doc.brackets (Doc.int idx)
 		SizeOf node args ->
 			ppSyntax "@sizeOf" <+>
 			Doc.parens (ppNode node (map ppVariable args))
@@ -92,6 +98,8 @@ ppSimpleExpression simple =
 			ppSyntax "@eval" <+> ppVariable var
 		Apply a b ->
 			ppSyntax "@apply" <+> ppVariable a <+> ppVariable b
+		ReadRegister reg ->
+			ppSyntax "@register" <+> text reg
 		GCAllocate n ->
 			ppSyntax "@gc_allocate" <+> Doc.int n
 		GCBegin ->

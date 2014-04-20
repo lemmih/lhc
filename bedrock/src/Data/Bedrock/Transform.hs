@@ -140,12 +140,17 @@ freeVariablesSimple simple =
             id
         Store _constructor args ->
             Set.union (Set.fromList args)
+        Write ptr _idx arg ->
+            Set.insert ptr . freeVariablesArguments [arg]
         Fetch ptr ->
             Set.insert ptr
         Load ptr _idx ->
             Set.insert ptr
         Add lhs rhs ->
             Set.insert lhs . Set.insert rhs
+        ReadRegister{} -> id
+        WriteRegister _reg var -> Set.insert var
+        Address var _idx -> Set.insert var
         Print var ->
             Set.insert var
         Unit args ->
@@ -154,6 +159,7 @@ freeVariablesSimple simple =
             Set.insert var
         Apply obj arg ->
             Set.insert obj . Set.insert arg
+        _ -> error $ "freeVariablesSimple: " ++ show simple
 
 freeVariablesArguments :: [Argument] -> Set Variable -> Set Variable
 freeVariablesArguments = flip (foldr freeVariablesArgument)

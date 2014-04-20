@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternGuards #-}
 module Data.Bedrock.Storage
     ( lowerAlloc ) where
 
@@ -114,6 +115,18 @@ transformSimpleExpresion
     -> Expression -> Gen Expression
 transformSimpleExpresion origin binds simple rest =
     case simple of
+        Store nodeName args | [bind] <- binds -> do
+            let size = 1 + length args
+            hp <- newVariable "hp" NodePtr
+            hp' <- newVariable "hp'" NodePtr
+            return $
+                Bind [hp] (ReadRegister "hp") $
+                Bind [bind] (Unit [RefArg hp]) $
+                Bind [] (Write hp 0 (NodeArg nodeName [])) $
+                foldr (\(nth, arg) -> Bind [] (Write hp nth (RefArg arg)))
+                    (Bind [hp'] (Address hp size) $
+                     Bind [] (WriteRegister "hp" hp') rest) 
+                    (zip [1..] args)
         Alloc n -> do
             continueName <- tagName "with_mem" (fnName origin)
             divertName <- tagName "without_mem" (fnName origin)
@@ -152,6 +165,30 @@ transformSimpleExpresion origin binds simple rest =
                     [ Alternative (LitPat (LiteralInt 0)) divert
                     , Alternative (LitPat (LiteralInt 1)) continue]
         _       -> return $ Bind binds simple rest
+
+
+
+
+
+
+
+
+
+
+-----------------------------------------------------------
+-- Pluggable GCs
+
+--newtype GC a = GC { unGC :: State AvailableNamespace a }
+
+--data GCPlugin = GCPlugin
+--    { gcPluginInit     :: GC Function
+--    , gcPluginAllocate :: GC Function
+--    }
+
+
+
+
+
 
 {- What needs to be done?
 

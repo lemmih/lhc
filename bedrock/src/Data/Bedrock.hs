@@ -19,11 +19,26 @@ data AvailableNamespace = AvailableNamespace
 	, nsNextPrimitiveId :: Int
 	, nsNextGlobalId    :: Int }
 
+data CType
+	= I8
+	| I32
+	| I64
+	| CPointer CType
+	| CVoid
+	deriving (Show)
+
+data Foreign = Foreign
+	{ foreignName :: String
+	, foreignReturn :: CType
+	, foreignArguments :: [CType]
+	} deriving (Show)
+
 data Module = Module
-	{ nodes      :: [NodeDefinition]
+	{ modForeigns :: [Foreign]
+	, nodes      :: [NodeDefinition]
 	, entryPoint :: Name
 	, functions  :: [Function]
-	, moduleNamespace :: AvailableNamespace
+	, modNamespace :: AvailableNamespace
 	-- CAFs?
 	}
 
@@ -52,6 +67,7 @@ data Alternative = Alternative Pattern Expression
 
 data Literal
 	= LiteralInt Integer -- compile error if Integer to too large
+	| LiteralString String
 	deriving (Show, Eq)
 
 data Argument
@@ -68,16 +84,25 @@ data SimpleExpression
 	| Alloc Int
 	| SizeOf NodeName [Variable]
 	| Store NodeName [Variable]
+	| Write Variable Int Argument
+	| Address Variable Int
+
 	| Fetch Variable
 	| Load Variable Int
 	| Add Variable Variable
 	| Print Variable
+
+	-- Global variables.
+	| ReadRegister String
+	| WriteRegister String Variable
 	| ReadGlobal String
 	| WriteGlobal String Variable
 	| Unit [Argument]
+
 	-- Eval/Apply
 	| Eval Variable
 	| Apply Variable Variable
+
 	-- GC
 	| GCAllocate Int
 	| GCBegin

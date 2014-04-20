@@ -79,7 +79,8 @@ parseConstructor = try (do
 
 parseLiteral :: Parser Literal
 parseLiteral =
-	LiteralInt . read <$> many1 digit
+	LiteralInt . read <$> many1 digit <|>
+	LiteralString <$> between (char '"') (char '"') (many (satisfy (/='"')))
 	<?> "literal"
 
 parsePattern :: Parser Pattern
@@ -218,10 +219,38 @@ parseEntryPoint = do
 	char ':'; spaces
 	parseName isLower
 
+-- i8 i32 i64 void i64*
+parseCType :: Parser CType
+parseCType = do
+	ty <- prim
+	p <- length <$> many (char '*')
+	return $ foldr (.) id (replicate p CPointer) ty
+  where
+  	prim = choice $ map try
+		[ string "i8" >> return I8
+		, string "i32" >> return I32
+		, string "i64" >> return I64
+		, string "void" >> return CVoid
+		]
+
+-- foreign [ret] name([args])
+parseForeign :: Parser Foreign
+parseForeign = do
+	string "foreign"; spaces
+	ret <- parseCType <* spaces
+	name <- many1 alphaNum <* spaces
+	args <- parens $
+				spaces *>
+					(parseCType `sepBy` (try $ spaces >> char ',' >> spaces))
+				 <* spaces
+	spaces
+	return $ Foreign name ret args
+
 parseModule :: Parser Module
 parseModule =
 	Module
-		<$> many parseNodeDefinition
+		<$> many parseForeign
+		<*> many parseNodeDefinition
 		<*> parseEntryPoint
 		<*> many parseFunction
 		<*> pure (error "next free unique not defined")

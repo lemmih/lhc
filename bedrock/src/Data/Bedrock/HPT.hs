@@ -103,7 +103,7 @@ runHPT mOrigin = runST (do
         nStores = countStores m
         fnArgs = Map.fromList
             [ (fnName fn, fnArguments fn) | fn <- functions m ]
-        (fnRets, nextFree) = mkFnRets (moduleNamespace m) m
+        (fnRets, nextFree) = mkFnRets (modNamespace m) m
         (nodeArgs, ns) = mkNodeArgs nextFree m
         nPointers = nsNextPointerId ns
         nNodes = nsNextNodeId ns

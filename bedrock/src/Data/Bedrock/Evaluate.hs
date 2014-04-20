@@ -1,25 +1,26 @@
 module Data.Bedrock.Evaluate where
 
-import           Control.Applicative           ((<$>))
+import           Control.Applicative               ((<$>))
 import           Control.Monad.RWS
-import           Data.Map                      (Map)
-import qualified Data.Map                      as Map
-import           Text.ParserCombinators.Parsec (parseFromFile)
-import qualified Text.PrettyPrint.ANSI.Leijen  as Doc
-import Data.List
+import           Data.List
+import           Data.Map                          (Map)
+import qualified Data.Map                          as Map
+import           Text.ParserCombinators.Parsec     (parseFromFile)
+import qualified Text.PrettyPrint.ANSI.Leijen      as Doc
 
 import           Data.Bedrock
+import           Data.Bedrock.EvalApply
 import           Data.Bedrock.Exceptions
-import           Data.Bedrock.Storage
+import           Data.Bedrock.GlobalVariables
+import           Data.Bedrock.HPT                  (ppHPTResult, runHPT)
+import           Data.Bedrock.Invoke
+import           Data.Bedrock.LLVM                 as LLVM
 import           Data.Bedrock.Parse
 import           Data.Bedrock.PrettyPrint
-import           Data.Bedrock.Invoke
-import           Data.Bedrock.Rename
-import           Data.Bedrock.Transform ( runGens )
-import           Data.Bedrock.HPT ( runHPT, ppHPTResult )
-import           Data.Bedrock.EvalApply
 import           Data.Bedrock.RegisterIntroduction
-import           Data.Bedrock.LLVM as LLVM
+import           Data.Bedrock.Rename
+import           Data.Bedrock.Storage
+import           Data.Bedrock.Transform            (runGens)
 
 type HeapPtr = Int
 data Value
@@ -91,9 +92,10 @@ evaluateFromFile path = do
             let m3 = registerIntroduction $ runGens m''
                         [ mkInvoke hpt2
                         ]
-                m4 = unique $ runGens m3 [ lowerAlloc ]
+                m4 = unique $ lowerGlobalRegisters $
+                        runGens m3 [ lowerAlloc ]
             print (ppModule m4)
-            evaluate m4
+            --evaluate m4
             LLVM.compile m4
 
 
@@ -163,6 +165,16 @@ evalSimple simple =
             argValues <- mapM queryScope args
             ptr <- pushHeapValue (NodeValue name argValues)
             return [HeapPtrValue ptr]
+        Write var 0 (NodeArg node []) -> do
+            HeapPtrValue ptr <- queryScope var
+            updateHeapValue ptr (NodeValue node [])
+            return []
+        Write var _idx (RefArg arg) -> do
+            HeapPtrValue ptr <- queryScope var
+            argValue <- queryScope arg
+            NodeValue node args <- fetchHeapValue ptr
+            updateHeapValue ptr (NodeValue node (args ++ [argValue]))
+            return []
         SizeOf _name _args ->
             return [LitValue $ LiteralInt 0]
         Fetch var -> do

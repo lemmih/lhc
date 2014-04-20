@@ -21,7 +21,7 @@ registerIntroduction :: Module -> Module
 registerIntroduction m = evalState (runReaderT (unUniq (uniqModule m)) env) st
   where
     env = Map.empty
-    st = moduleNamespace m
+    st = modNamespace m
 
 
 
@@ -67,10 +67,11 @@ uniqModule m =
         fns <- mapM uniqFunction (functions m)
         namespace <- get
         return Module
-            { nodes = ns
+            { modForeigns = modForeigns m
+            , nodes = ns
             , entryPoint = entryPoint m
             , functions = fns
-            , moduleNamespace = namespace
+            , modNamespace = namespace
             }
 
 uniqNode :: NodeDefinition -> Uniq NodeDefinition
