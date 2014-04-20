@@ -74,6 +74,8 @@ Garbage collection:
 Things to benchmark:
   How much does it cost to limit the mutator with a fuel argument?
   How does immix compare to an ordinary copying collector?
+  What percentage of of thunks are forced? A high percentage would
+  mean eager evaluation is beneficial.
 
 Stepping in generational garbage collectors:
   Problem: Not all objects in a generation will be given the same amount of
