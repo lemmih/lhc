@@ -463,6 +463,7 @@ hptSimpleExpression binds simple =
             foreignArgs <- getFunctionArgumentRegisters fn
             forM_ (zip vars foreignArgs) $ uncurry hptCopyVariables
             forM_ (zip foreignRets binds) $ uncurry hptCopyVariables
+        CCall{} -> return ()
         Eval ptrRef | [objRef] <- binds -> eachIteration $ do
             ptrs <- IntSet.toList <$> getPtrScope ptrRef
             objects <- mergeObjectList <$> mapM getHeapObjects ptrs

@@ -160,6 +160,8 @@ uniqSimple simple =
             pure (Literal lit)
         Application fn vars ->
             Application fn <$> resolveMany vars
+        CCall fn vars ->
+            CCall fn <$> resolveMany vars
         WithExceptionHandler exh exhArgs fn fnArgs ->
             WithExceptionHandler
                 <$> pure exh <*> resolveMany exhArgs

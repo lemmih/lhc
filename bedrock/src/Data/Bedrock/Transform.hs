@@ -132,6 +132,8 @@ freeVariablesSimple simple =
             id
         Application _fn args ->
             Set.union (Set.fromList args)
+        CCall _fn args ->
+            Set.union (Set.fromList args)
         WithExceptionHandler _exh exhArgs _fn fnArgs ->
             Set.union (Set.fromList (exhArgs ++ fnArgs))
         Alloc{} ->

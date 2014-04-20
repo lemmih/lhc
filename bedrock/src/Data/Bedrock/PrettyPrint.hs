@@ -88,6 +88,9 @@ ppSimpleExpression simple =
 			ppSyntax "@add" <+> ppVariable lhs <+> ppVariable rhs
 		Application fn args ->
 			ppName fn <> Doc.parens (ppList $ map ppVariable args)
+		CCall fn args ->
+			ppSyntax "@ccall" <+>
+			text fn <> Doc.parens (ppList $ map ppVariable args)
 		WithExceptionHandler exh exhArgs fn args ->
 			ppSyntax "@withExceptionHandler" <+>
 			ppName exh <> Doc.parens (ppList $ map ppVariable exhArgs) <+>

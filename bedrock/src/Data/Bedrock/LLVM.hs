@@ -14,6 +14,7 @@ import           Data.Bedrock
 data Env = Env
     { envNodeMapping :: Map NodeName Int
     , envVariables   :: Map Variable LLVM.Value
+    , envForeigns    :: Map String Foreign
     , envBuilder     :: LLVM.Builder
     , envFunction    :: Value
     , envModule      :: LLVM.Module
@@ -39,7 +40,10 @@ compile bedrock = do
     cx <- LLVM.getGlobalContext
     voidTy <- LLVM.voidTypeInContext cx
 
+    mapM_ (compileForeign m) (modForeigns bedrock)
+
     runGen bedrock m cx $ prepareFunctions (functions bedrock) $ \llvmFns -> do
+
         zipWithM_ compileFunction (functions bedrock) llvmFns
 
 
@@ -69,6 +73,26 @@ compile bedrock = do
     return ()
   where
     nMainArgs = head [ length (fnArguments fn) | fn <- functions bedrock, fnName fn == entryPoint bedrock ]
+
+cTypeToLLVM :: CType -> IO LLVM.Type
+cTypeToLLVM cType = do
+    cx <- LLVM.getGlobalContext
+    case cType of
+        I8  -> LLVM.intTypeInContext cx 8
+        I32 -> LLVM.intTypeInContext cx 32
+        I64 -> LLVM.intTypeInContext cx 64
+        CPointer ty -> do
+            tyRef <- cTypeToLLVM ty
+            return $ LLVM.pointerType tyRef 0
+
+compileForeign :: LLVM.Module -> Foreign -> IO ()
+compileForeign m f = do
+
+    ret <- cTypeToLLVM (foreignReturn f)
+    args <- mapM cTypeToLLVM (foreignArguments f)
+    let fnTy = LLVM.functionType ret args False
+    LLVM.addFunction m (foreignName f) fnTy
+    return ()
 
 prepareFunctions :: [Function] -> ([Value] -> Gen a) -> Gen a
 prepareFunctions fs0 action = worker [] fs0
@@ -106,6 +130,22 @@ compileFunction fn llvmFn = do
 compileExpression :: Expression -> Gen ()
 compileExpression expr =
     case expr of
+        Bind binds (CCall fName args) rest -> do
+            f <- asks ((Map.! fName) . envForeigns)
+
+            argValues <- mapM resolve args
+
+            m <- asks envModule
+            Just fn <- liftIO $ LLVM.getNamedFunction m fName
+    
+            typedArgs <- zipWithM asCType argValues (foreignArguments f)
+
+            ret <- buildCall fn typedArgs ""
+            typedRet <- fromCType ret (foreignReturn f)
+
+            case binds of
+                [bind] -> bindVariable bind typedRet $ compileExpression rest
+                _      -> compileExpression rest
         Bind [bind] (Unit [arg]) rest -> do
             value <- compileBind arg
             bindVariable bind value $ compileExpression rest
@@ -236,6 +276,7 @@ compileBind arg = do
     case arg of
         RefArg ref            -> resolve ref
         LitArg (LiteralInt i) -> constWord i
+        LitArg (LiteralString str) -> buildGlobalStringPtr str ""
         NodeArg name _args    -> resolveNodeName name
 
 
@@ -300,6 +341,8 @@ mkEnv m llvmModule cx = do
             [ FunctionName (fnName fn) blanks
             | fn <- functions m, blanks <- [0..length (fnArguments fn)] ]
         , envVariables = Map.empty
+        , envForeigns = Map.fromList
+            [ (foreignName f, f) | f <- modForeigns m ]
         , envFunction = error "envFunction not defined"
         , envBuilder = error "envBuilder not defined"
         , envModule = llvmModule
@@ -318,6 +361,29 @@ uniqueVariable = uniqueName . variableName
 
 -------------------------------------------------
 -- LLVM Wrappers
+-- cTypeToLLVM :: CType -> IO LLVM.Type
+asCType :: Value -> CType -> Gen Value
+asCType value cType = do
+    case cType of
+        CPointer ty -> do
+            ptr <- asPointer value
+            llvmType <- liftIO $ cTypeToLLVM ty
+            buildTruncOrBitCast ptr (LLVM.pointerType llvmType 0) ""
+        _ -> do
+            word <- asWord value
+            llvmType <- liftIO $ cTypeToLLVM cType
+            buildTruncOrBitCast word llvmType ""
+
+fromCType :: Value -> CType -> Gen Value
+fromCType value cType = do
+    case cType of
+        CPointer ty -> do
+            llvmType <- liftIO $ cTypeToLLVM ty
+            asPointer =<< buildTruncOrBitCast value (LLVM.pointerType llvmType 0) ""
+        _ -> do
+            llvmType <- liftIO $ cTypeToLLVM cType
+            asWord =<< buildTruncOrBitCast value llvmType ""
+
 
 asWord :: Value -> Gen Value
 asWord value = do
@@ -360,6 +426,14 @@ buildPtrToInt :: Value -> LLVM.Type -> String -> Gen Value
 buildPtrToInt ptrValue intType name = withBuilder $ \bld ->
     liftIO $ LLVM.buildPtrToInt bld ptrValue intType name
 
+_buildBitCast :: Value -> LLVM.Type -> String -> Gen Value
+_buildBitCast value ty name = withBuilder $ \bld ->
+    liftIO $ LLVM.buildBitCast bld value ty name
+
+buildTruncOrBitCast :: Value -> LLVM.Type -> String -> Gen Value
+buildTruncOrBitCast value ty name = withBuilder $ \bld ->
+    liftIO $ LLVM.buildTruncOrBitCast bld value ty name
+
 buildGEP :: Value -> [Value] -> String -> Gen Value
 buildGEP ptrValue indices name = withBuilder $ \bld ->
     liftIO $ LLVM.buildGEP bld ptrValue indices name
@@ -391,6 +465,10 @@ buildCall fn args name = withBuilder $ \bld ->
 buildAdd :: Value -> Value -> String -> Gen Value
 buildAdd a b name = withBuilder $ \bld ->
     liftIO $ LLVM.buildAdd bld a b name
+
+buildGlobalStringPtr :: String -> String -> Gen Value
+buildGlobalStringPtr str name = withBuilder $ \bld ->
+    liftIO $ LLVM.buildGlobalStringPtr bld str name
 
 -- Sublime Text 2 does not like functions with 'module' in their name.
 mCreateWithName :: String -> IO LLVM.Module

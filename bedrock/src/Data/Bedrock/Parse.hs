@@ -161,6 +161,11 @@ parseSimpleExpression = choice
 		args <- parens parseVariables
 		return $ Application fn args
 	, do
+		try (string "@ccall"); spaces
+		fn <- parseForeignName <* spaces
+		args <- parens parseVariables
+		return $ CCall fn args
+	, do
 		try (string "@withExceptionHandler"); spaces
 		exh <- parseName isLower <* spaces
 		exhArgs <- parens parseVariables <* spaces
@@ -233,12 +238,15 @@ parseCType = do
 		, string "void" >> return CVoid
 		]
 
+parseForeignName :: Parser String
+parseForeignName = many1 alphaNum
+
 -- foreign [ret] name([args])
 parseForeign :: Parser Foreign
 parseForeign = do
 	string "foreign"; spaces
 	ret <- parseCType <* spaces
-	name <- many1 alphaNum <* spaces
+	name <- parseForeignName <* spaces
 	args <- parens $
 				spaces *>
 					(parseCType `sepBy` (try $ spaces >> char ',' >> spaces))

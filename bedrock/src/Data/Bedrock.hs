@@ -79,6 +79,7 @@ data Argument
 data SimpleExpression
 	= Literal Literal
 	| Application Name [Variable]
+	| CCall String [Variable]
 	| WithExceptionHandler Name [Variable] Name [Variable]
 	-- Built-in
 	| Alloc Int
