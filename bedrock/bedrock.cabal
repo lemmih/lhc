@@ -32,3 +32,8 @@ library
   build-depends:       base ==4.*, ansi-wl-pprint,
                        parsec, containers, mtl, vector,
                        llvm-base
+
+executable bedrock
+  main-is:             cli/Main.hs
+
+  build-depends:       base ==4.*, cmdtheline
