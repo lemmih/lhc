@@ -219,7 +219,7 @@ countStores = getSum . execWriter . mapM_ countFn . functions
 
 sizeOfNode :: HPTResult -> Variable -> Int
 sizeOfNode hpt var =
-    maximum (map Vector.length (Map.elems objects)) + 1
+    foldr max 0 (map Vector.length (Map.elems objects)) + 1
   where
     objects = hptNodeScope hpt Vector.! variableIndex var
 

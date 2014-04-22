@@ -19,7 +19,10 @@ import           Data.Bedrock.Parse
 import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.RegisterIntroduction
 import           Data.Bedrock.Rename
+import           Data.Bedrock.Simplify
 import           Data.Bedrock.Storage
+import           Data.Bedrock.Storage.Pluggable
+import           Data.Bedrock.Storage.Fixed
 import           Data.Bedrock.Transform            (runGens)
 
 type HeapPtr = Int
@@ -78,7 +81,7 @@ evaluateFromFile path = do
         Left err -> print err
         Right m  -> do
             let m' = unique m
-            print (ppModule m')
+            --print (ppModule m')
             let hpt1 = runHPT m'
             ppHPTResult hpt1
             let m'' = unique $ runGens m'
@@ -86,17 +89,20 @@ evaluateFromFile path = do
                     , cpsTransformation
                     -- , lowerAlloc
                     ]
-            print (ppModule m'')
+            --print (ppModule m'')
             let hpt2 = runHPT m''
             ppHPTResult hpt2
-            let m3 = registerIntroduction $ runGens m''
+            let m3 = simplify $ unique $ registerIntroduction $ runGens m''
                         [ mkInvoke hpt2
                         ]
-                m4 = unique $ lowerGlobalRegisters $
-                        runGens m3 [ lowerAlloc ]
-            print (ppModule m4)
+                m4 = unique $ runGens m3 [ lowerAlloc ]
+                (sm, m5) = runGC m4 fixedGC
+                m6 = unique $ lowerGlobalRegisters $ lowerGC m5 sm
+            --print (ppModule m3)
+            print (ppModule m5)
+            print (ppModule m6)
             --evaluate m4
-            LLVM.compile m4
+            LLVM.compile m6
 
 
 evaluate :: Module -> IO ()

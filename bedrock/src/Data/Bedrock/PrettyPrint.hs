@@ -103,6 +103,12 @@ ppSimpleExpression simple =
 			ppSyntax "@apply" <+> ppVariable a <+> ppVariable b
 		ReadRegister reg ->
 			ppSyntax "@register" <+> text reg
+		WriteRegister reg var ->
+			ppSyntax "@register" <+> text reg <+> Doc.equals <+> ppVariable var
+		ReadGlobal reg ->
+			ppSyntax "@global" <+> text reg
+		WriteGlobal reg var ->
+			ppSyntax "@global" <+> text reg <+> Doc.equals <+> ppVariable var
 		GCAllocate n ->
 			ppSyntax "@gc_allocate" <+> Doc.int n
 		GCBegin ->
@@ -113,6 +119,7 @@ ppSimpleExpression simple =
 			ppSyntax "@gc_mark" <+> ppVariable var
 		GCMarkNode var ->
 			ppSyntax "@gc_mark_node" <+> ppVariable var
+		other -> error $ "PrettyPrint: Unhandled: " ++ show other
 
 ppExpression :: Expression -> Doc
 ppExpression expression =

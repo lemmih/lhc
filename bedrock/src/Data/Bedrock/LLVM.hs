@@ -1,20 +1,24 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Bedrock.LLVM ( compile ) where
 
-import           Control.Applicative    (Applicative)
+import           Control.Applicative          (Applicative)
 import           Control.Monad.Reader
-import           Data.Map               (Map)
-import qualified Data.Map               as Map
-import qualified LLVM.Wrapper.BitWriter as LLVM
-import qualified LLVM.Wrapper.Core      as LLVM
-import LLVM.Wrapper.Core ( Value )
+import           Data.Map                     (Map)
+import qualified Data.Map                     as Map
+import qualified Data.Set                     as Set
+import qualified LLVM.FFI.Core                as LLVM (setThreadLocal)
+import qualified LLVM.Wrapper.BitWriter       as LLVM
+import           LLVM.Wrapper.Core            (Value)
+import qualified LLVM.Wrapper.Core            as LLVM
 
 import           Data.Bedrock
+import           Data.Bedrock.GlobalVariables (allRegisters)
 
 data Env = Env
     { envNodeMapping :: Map NodeName Int
     , envVariables   :: Map Variable LLVM.Value
     , envForeigns    :: Map String Foreign
+    , envGlobals     :: Map String LLVM.Value
     , envBuilder     :: LLVM.Builder
     , envFunction    :: Value
     , envModule      :: LLVM.Module
@@ -48,14 +52,14 @@ compile bedrock = do
 
 
 
-        
+
         let mainFnTy = LLVM.functionType voidTy [] False
         mainFn <- liftIO $ LLVM.addFunction m "main" mainFnTy
         entry <- liftIO $ LLVM.appendBasicBlock mainFn ""
         bld <- liftIO $ LLVM.createBuilder
         setFunction mainFn $ setBuilder bld $ do
             Just entryFn <- liftIO $ LLVM.getNamedFunction m (uniqueName $ entryPoint bedrock)
-        
+
             liftIO $ LLVM.positionAtEnd bld entry
             wordTy <- asks envWordTy
             heapSize <- constWord (1024*1024)
@@ -85,6 +89,11 @@ cTypeToLLVM cType = do
             tyRef <- cTypeToLLVM ty
             return $ LLVM.pointerType tyRef 0
 
+typesToLLVM :: [Type] -> Gen LLVM.Type
+typesToLLVM [] = asks envVoidTy
+typesToLLVM [_] = asks envWordTy
+typesToLLVM _ = error $ "typesToLLVM: Unsupported type"
+
 compileForeign :: LLVM.Module -> Foreign -> IO ()
 compileForeign m f = do
 
@@ -105,8 +114,8 @@ prepareFunction fn action = do
     wordTy <- asks envWordTy
     voidTy <- asks envVoidTy
     m <- asks envModule
-    let fnReturnTy = voidTy
-        fnArgTys = replicate (length (fnArguments fn)) wordTy
+    fnReturnTy <- typesToLLVM (fnResults fn)
+    let fnArgTys = replicate (length (fnArguments fn)) wordTy
         fnTy = LLVM.functionType fnReturnTy fnArgTys False
     llvmFn <- liftIO $ LLVM.addFunction m (uniqueName (fnName fn)) fnTy
     liftIO $ LLVM.setLinkage llvmFn LLVM.PrivateLinkage
@@ -137,7 +146,7 @@ compileExpression expr =
 
             m <- asks envModule
             Just fn <- liftIO $ LLVM.getNamedFunction m fName
-    
+
             typedArgs <- zipWithM asCType argValues (foreignArguments f)
 
             ret <- buildCall fn typedArgs ""
@@ -176,6 +185,37 @@ compileExpression expr =
             value <- resolve ptr
             bindVariable bind value $ compileExpression rest
 
+        Bind [] (Application fn args) rest -> do
+            llvmFn <- resolveFunction fn
+            llvmArgs <- mapM asWord =<< mapM resolve args
+            llvmCall <- buildCall llvmFn llvmArgs ""
+            liftIO $ LLVM.setInstructionCallConv llvmCall LLVM.Fast
+            compileExpression rest
+        Bind [ret] (Application fn args) rest -> do
+            llvmFn <- resolveFunction fn
+            llvmArgs <- mapM asWord =<< mapM resolve args
+            llvmCall <- buildCall llvmFn llvmArgs ""
+            liftIO $ LLVM.setInstructionCallConv llvmCall LLVM.Fast
+            bindVariable ret llvmCall $ compileExpression rest
+        Return [] ->
+            buildRetVoid >> return ()
+        Return [var] -> do
+            value <- resolve var
+            buildRet value
+            return ()
+        Panic msg ->
+            buildUnreachable >> return ()
+
+        Bind [var] (ReadGlobal reg) rest -> do
+            global <- asks ((Map.! reg) . envGlobals)
+            globalValue <- buildLoad global ""
+            bindVariable var globalValue $ compileExpression rest
+        Bind [] (WriteGlobal reg var) rest -> do
+            value <- asWord =<< resolve var
+            global <- asks ((Map.! reg) . envGlobals)
+            buildStore value global
+            compileExpression rest
+
         Bind [] (Print prim) rest -> do
             cx <- liftIO LLVM.getGlobalContext
             i8 <- liftIO $ LLVM.intTypeInContext cx 8
@@ -192,7 +232,7 @@ compileExpression expr =
         Bind [bind] (Add a b) rest -> do
             value <- compileAdd a b
             bindVariable bind value $ compileExpression rest
-        
+
         Bind binds (Unit args) rest ->
             compileExpression $
                 foldr (\(b,a) -> Bind [b] (Unit [a])) rest (zip binds args)
@@ -258,7 +298,7 @@ compileStore bind nodeName args action = do
 compileLoad :: Variable -> Variable -> Int -> Gen a -> Gen a
 compileLoad bind ptr nth action = do
     wordValue <- resolve ptr
-    
+
     ptrValue    <- asPointer wordValue
     offset      <- constWord (fromIntegral nth)
     offsetValue <- buildGEP ptrValue [offset] ""
@@ -335,6 +375,13 @@ mkEnv :: Module -> LLVM.Module -> LLVM.Context -> IO Env
 mkEnv m llvmModule cx = do
     wordTy <- LLVM.intTypeInContext cx 64
     voidTy <- LLVM.voidTypeInContext cx
+    let regs = Set.toList $ allRegisters m
+    globals <- forM regs $ \reg -> do
+        global <- LLVM.addGlobal llvmModule wordTy reg
+        LLVM.setThreadLocal global 1
+        LLVM.setVisibility global LLVM.HiddenVisibility
+        LLVM.setInitializer global (LLVM.constInt wordTy 0 False)
+        return global
     return Env
         { envNodeMapping = Map.fromList $ flip zip [0..] $
             [ ConstructorName name | NodeDefinition name _tys <- nodes m ] ++
@@ -343,6 +390,7 @@ mkEnv m llvmModule cx = do
         , envVariables = Map.empty
         , envForeigns = Map.fromList
             [ (foreignName f, f) | f <- modForeigns m ]
+        , envGlobals = Map.fromList $ zip regs globals
         , envFunction = error "envFunction not defined"
         , envBuilder = error "envBuilder not defined"
         , envModule = llvmModule
@@ -389,9 +437,11 @@ asWord :: Value -> Gen Value
 asWord value = do
     ty <- liftIO $ LLVM.typeOf value
     kind <- liftIO $ LLVM.getTypeKind ty
+    name <- liftIO $ LLVM.getValueName value
     case kind of
         LLVM.IntegerTypeKind -> return value
         LLVM.PointerTypeKind -> castPtrToWord value
+        _ -> error $ "LLVM: Unknown kind: " ++ show (kind, name)
 
 asPointer :: Value -> Gen Value
 asPointer value = do
@@ -417,6 +467,14 @@ castPtrToWord value = do
 buildRetVoid :: Gen Value
 buildRetVoid = withBuilder $ \bld -> do
     liftIO $ LLVM.buildRetVoid bld
+
+buildRet :: Value -> Gen Value
+buildRet ret = withBuilder $ \bld -> do
+    liftIO $ LLVM.buildRet bld ret
+
+buildUnreachable :: Gen Value
+buildUnreachable = withBuilder $ \bld ->
+    liftIO $ LLVM.buildUnreachable bld
 
 buildIntToPtr :: Value -> LLVM.Type -> String -> Gen Value
 buildIntToPtr intValue ptrType name = withBuilder $ \bld ->

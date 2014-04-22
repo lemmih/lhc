@@ -194,8 +194,10 @@ uniqSimple simple =
         ReadRegister{} -> return simple
         WriteRegister reg var ->
             WriteRegister reg <$> resolve var
-        ReadGlobal{} -> error "uniqSimple: ReadGlobal"
-        WriteGlobal{} -> error "uniqSimple: WriteGlobal"
+        ReadGlobal reg ->
+            pure $ ReadGlobal reg
+        WriteGlobal reg var ->
+            WriteGlobal reg <$> resolve var
         Unit args ->
             Unit <$> mapM resolveArgument args
         GCAllocate n ->

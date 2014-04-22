@@ -55,6 +55,8 @@ transformExpression origin expr =
             return expr
         Exit ->
             return expr
+        Panic{} ->
+            return expr
 
 transformAlternative :: Function -> Alternative -> Gen Alternative
 transformAlternative origin (Alternative pat expr) =
@@ -174,16 +176,6 @@ transformSimpleExpresion origin binds simple rest =
 
 
 
-
------------------------------------------------------------
--- Pluggable GCs
-
---newtype GC a = GC { unGC :: State AvailableNamespace a }
-
---data GCPlugin = GCPlugin
---    { gcPluginInit     :: GC Function
---    , gcPluginAllocate :: GC Function
---    }
 
 
 

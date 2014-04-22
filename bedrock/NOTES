@@ -72,7 +72,7 @@ Garbage collection:
 
   Trivial collectors:
     NoGC, fixed. Allocate a single chunk, never grow it.
-    NoGC, growing. Allocate as needed, never GC.
+    NoGC, growing. Allocate as needed, never collect.
     Boehm.
 
 Whole program alias analysis:

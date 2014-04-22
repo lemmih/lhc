@@ -38,6 +38,9 @@ traverseExpression hpt origin expr =
                     let partialArgs = dropLast blanks $ hptFnArgs hpt Map.! fn in
                     Alternative (NodePat name partialArgs) $
                     TailCall fn (map (setVariableSize hpt) $ partialArgs ++ args)
+                mkAlt alt = 
+                    Alternative (NodePat alt []) Exit
+                    --error $ "invoke alt: " ++ show (alt, fnName origin)
             return $
                 Case (setVariableSize hpt obj) Nothing (map mkAlt names)
         other -> return other
