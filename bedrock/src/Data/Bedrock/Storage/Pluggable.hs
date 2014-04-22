@@ -3,6 +3,7 @@ module Data.Bedrock.Storage.Pluggable where
 
 import Control.Applicative ( Applicative, (<$>) )
 import Control.Monad.State
+import Control.Monad.Reader
 
 import Data.Bedrock
 import Data.Bedrock.Misc
@@ -13,7 +14,8 @@ import Data.Bedrock.Misc
 
 data GCState = GCState
     { gcNamespace    :: AvailableNamespace
-    , gcNewFunctions :: [Function] }
+    , gcNewFunctions :: [Function]
+    , gcNewForeigns  :: [Foreign] }
 newtype GC a = GC { unGC :: State GCState a }
     deriving
         ( Monad, Functor, Applicative
@@ -34,10 +36,12 @@ runGC m action =
   where
     initState = GCState
         { gcNamespace = modNamespace m
-        , gcNewFunctions = [] }
+        , gcNewFunctions = []
+        , gcNewForeigns = [] }
     mkModule st = m
         { modNamespace = gcNamespace st
-        , functions = functions m ++ gcNewFunctions st }
+        , functions = functions m ++ gcNewFunctions st
+        , modForeigns = modForeigns m ++ gcNewForeigns st }
 
 -----------------------------------------------------------
 -- Lower
@@ -52,13 +56,17 @@ runGC m action =
 lowerGC :: Module -> StorageManager -> Module
 lowerGC m sm = m{ functions = loweredFunctions ++ newFunctions }
   where
-    loweredFunctions = mapM lowerFunction (functions m) sm
+    loweredFunctions = mapM (lowerFunction (entryPoint m)) (functions m) sm
     newFunctions = map ($sm) [smInit, smBegin, smEnd, smMark]
 
-lowerFunction :: Function -> StorageManager -> Function
-lowerFunction fn = do
+lowerFunction :: Name -> Function -> StorageManager -> Function
+lowerFunction entry fn = do
     body <- lowerExpression (fnBody fn)
-    return fn{ fnBody = body }
+    sm <- ask
+    let initName = fnName (smInit sm)
+    if fnName fn == entry
+        then return fn{ fnBody = Bind [] (Application initName []) body }
+        else return fn{ fnBody = body }
 
 lowerExpression :: Expression -> StorageManager -> Expression
 lowerExpression expr =
@@ -116,4 +124,7 @@ pushFunction :: Function -> GC ()
 pushFunction fn = modify $ \st ->
     st{ gcNewFunctions = fn : gcNewFunctions st }
 
+pushForeign :: Foreign -> GC ()
+pushForeign f = modify $ \st ->
+    st{ gcNewForeigns = f : gcNewForeigns st }
 

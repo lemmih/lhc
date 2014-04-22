@@ -6,7 +6,9 @@ import           Control.Monad.Reader
 import           Data.Map                     (Map)
 import qualified Data.Map                     as Map
 import qualified Data.Set                     as Set
-import qualified LLVM.FFI.Core                as LLVM (setThreadLocal)
+import qualified LLVM.FFI.Core                as LLVM (constIntToPtr,
+                                                       constPtrToInt,
+                                                       setThreadLocal)
 import qualified LLVM.Wrapper.BitWriter       as LLVM
 import           LLVM.Wrapper.Core            (Value)
 import qualified LLVM.Wrapper.Core            as LLVM
@@ -62,13 +64,9 @@ compile bedrock = do
             Just entryFn <- liftIO $ LLVM.getNamedFunction m (uniqueName $ entryPoint bedrock)
 
             liftIO $ LLVM.positionAtEnd bld entry
-            wordTy <- asks envWordTy
             pointerTy <- asks envPointerTy
-            heapSize <- constWord (1024*1024)
-            heapPtr <- buildArrayMalloc wordTy heapSize ""
-            --zeroes <- replicateM (nMainArgs-1) (constWord 0)
-            zeroes <- replicateM (nMainArgs-1) (liftIO $ LLVM.constPointerNull pointerTy)
-            call <- buildCall entryFn (heapPtr:zeroes) ""
+            zeroes <- replicateM nMainArgs (liftIO $ LLVM.constPointerNull pointerTy)
+            call <- buildCall entryFn (zeroes) ""
             liftIO $ LLVM.setInstructionCallConv call LLVM.Fast
             buildRetVoid
             return ()
@@ -177,13 +175,16 @@ compileExpression expr =
         Bind [bind] (Load ptr nth) rest ->
             compileLoad bind ptr nth $
             compileExpression rest
-        
+
         Bind [] (Write word nth arg) rest -> do
             compileWrite word nth arg
             compileExpression rest
         Bind [bind] (Address word nth) rest -> do
             wordValue <- resolve word
+            pointerTy <- asks envPointerTy
+            --let ppTy = LLVM.pointerType pointerTy 0
             ptr <- asPointer wordValue
+            --let ptr = LLVM.constBitCast wordValue ppTy
             offset <- constWord (fromIntegral nth)
             offsetPtr <- buildGEP ptr [offset] ""
             bindVariable bind offsetPtr $ compileExpression rest
@@ -275,7 +276,10 @@ compileAdd a b = do
 compileWrite :: Variable -> Int -> Argument -> Gen Value
 compileWrite word nth arg = do
     argValue <- asWord =<< resolveArgument arg
-    ptr <- asPointer =<< resolve word
+    
+    wordValue <- resolve word
+    ptr <- asPointer wordValue
+    
     offset <- constWord (fromIntegral nth)
     offsetPtr <- buildGEP ptr [offset] ""
     buildStore argValue offsetPtr
@@ -378,7 +382,8 @@ mkEnv m llvmModule cx = do
     let regs = Set.toList $ allRegisters m
     globals <- forM regs $ \reg -> do
         global <- LLVM.addGlobal llvmModule wordTy reg
-        LLVM.setThreadLocal global 1
+        -- The JIT compiler doesn't support thread local globals.
+        --LLVM.setThreadLocal global 1
         LLVM.setVisibility global LLVM.HiddenVisibility
         LLVM.setInitializer global (LLVM.constInt wordTy 0 False)
         return global
@@ -458,11 +463,13 @@ castWordToPtr value = do
     wordTy <- asks envWordTy
     let pType = LLVM.pointerType wordTy 0
     buildIntToPtr value pType ""
+    --return $ LLVM.constIntToPtr value pType
 
 castPtrToWord :: Value -> Gen Value
 castPtrToWord value = do
     wordTy <- asks envWordTy
     buildPtrToInt value wordTy ""
+    --return $ LLVM.constPtrToInt value wordTy
 
 
 buildRetVoid :: Gen Value
@@ -485,8 +492,8 @@ buildPtrToInt :: Value -> LLVM.Type -> String -> Gen Value
 buildPtrToInt ptrValue intType name = withBuilder $ \bld ->
     liftIO $ LLVM.buildPtrToInt bld ptrValue intType name
 
-_buildBitCast :: Value -> LLVM.Type -> String -> Gen Value
-_buildBitCast value ty name = withBuilder $ \bld ->
+buildBitCast :: Value -> LLVM.Type -> String -> Gen Value
+buildBitCast value ty name = withBuilder $ \bld ->
     liftIO $ LLVM.buildBitCast bld value ty name
 
 buildTruncOrBitCast :: Value -> LLVM.Type -> String -> Gen Value

@@ -17,12 +17,24 @@ gc_allocate n =
 
 fixedGC :: GC StorageManager
 fixedGC = do
+    pushForeign $ Foreign
+        { foreignName = "calloc"
+        , foreignReturn = CPointer I8
+        , foreignArguments = [I32, I32] }
     initName <- newName "init"
+    hp <- newVariable "hp" NodePtr
+    wordSize <- newVariable "size" Primitive
+    heapSize <- newVariable "heapSize" Primitive
     beginName <- newName "begin"
     endName <- newName "end"
     markName <- newName "mark"
     markPtr  <- newVariable "root" NodePtr
-    let initFn = Function initName [] [] (Return [])
+    let initFn = Function initName [] [] $
+            Bind [wordSize] (Unit [LitArg (LiteralInt 8)]) $
+            Bind [heapSize] (Unit [LitArg (LiteralInt 1024)]) $
+            Bind [hp] (CCall "calloc" [wordSize, heapSize]) $
+            Bind [] (WriteGlobal "hp" hp) $
+            Return []
         beginFn = Function beginName [] [] $
             Panic "FixedGC: Collection not supported!"
         endFn = Function endName [] [] $
