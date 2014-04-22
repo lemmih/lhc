@@ -75,6 +75,22 @@ Garbage collection:
     NoGC, growing. Allocate as needed, never GC.
     Boehm.
 
+Whole program alias analysis:
+  Alias analysis is import for allowing LLVM to optimize properly. In
+  particular, LLVM cannot move invariant loads out of loops if indeed
+  it doesn't know which loads are invariant.
+  GHC saw a decent performance improvement (average of about 4% on nofib)
+  when they enabled basic aliasing analysis. The improvement came nearly
+  entirely from hoisting loads out of strict loops.
+  The HPT analysis we do on bedrock code should give us much better
+  aliasing data than what GHC can muster. Not only can tell LLVM about
+  trivial things (Stack pointers and heap pointers don't alias, heap
+  isn't directy modified by other programs, etc); We can tell LLVM exactly
+  which heap pointers alias each other and which do not.
+  This should be important for performance so make sure to benchmark it to
+  verify. If no performance improvements are seen, figure out why.
+
+Interprocedural register allocation:
 
 Things to benchmark:
   How much does it cost to limit the mutator with a fuel argument?
