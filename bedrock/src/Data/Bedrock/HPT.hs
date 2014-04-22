@@ -450,7 +450,7 @@ hptSimpleExpression binds simple =
                 ptrs <- IntSet.toList <$> getPtrScope ptrRef
                 objects <- mapM getHeapObjects ptrs
                 setNodeScope node (mergeObjectList objects)
-        Unit args -> forM_ (zip binds args) $ \(bind, arg) -> do
+        Unit arg | [bind] <- binds -> do
             case arg of
                 -- All such simple renamings should have been removed
                 -- for performance reasons.
@@ -497,7 +497,6 @@ hptSimpleExpression binds simple =
                         hptCopyVariables arg (fnArgs!!(length fnArgs-n))
                     _ -> error $ "invalid apply: " ++ show (objRef, nodeName)
         Add{} -> return ()
-        Print{} -> return ()
         GCAllocate{} -> return ()
         GCBegin -> return ()
         GCEnd -> return ()

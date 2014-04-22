@@ -30,8 +30,8 @@ fixedGC = do
     markName <- newName "mark"
     markPtr  <- newVariable "root" NodePtr
     let initFn = Function initName [] [] $
-            Bind [wordSize] (Unit [LitArg (LiteralInt 8)]) $
-            Bind [heapSize] (Unit [LitArg (LiteralInt 1024)]) $
+            Bind [wordSize] (Unit (LitArg (LiteralInt 8))) $
+            Bind [heapSize] (Unit (LitArg (LiteralInt 1024))) $
             Bind [hp] (CCall "calloc" [wordSize, heapSize]) $
             Bind [] (WriteGlobal "hp" hp) $
             Return []
@@ -41,7 +41,7 @@ fixedGC = do
             Panic "FixedGC: Collection not supported!"
         markFn = Function markName [markPtr] [NodePtr] $
             Panic "FixedGC: Collection not supported!"
-        allocate _size = Unit [LitArg (LiteralInt 1)]
+        allocate _size = Unit (LitArg (LiteralInt 1))
     return StorageManager
         { smInit     = initFn
         , smBegin    = beginFn

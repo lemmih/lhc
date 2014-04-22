@@ -82,8 +82,6 @@ ppSimpleExpression simple =
 			ppSyntax "@fetch" <+> ppVariable ptr
 		Load ptr nth ->
 			ppSyntax "@load" <+> ppVariable ptr <> Doc.brackets (Doc.int nth)
-		Print var ->
-			ppSyntax "@print" <+> ppVariable var
 		Add lhs rhs ->
 			ppSyntax "@add" <+> ppVariable lhs <+> ppVariable rhs
 		Application fn args ->
@@ -95,8 +93,8 @@ ppSimpleExpression simple =
 			ppSyntax "@withExceptionHandler" <+>
 			ppName exh <> Doc.parens (ppList $ map ppVariable exhArgs) <+>
 			ppName fn <> Doc.parens (ppList $ map ppVariable args)
-		Unit args ->
-			ppSyntax "@unit" <> Doc.parens (ppList $ map ppArgument args)
+		Unit arg ->
+			ppSyntax "@unit" <> Doc.parens (ppArgument arg)
 		Eval var ->
 			ppSyntax "@eval" <+> ppVariable var
 		Apply a b ->

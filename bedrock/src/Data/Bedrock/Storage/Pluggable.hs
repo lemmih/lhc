@@ -90,7 +90,7 @@ lowerSimple :: [Variable] -> SimpleExpression -> Expression
 lowerSimple binds simple rest sm =
     case simple of
         GCAllocate n ->
-            Bind [size] (Unit [LitArg (LiteralInt $ fromIntegral n)]) $
+            Bind [size] (Unit (LitArg (LiteralInt $ fromIntegral n))) $
             ret $ smAllocate sm size
         GCBegin ->
             ret $ Application (fnName (smBegin sm)) []

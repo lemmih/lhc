@@ -191,17 +191,13 @@ evalSimple simple =
             HeapPtrValue ptr <- queryScope var
             value <- fetchHeapValue ptr
             return [loadNth value nth]
-        Print var -> do
-            value <- queryScope var
-            liftIO $ putStr (show (ppVariable var) ++ " = ")
-            trace <- traceValue value
-            liftIO $ putStrLn trace
-            return []
         Add lhs rhs -> do
             LitValue (LiteralInt a) <- queryScope lhs
             LitValue (LiteralInt b) <- queryScope rhs
             return [LitValue (LiteralInt (a+b))]
-        Unit args -> mapM evalArgument args
+        Unit arg -> do
+            value <- evalArgument arg
+            return [value]
         Eval var -> do
             HeapPtrValue ptr <- queryScope var
             value <- fetchHeapValue ptr

@@ -189,8 +189,6 @@ uniqSimple simple =
             Eval <$> resolve var
         Apply a b ->
             Apply <$> resolve a <*> resolve b
-        Print var ->
-            Print <$> resolve var
         ReadRegister{} -> return simple
         WriteRegister reg var ->
             WriteRegister reg <$> resolve var
@@ -198,8 +196,8 @@ uniqSimple simple =
             pure $ ReadGlobal reg
         WriteGlobal reg var ->
             WriteGlobal reg <$> resolve var
-        Unit args ->
-            Unit <$> mapM resolveArgument args
+        Unit arg ->
+            Unit <$> resolveArgument arg
         GCAllocate n ->
             pure (GCAllocate n)
         GCBegin -> pure GCBegin

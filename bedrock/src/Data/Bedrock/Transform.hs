@@ -153,10 +153,8 @@ freeVariablesSimple simple =
         ReadRegister{} -> id
         WriteRegister _reg var -> Set.insert var
         Address var _idx -> Set.insert var
-        Print var ->
-            Set.insert var
-        Unit args ->
-            freeVariablesArguments args
+        Unit arg ->
+            freeVariablesArguments [arg]
         Eval var ->
             Set.insert var
         Apply obj arg ->

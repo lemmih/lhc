@@ -45,7 +45,7 @@ lowerExpression expr =
         Bind [bind] (ReadRegister reg) rest -> do
             var <- asks (Map.! reg)
             rest' <- lowerExpression rest
-            return $ Bind [bind] (Unit [RefArg var]) rest'
+            return $ Bind [bind] (Unit (RefArg var)) rest'
         Bind [] (WriteRegister reg var) rest ->
             local (Map.insert reg var) $
                 lowerExpression rest

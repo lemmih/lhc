@@ -111,8 +111,8 @@ parseSimpleExpression :: Parser SimpleExpression
 parseSimpleExpression = choice
 	[ do
 		try (string "@unit"); spaces
-		args <- parens parseArguments; spaces
-		return $ Unit args
+		arg <- parens (spaces *> parseArgument <* spaces)
+		return $ Unit arg
 	, do
 		try (string "@alloc"); spaces
 		n <- many1 digit
@@ -152,10 +152,6 @@ parseSimpleExpression = choice
 		ptr <- parseVariable <* spaces
 		val <- parseVariable <* spaces
 		return $ Apply ptr val
-	, do
-		try (string "@print"); spaces
-		var <- parseVariable <* spaces
-		return $ Print var
 	, do
 		fn <- parseName isLower <* spaces
 		args <- parens parseVariables

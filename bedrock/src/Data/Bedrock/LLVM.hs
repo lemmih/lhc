@@ -138,7 +138,6 @@ compileFunction fn llvmFn = do
 compileExpression :: Expression -> Gen ()
 compileExpression expr =
     case expr of
-        Bind _ Print{} _ -> error "LLVM: Unsupported: @print"
         Bind _ Store{} _ -> error "LLVM: Unsupported: @store"
 
 
@@ -159,7 +158,7 @@ compileExpression expr =
             case binds of
                 [bind] -> bindVariable bind typedRet $ compileExpression rest
                 _      -> compileExpression rest
-        Bind [bind] (Unit [RefArg arg]) rest -> do
+        Bind [bind] (Unit (RefArg arg)) rest -> do
             value <- resolve arg
             case (variableType bind, variableType arg) of
                 (Primitive, NodePtr) -> do
@@ -169,7 +168,7 @@ compileExpression expr =
                     typedValue <- asPointer value
                     bindVariable bind typedValue $ compileExpression rest
                 _ -> bindVariable bind value $ compileExpression rest
-        Bind [bind] (Unit [arg]) rest -> do
+        Bind [bind] (Unit arg) rest -> do
             value <- resolveArgument arg
             bindVariable bind value $ compileExpression rest
         Bind [bind] (Load ptr nth) rest ->
@@ -234,10 +233,6 @@ compileExpression expr =
         Bind [bind] (Add a b) rest -> do
             value <- compileAdd a b
             bindVariable bind value $ compileExpression rest
-
-        Bind binds (Unit args) rest ->
-            compileExpression $
-                foldr (\(b,a) -> Bind [b] (Unit [a])) rest (zip binds args)
 
         Case scrut _defaultBranch alts -> do
             self <- asks envFunction

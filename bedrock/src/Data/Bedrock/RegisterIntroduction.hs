@@ -86,7 +86,8 @@ uniqFunction (Function name args rets body) = lowerMany args $
         <*> pure rets
         <*> uniqExpression body
 
-uniqExpression :: Expression -> Uniq Expression
+bindMany lst rest = foldr (\(bind, arg) -> Bind [bind] (Unit arg)) rest lst
+
 uniqExpression expr =
     case expr of
         Case scrut mbBranch alts -> do
@@ -95,21 +96,22 @@ uniqExpression expr =
                 <$> pure tag
                 <*> uniqMaybe uniqExpression mbBranch
                 <*> mapM (uniqAlternative args) alts
-        Bind binds (Unit args) rest -> lowerMany binds $ do
-            rocks <- forM (zip binds args) $ \(bind, arg) ->
-                case arg of
-                    RefArg var ->
-                        Bind
-                            <$> resolve bind
-                            <*> (Unit <$> fmap (map RefArg) (resolve var))
-                    LitArg{} -> return $ Bind [bind] (Unit [arg])
-                    NodeArg nodeName nodeArgs -> do
-                        (tag:nodeBinds) <- resolve bind
-                        return $
-                            Bind (tag:nodeBinds) $
-                            Unit $ NodeArg nodeName [] : map RefArg nodeArgs
+        Bind [bind] (Unit (RefArg var)) rest -> lower bind $ do
+            nodeBinds <- resolve bind
+            varArgs   <- resolve var
+            bindMany (zip nodeBinds (map RefArg varArgs))
+                <$> uniqExpression rest
+        Bind [bind] (Unit (LitArg lit)) rest -> lower bind $
+            Bind
+                <$> resolve bind
+                <*> pure (Unit (LitArg lit))
+                <*> uniqExpression rest
+        Bind [bind] (Unit (NodeArg nodeName nodeArgs)) rest -> lower bind $ do
+            nodeBinds <- resolve bind
             rest' <- uniqExpression rest
-            return $ foldr ($) rest' rocks
+            return $ bindMany 
+                (zip nodeBinds (NodeArg nodeName [] : map RefArg nodeArgs))
+                rest'
         Bind binds (Fetch ptr) rest -> lowerMany binds $ do
             binds' <- resolveMany binds
             rest' <- uniqExpression rest
@@ -143,7 +145,7 @@ uniqAlternative args (Alternative pattern branch) =
         NodePat nodeName vars -> lowerMany vars $
             Alternative
                 <$> pure (NodePat nodeName [])
-                <*> (Bind vars (Unit $ map RefArg args) <$> uniqExpression branch)
+                <*> (bindMany (zip vars (map RefArg args)) <$> uniqExpression branch)
 
 
 uniqMaybe :: (a -> Uniq a) -> Maybe a -> Uniq (Maybe a)
@@ -179,8 +181,6 @@ uniqSimple simple =
             pure $ Eval var
         Apply a b ->
             pure $ Apply a b
-        Print var ->
-            Print <$> fmap head (resolve var)
         ReadGlobal{} -> error "uniqSimple: ReadGlobal"
         WriteGlobal{} -> error "uniqSimple: WriteGlobal"
         Unit args ->

@@ -123,7 +123,7 @@ transformSimpleExpresion origin binds simple rest =
             hp' <- newVariable "hp'" NodePtr
             return $
                 Bind [hp] (ReadRegister "hp") $
-                Bind [bind] (Unit [RefArg hp]) $
+                Bind [bind] (Unit (RefArg hp)) $
                 Bind [] (Write hp 0 (NodeArg nodeName [])) $
                 foldr (\(nth, arg) -> Bind [] (Write hp nth (RefArg arg)))
                     (Bind [hp'] (Address hp size) $
@@ -143,7 +143,7 @@ transformSimpleExpresion origin binds simple rest =
                         NodePtr   -> GCMark var
                         Node{}    -> GCMarkNode var
                         -- Application gcMarkNodeName [var]
-                        Primitive -> Unit [RefArg var]
+                        Primitive -> Unit (RefArg var)
 
                 divertBody =
                     Bind [] GCBegin $

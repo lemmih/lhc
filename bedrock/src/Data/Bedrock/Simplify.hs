@@ -44,17 +44,12 @@ simplifyExpression expr =
                 [Alternative (NodePat node []) branch] -> do
             clone <- cloneVariable scrut
             bindVariable scrut clone $
-                Bind [clone] (Unit [NodeArg node []]) <$>
+                Bind [clone] (Unit (NodeArg node [])) <$>
                     simplifyExpression branch
         Bind [] Unit{} rest ->
             simplifyExpression rest
-        Bind [bind] (Unit [arg]) rest ->
-            Bind [bind] (Unit [arg]) <$> simplifyExpression rest
-        Bind binds (Unit args) rest -> do
-            rest' <- simplifyExpression rest
-            return $
-                foldr (\(b,a) -> Bind [b] (Unit [a])) rest' $
-                zip binds args
+        Bind [bind] (Unit arg) rest ->
+            Bind [bind] (Unit arg) <$> simplifyExpression rest
         Bind binds simple rest ->
             Bind <$> mapM resolve binds
                 <*> pure simple

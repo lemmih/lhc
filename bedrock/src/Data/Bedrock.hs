@@ -91,14 +91,13 @@ data SimpleExpression
 	| Fetch Variable
 	| Load Variable Int
 	| Add Variable Variable
-	| Print Variable
 
 	-- Global variables.
 	| ReadRegister String
 	| WriteRegister String Variable
 	| ReadGlobal String
 	| WriteGlobal String Variable
-	| Unit [Argument]
+	| Unit Argument
 
 	-- Eval/Apply
 	| Eval Variable
