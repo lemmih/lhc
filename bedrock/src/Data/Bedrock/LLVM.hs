@@ -38,8 +38,8 @@ newtype Gen a = Gen { unGen :: ReaderT Env IO a }
 
 
 
-compile :: Module -> IO ()
-compile bedrock = do
+compile :: Module -> FilePath -> IO ()
+compile bedrock dst = do
     m <- mCreateWithName "lhc"
     cx <- LLVM.getGlobalContext
     voidTy <- LLVM.voidTypeInContext cx
@@ -69,7 +69,7 @@ compile bedrock = do
             return ()
 
 
-    LLVM.writeBitcodeToFile m "output.bc"
+    LLVM.writeBitcodeToFile m dst
     --LLVM.destroyModule m
     return ()
   where

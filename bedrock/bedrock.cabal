@@ -20,18 +20,20 @@ library
                        Data.Bedrock.Parse,
                        Data.Bedrock.PrettyPrint, 
                        Data.Bedrock.Exceptions,
-                       Data.Bedrock.Evaluate,
+                       Data.Bedrock.Compile,
                        Data.Bedrock.Invoke,
                        Data.Bedrock.TypeCheck,
                        Data.Bedrock.HPT,
                        Data.Bedrock.EvalApply,
                        Data.Bedrock.Storage,
+                       Data.Bedrock.Storage.Pluggable,
+                       Data.Bedrock.Storage.Fixed,
                        Data.Bedrock.RegisterIntroduction,
                        Data.Bedrock.Rename
   -- other-modules:       
   build-depends:       base ==4.*, ansi-wl-pprint,
                        parsec, containers, mtl, vector,
-                       llvm-base
+                       llvm-base, filepath
 
   ghc-options:         -fwarn-incomplete-patterns -fwarn-unused-binds
                        -fwarn-unused-imports -Werror
