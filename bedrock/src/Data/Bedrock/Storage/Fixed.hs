@@ -21,13 +21,13 @@ fixedGC = do
         { foreignName = "calloc"
         , foreignReturn = CPointer I8
         , foreignArguments = [I32, I32] }
-    initName <- newName "init"
+    initName <- newName "fixed_gc_init"
     hp <- newVariable "hp" NodePtr
     wordSize <- newVariable "size" Primitive
     heapSize <- newVariable "heapSize" Primitive
-    beginName <- newName "begin"
-    endName <- newName "end"
-    markName <- newName "mark"
+    beginName <- newName "fixed_gc_begin"
+    endName <- newName "fixed_gc_end"
+    markName <- newName "fixed_gc_mark"
     markPtr  <- newVariable "root" NodePtr
     let initFn = Function initName [] [] $
             Bind [wordSize] (Unit (LitArg (LiteralInt 8))) $
