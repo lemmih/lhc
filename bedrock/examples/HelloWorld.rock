@@ -1,4 +1,9 @@
-main =
-	ptr := @store (HelloWorld);
-	@print ptr;
-	@exit
+foreign i32 puts(i8*)
+
+
+entrypoint: main
+
+main()
+    #msg = @unit( "Hello world!" )
+    @ccall puts(#msg)
+    @exit
