@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Bedrock.Storage.Pluggable where
 
-import Control.Applicative ( Applicative, (<$>), (<*>) )
+import Control.Applicative ( Applicative, (<$>) )
 import Control.Monad.State
 
 import Data.Bedrock

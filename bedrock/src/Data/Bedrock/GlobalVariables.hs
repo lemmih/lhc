@@ -23,7 +23,7 @@ lowerGlobalRegisters m = m
   where
     runLower action = runReader (unLower action) env
     env = Map.fromList
-        [ (name, Variable (Name [] name idNum) Primitive)
+        [ (name, Variable (Name [] name idNum) NodePtr)
         | (idNum, name) <- zip idNums regs ]
     (idNums, ns) = getGlobalIDs (modNamespace m) (length regs)
     regs = Set.toList $ allRegisters m
@@ -52,10 +52,10 @@ lowerExpression expr =
         Bind binds (Application fn args) rest -> do
             regs <- asks Map.elems
             allRegs <- asks Map.toList
-            let saveReg (reg, var) = Bind [] (WriteGlobal reg var)
+            --let saveReg (reg, var) = Bind [] (WriteGlobal reg var)
             let restoreReg (reg, var) = Bind [var] (ReadGlobal reg)
             rest' <- lowerExpression rest
-            return $ flip (foldr saveReg) allRegs $ 
+            return $ -- flip (foldr saveReg) allRegs $ 
                 Bind binds (Application fn (regs ++ args)) $
                 foldr restoreReg rest' allRegs
         Bind binds simple rest ->

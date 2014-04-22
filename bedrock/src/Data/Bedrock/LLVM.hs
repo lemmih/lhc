@@ -23,6 +23,7 @@ data Env = Env
     , envFunction    :: Value
     , envModule      :: LLVM.Module
     , envWordTy      :: LLVM.Type
+    , envPointerTy   :: LLVM.Type
     , envVoidTy      :: LLVM.Type
     }
 
@@ -62,11 +63,12 @@ compile bedrock = do
 
             liftIO $ LLVM.positionAtEnd bld entry
             wordTy <- asks envWordTy
+            pointerTy <- asks envPointerTy
             heapSize <- constWord (1024*1024)
             heapPtr <- buildArrayMalloc wordTy heapSize ""
-            heapWord <- castPtrToWord heapPtr
-            zeroes <- replicateM (nMainArgs-1) (constWord 0)
-            call <- buildCall entryFn (heapWord:zeroes) ""
+            --zeroes <- replicateM (nMainArgs-1) (constWord 0)
+            zeroes <- replicateM (nMainArgs-1) (liftIO $ LLVM.constPointerNull pointerTy)
+            call <- buildCall entryFn (heapPtr:zeroes) ""
             liftIO $ LLVM.setInstructionCallConv call LLVM.Fast
             buildRetVoid
             return ()
@@ -90,9 +92,10 @@ cTypeToLLVM cType = do
             return $ LLVM.pointerType tyRef 0
 
 typesToLLVM :: [Type] -> Gen LLVM.Type
-typesToLLVM [] = asks envVoidTy
-typesToLLVM [_] = asks envWordTy
-typesToLLVM _ = error $ "typesToLLVM: Unsupported type"
+typesToLLVM []        = asks envVoidTy
+typesToLLVM [NodePtr] = asks envPointerTy
+typesToLLVM [_]       = asks envWordTy
+typesToLLVM _         = error $ "typesToLLVM: Unsupported type"
 
 compileForeign :: LLVM.Module -> Foreign -> IO ()
 compileForeign m f = do
@@ -111,12 +114,10 @@ prepareFunctions fs0 action = worker [] fs0
 
 prepareFunction :: Function -> (Value -> Gen a) -> Gen a
 prepareFunction fn action = do
-    wordTy <- asks envWordTy
-    voidTy <- asks envVoidTy
     m <- asks envModule
     fnReturnTy <- typesToLLVM (fnResults fn)
-    let fnArgTys = replicate (length (fnArguments fn)) wordTy
-        fnTy = LLVM.functionType fnReturnTy fnArgTys False
+    fnArgTys <- forM (fnArguments fn) $ \arg -> typesToLLVM [variableType arg]
+    let fnTy = LLVM.functionType fnReturnTy fnArgTys False
     llvmFn <- liftIO $ LLVM.addFunction m (uniqueName (fnName fn)) fnTy
     liftIO $ LLVM.setLinkage llvmFn LLVM.PrivateLinkage
     liftIO $ LLVM.setFunctionCallConv llvmFn LLVM.Fast
@@ -139,6 +140,11 @@ compileFunction fn llvmFn = do
 compileExpression :: Expression -> Gen ()
 compileExpression expr =
     case expr of
+        Bind _ Print{} _ -> error "LLVM: Unsupported: @print"
+        Bind _ Store{} _ -> error "LLVM: Unsupported: @store"
+
+
+
         Bind binds (CCall fName args) rest -> do
             f <- asks ((Map.! fName) . envForeigns)
 
@@ -155,15 +161,23 @@ compileExpression expr =
             case binds of
                 [bind] -> bindVariable bind typedRet $ compileExpression rest
                 _      -> compileExpression rest
+        Bind [bind] (Unit [RefArg arg]) rest -> do
+            value <- resolve arg
+            case (variableType bind, variableType arg) of
+                (Primitive, NodePtr) -> do
+                    typedValue <- asWord value
+                    bindVariable bind typedValue $ compileExpression rest
+                (NodePtr, Primitive) -> do
+                    typedValue <- asPointer value
+                    bindVariable bind typedValue $ compileExpression rest
+                _ -> bindVariable bind value $ compileExpression rest
         Bind [bind] (Unit [arg]) rest -> do
-            value <- compileBind arg
+            value <- resolveArgument arg
             bindVariable bind value $ compileExpression rest
         Bind [bind] (Load ptr nth) rest ->
             compileLoad bind ptr nth $
             compileExpression rest
-        Bind [bind] (Store node args) rest ->
-            compileStore bind node args $
-            compileExpression rest
+        
         Bind [] (Write word nth arg) rest -> do
             compileWrite word nth arg
             compileExpression rest
@@ -175,25 +189,25 @@ compileExpression expr =
             bindVariable bind offsetPtr $ compileExpression rest
 
         -- Ignore GCAllocate and Alloc for now
-        Bind [bind] GCAllocate{} rest -> do
-            value <- constWord 1
-            bindVariable bind value $ compileExpression rest
-        Bind [] Alloc{} rest -> compileExpression rest
-        Bind [] GCBegin{} rest -> compileExpression rest
-        Bind [] GCEnd{} rest -> compileExpression rest
-        Bind [bind] (GCMark ptr) rest -> do
-            value <- resolve ptr
-            bindVariable bind value $ compileExpression rest
+        --Bind [bind] GCAllocate{} rest -> do
+        --    value <- constWord 1
+        --    bindVariable bind value $ compileExpression rest
+        --Bind [] Alloc{} rest -> compileExpression rest
+        --Bind [] GCBegin{} rest -> compileExpression rest
+        --Bind [] GCEnd{} rest -> compileExpression rest
+        --Bind [bind] (GCMark ptr) rest -> do
+        --    value <- resolve ptr
+        --    bindVariable bind value $ compileExpression rest
 
         Bind [] (Application fn args) rest -> do
             llvmFn <- resolveFunction fn
-            llvmArgs <- mapM asWord =<< mapM resolve args
+            llvmArgs <- mapM resolve args
             llvmCall <- buildCall llvmFn llvmArgs ""
             liftIO $ LLVM.setInstructionCallConv llvmCall LLVM.Fast
             compileExpression rest
         Bind [ret] (Application fn args) rest -> do
             llvmFn <- resolveFunction fn
-            llvmArgs <- mapM asWord =<< mapM resolve args
+            llvmArgs <- mapM resolve args
             llvmCall <- buildCall llvmFn llvmArgs ""
             liftIO $ LLVM.setInstructionCallConv llvmCall LLVM.Fast
             bindVariable ret llvmCall $ compileExpression rest
@@ -203,12 +217,12 @@ compileExpression expr =
             value <- resolve var
             buildRet value
             return ()
-        Panic msg ->
+        Panic{} -> -- XXX: Ignoring the msg for now.
             buildUnreachable >> return ()
 
         Bind [var] (ReadGlobal reg) rest -> do
             global <- asks ((Map.! reg) . envGlobals)
-            globalValue <- buildLoad global ""
+            globalValue <- asPointer =<< buildLoad global ""
             bindVariable var globalValue $ compileExpression rest
         Bind [] (WriteGlobal reg var) rest -> do
             value <- asWord =<< resolve var
@@ -216,19 +230,6 @@ compileExpression expr =
             buildStore value global
             compileExpression rest
 
-        Bind [] (Print prim) rest -> do
-            cx <- liftIO LLVM.getGlobalContext
-            i8 <- liftIO $ LLVM.intTypeInContext cx 8
-            i32 <- liftIO $ LLVM.intTypeInContext cx 32
-            wordTy <- asks envWordTy
-            let i8p = LLVM.pointerType i8 0
-            let fnTy = LLVM.functionType i32 [i8p,wordTy] False
-            m <- asks envModule
-            printf <- liftIO $ LLVM.addFunction m "printf" fnTy
-            string <- withBuilder $ \bld -> liftIO $ LLVM.buildGlobalStringPtr bld "string %d\n" ""
-            arg <- resolve prim
-            buildCall printf [string, arg] ""
-            compileExpression rest
         Bind [bind] (Add a b) rest -> do
             value <- compileAdd a b
             bindVariable bind value $ compileExpression rest
@@ -256,7 +257,7 @@ compileExpression expr =
             return ()
         TailCall fn args -> do
             llvmFn <- resolveFunction fn
-            llvmArgs <- mapM asWord =<< mapM resolve args
+            llvmArgs <- mapM resolve args
             llvmCall <- buildCall llvmFn llvmArgs ""
             liftIO $ LLVM.setTailCall llvmCall True
             liftIO $ LLVM.setInstructionCallConv llvmCall LLVM.Fast
@@ -273,15 +274,14 @@ compileAdd a b = do
 
 compileWrite :: Variable -> Int -> Argument -> Gen Value
 compileWrite word nth arg = do
-    argValue <- compileBind arg
-    wordValue <- resolve word
-    ptr <- asPointer wordValue
+    argValue <- asWord =<< resolveArgument arg
+    ptr <- asPointer =<< resolve word
     offset <- constWord (fromIntegral nth)
     offsetPtr <- buildGEP ptr [offset] ""
     buildStore argValue offsetPtr
 
-compileStore :: Variable -> NodeName -> [Variable] -> Gen a -> Gen a
-compileStore bind nodeName args action = do
+_compileStore :: Variable -> NodeName -> [Variable] -> Gen a -> Gen a
+_compileStore bind nodeName args action = do
     wordTy <- asks envWordTy
     size <- constWord (fromIntegral $ 1 + length args)
     ptrValue <- buildArrayMalloc wordTy size ""
@@ -311,8 +311,8 @@ compilePattern pattern = do
         LitPat (LiteralInt i) -> constWord i
         NodePat name []       -> resolveNodeName name
 
-compileBind :: Argument -> Gen Value
-compileBind arg = do
+resolveArgument :: Argument -> Gen Value
+resolveArgument arg = do
     case arg of
         RefArg ref            -> resolve ref
         LitArg (LiteralInt i) -> constWord i
@@ -395,6 +395,7 @@ mkEnv m llvmModule cx = do
         , envBuilder = error "envBuilder not defined"
         , envModule = llvmModule
         , envWordTy = wordTy
+        , envPointerTy = LLVM.pointerType wordTy 0
         , envVoidTy = voidTy
         }
 
