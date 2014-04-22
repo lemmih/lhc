@@ -4,46 +4,69 @@ import           Control.Applicative           (pure, (*>), (<$>), (<*), (<*>))
 import           Control.Monad                 (guard)
 import           Data.Char
 import           Text.ParserCombinators.Parsec
+import qualified Text.ParserCombinators.Parsec as P
+import qualified Text.ParserCombinators.Parsec.Token as P
+import qualified Text.ParserCombinators.Parsec.Language as P
+import Data.Maybe
 
-import Data.Bedrock
+import           Data.Bedrock
 
 -------------------------------------------------------------------------------
 -- Parsing
 
-parseName :: (Char -> Bool) -> Parser Name
-parseName firstLetter =
+bedrockDef = P.emptyDef
+	{ P.commentLine = ";" -- similar to LLVM IR
+	, P.caseSensitive = True
+	, P.reservedNames = ["node", "foreign", "entrypoint", "case", "of"]
+	, P.reservedOpNames = ["=","->"] }
+
+lexer = P.makeTokenParser bedrockDef
+
+identifier = P.identifier lexer
+parens     = P.parens lexer
+reserved   = P.reserved lexer
+reservedOp = P.reservedOp lexer
+symbol     = P.symbol lexer
+comma      = P.comma lexer
+integer    = P.integer lexer
+stringLiteral = P.stringLiteral lexer
+commaSep   = P.commaSep lexer
+commaSep1  = P.commaSep1 lexer
+natural    = P.natural lexer
+
+parseName :: Parser Name
+parseName =
 	Name
 		<$> pure []
-		<*> ((:) <$> satisfy firstLetter <*> (many alphaNum))
+		<*> identifier
 		<*> pure 0
 
 parseType :: Parser Type
 parseType = choice (map try
-	[ char '*' >> return NodePtr
-	, char '%' >> return Node
-	, char '#' >> return Primitive ])
+	[ symbol "*" >> return NodePtr
+	, symbol "%" >> return Node
+	, symbol "#" >> return Primitive ])
 	<?> "type"
 
 parseVariable :: Parser Variable
 parseVariable = do
 	ty <- parseType
-	name <- parseName isLower
+	name <- parseName
 	return Variable{ variableName = name, variableType = ty }
 
 parseNodeDefinition :: Parser NodeDefinition
 parseNodeDefinition = try $ do
-	string "node"; spaces
-	name <- parseName isUpper; spaces
-	args <- many (parseType <* spaces)
+	reserved "node"
+	name <- parseName
+	args <- many parseType
 	return $ NodeDefinition name args
 
 parseFunction :: Parser Function
 parseFunction = do
-	retTypes <- many parseType <* spaces
-	name <- parseName isLower <* spaces
-	args <- parseVariable `endBy` spaces
-	char '='; spaces
-	body <- parseExpression
+	retTypes <- many parseType
+	name <- parseName
+	args <- parens (commaSep parseVariable)
+	body <- parseBlock
 	return (Function name args retTypes body)
 
 -- FIXME: Parse nodes
@@ -52,173 +75,161 @@ parseArgument =
 	RefArg <$> try parseVariable <|>
 	LitArg <$> parseLiteral <|>
 	(parens $ do
-		constructor <- parseConstructor <* spaces
-		binds <- many (spaces *> parseVariable <* spaces)
+		constructor <- parseConstructor
+		binds <- many parseVariable
 		return $ NodeArg (ConstructorName constructor) binds) <|>
 	(parens $ do
-		fn <- parseName isLower <* spaces
-		binds <- many (spaces *> parseVariable <* spaces)
-		blanks <- many (spaces *> char '_' <* spaces)
+		fn <- parseName
+		binds <- many parseVariable
+		blanks <- many (symbol "_")
 		return $ NodeArg (FunctionName fn (length blanks)) binds)
 	<?> "argument"
 
-parseArguments :: Parser [Argument]
-parseArguments = (spaces *> parseArgument <* spaces) `sepBy` char ','
-
---parseNames :: Parser [Name]
---parseNames = (spaces *> parseName isLower <* spaces) `sepBy` char ','
-
-parseVariables :: Parser [Variable]
-parseVariables = (spaces *> parseVariable <* spaces) `sepBy` char ','
-
 parseConstructor :: Parser Name
 parseConstructor = try (do
-	name <- parseName isUpper
+	name <- parseName
+	guard (isUpper (head (nameIdentifier name)))
 	return name)
 	<?> "constructor"
 
 parseLiteral :: Parser Literal
 parseLiteral =
-	LiteralInt . read <$> many1 digit <|>
-	LiteralString <$> between (char '"') (char '"') (many (satisfy (/='"')))
+	LiteralInt <$> integer <|>
+	LiteralString <$> stringLiteral
 	<?> "literal"
 
 parsePattern :: Parser Pattern
 parsePattern = choice (map try
 	[ do
-		constructor <- parseConstructor <* spaces
-		binds <- many (spaces *> parseVariable <* spaces)
+		constructor <- parseConstructor
+		binds <- many parseVariable
 		return $ NodePat (ConstructorName constructor) binds
 	, do
-		fn <- parseName isLower <* spaces
-		binds <- many (spaces *> parseVariable <* spaces)
-		blanks <- many (spaces *> char '_' <* spaces)
+		fn <- parseName
+		binds <- many parseVariable
+		blanks <- many (symbol "_")
 		return $ NodePat (FunctionName fn (length blanks)) binds
 	, LitPat <$> parseLiteral
 	])
 
 parseAlternative :: Parser Alternative
 parseAlternative = do
-	pat <- parsePattern <* spaces
-	string "->"; spaces
-	expression <- parseExpression
+	pat <- parsePattern
+	reservedOp "->"
+	expression <- parseBlock
 	return $ Alternative pat expression
 
-parens :: Parser a -> Parser a
-parens = between (char '(') (char ')')
-
-parseSimpleExpression :: Parser SimpleExpression
-parseSimpleExpression = choice
+parseExpression :: Parser Expression
+parseExpression = choice
 	[ do
-		try (string "@unit"); spaces
-		arg <- parens (spaces *> parseArgument <* spaces)
+		reserved "@unit"
+		arg <- parens parseArgument
 		return $ Unit arg
 	, do
-		try (string "@alloc"); spaces
-		n <- many1 digit
-		return $ Alloc (read n)
+		reserved "@alloc"
+		n <- natural
+		return $ Alloc (fromIntegral n)
 	, do
-		try (string "@store"); spaces
+		reserved "@store"
 		parens $ do
-			constructor <- parseConstructor <* spaces
-			args <- parseVariables
+			constructor <- parseConstructor
+			args <- many parseVariable
 			return $ Store (ConstructorName constructor) args
 		  <|> do
-		  	fn <- parseName isLower <* spaces
-		  	args <- parseVariables
-		  	blanks <- many (spaces *> char '_' <* spaces)
+		  	fn <- parseName
+		  	args <- many parseVariable
+		  	blanks <- many (symbol "_")
 		  	return $ Store (FunctionName fn (length blanks)) args
 	, do
-		try (string "@sizeOf"); spaces
+		reserved "@sizeOf"
 		parens $ do
-			constructor <- parseConstructor <* spaces
-			args <- parseVariables
+			constructor <- parseConstructor
+			args <- many parseVariable
 			return $ SizeOf (ConstructorName constructor) args
 		  <|> do
-		  	fn <- parseName isLower <* spaces
-		  	args <- parseVariables
-		  	blanks <- many (spaces *> char '_' <* spaces)
+		  	fn <- parseName
+		  	args <- many parseVariable
+		  	blanks <- many (symbol "_")
 		  	return $ SizeOf (FunctionName fn (length blanks)) args
 	, do
-		try (string "@fetch"); spaces
-		ptr <- parseVariable <* spaces
+		reserved "@fetch"
+		ptr <- parseVariable
 		return $ Fetch ptr
 	, do
-		try (string "@eval"); spaces
-		ptr <- parseVariable <* spaces
+		reserved "@eval"
+		ptr <- parens parseVariable
 		return $ Eval ptr
 	, do
-		try (string "@apply"); spaces
-		ptr <- parseVariable <* spaces
-		val <- parseVariable <* spaces
-		return $ Apply ptr val
+		reserved "@apply"
+		parens $ do
+			ptr <- parseVariable
+			comma
+			val <- parseVariable
+			return $ Apply ptr val
 	, do
-		fn <- parseName isLower <* spaces
-		args <- parens parseVariables
+		fn <- parseName
+		args <- parens (commaSep parseVariable)
 		return $ Application fn args
 	, do
-		try (string "@ccall"); spaces
-		fn <- parseForeignName <* spaces
-		args <- parens parseVariables
+		reserved "@ccall"
+		fn <- parseForeignName
+		args <- parens (commaSep parseVariable)
 		return $ CCall fn args
 	, do
-		try (string "@withExceptionHandler"); spaces
-		exh <- parseName isLower <* spaces
-		exhArgs <- parens parseVariables <* spaces
-		fn <- parseName isLower <* spaces
-		args <- parens parseVariables
+		reserved "@withExceptionHandler"
+		exh <- parseName
+		exhArgs <- parens (commaSep parseVariable)
+		fn <- parseName
+		args <- parens (commaSep parseVariable)
 		return $ WithExceptionHandler exh exhArgs fn args
 	, do
-		try (string "@add"); spaces
-		lhs <- parseVariable <* spaces
-		rhs <- parseVariable <* spaces
+		reserved "@add"
+		lhs <- parseVariable
+		rhs <- parseVariable
 		return $ Add lhs rhs
 	]
 
-parseExpression :: Parser Expression
-parseExpression = spaces *> choice (map try
+parseBlock :: Parser Block
+parseBlock = choice (map try
 	[ do
-		try (string "@return"); spaces
-		args <- parens parseVariables; spaces
+		reserved "@return"
+		args <- parens (commaSep parseVariable)
 		return $ Return args
 	, do
-		try (string "case"); spaces
-		scrut <- parseVariable <* spaces
-		string "of"; spaces
-		alts <- (spaces *> parseAlternative <* spaces) `sepBy` char '|'
+		reserved "case"
+		scrut <- parseVariable
+		reserved "of"
+		alts <- many parseAlternative
 		return $ Case scrut Nothing alts
 	, do
-		names <- parseVariables
-		guard (not (null names))
-		string ":="; spaces
-		simple <- parseSimpleExpression
-		char ';'
-		rest <- parseExpression
+		names <- commaSep1 parseVariable
+		symbol "="
+		simple <- parseExpression
+		rest <- parseBlock
 		return $ Bind names simple rest
 	, do
-		simple <- parseSimpleExpression
-		char ';'
-		rest <- parseExpression
+		simple <- parseExpression
+		rest <- parseBlock
 		return $ Bind [] simple rest
 	, do
-		try (string "@throw"); spaces
+		reserved "@throw"
 		e <- parseVariable
 		return $ Throw e
 	, do
-		try (string "@exit"); spaces
+		reserved "@exit"
 		return $ Exit
 	, do
-		try (string "@tail"); space
-		fn <- parseName isLower <* spaces
-		args <- parens parseVariables
+		reserved "@tail"
+		fn <- parseName
+		args <- parens (commaSep parseVariable)
 		return $ TailCall fn args
 	]) <?> "expression"
 
 parseEntryPoint :: Parser Name
 parseEntryPoint = do
-	string "entrypoint"; spaces
-	char ':'; spaces
-	parseName isLower
+	reserved "entrypoint"
+	symbol ":"
+	parseName
 
 -- i8 i32 i64 void i64*
 parseCType :: Parser CType
@@ -228,34 +239,47 @@ parseCType = do
 	return $ foldr (.) id (replicate p CPointer) ty
   where
   	prim = choice $ map try
-		[ string "i8" >> return I8
-		, string "i32" >> return I32
-		, string "i64" >> return I64
-		, string "void" >> return CVoid
+		[ reserved "i8" >> return I8
+		, reserved "i32" >> return I32
+		, reserved "i64" >> return I64
+		, reserved "void" >> return CVoid
 		]
 
 parseForeignName :: Parser String
-parseForeignName = many1 alphaNum
+parseForeignName = identifier
 
 -- foreign [ret] name([args])
 parseForeign :: Parser Foreign
 parseForeign = do
-	string "foreign"; spaces
-	ret <- parseCType <* spaces
-	name <- parseForeignName <* spaces
-	args <- parens $
-				spaces *>
-					(parseCType `sepBy` (try $ spaces >> char ',' >> spaces))
-				 <* spaces
-	spaces
+	reserved "foreign"
+	ret <- parseCType
+	name <- parseForeignName
+	args <- parens $ commaSep parseCType
 	return $ Foreign name ret args
 
+data TopLevel
+	= TopForeign Foreign
+	| TopNode NodeDefinition
+	| TopEntryPoint Name
+	| TopFunction Function
+
+parseTopLevel :: Parser TopLevel
+parseTopLevel =
+	TopForeign <$> parseForeign <|>
+	TopNode <$> parseNodeDefinition <|>
+	TopEntryPoint <$> parseEntryPoint <|>
+	TopFunction <$> parseFunction
+
 parseModule :: Parser Module
-parseModule =
-	Module
-		<$> many parseForeign
-		<*> many parseNodeDefinition
-		<*> parseEntryPoint
-		<*> many parseFunction
-		<*> pure (error "next free unique not defined")
-		<* eof
+parseModule = do
+	topLevel <- many parseTopLevel
+	return Module
+		{ modForeigns = [ f | TopForeign f <- topLevel ]
+		, nodes = [ n | TopNode n <- topLevel ]
+		, entryPoint = fromMaybe noEntryPoint $ listToMaybe
+			[ e | TopEntryPoint e <- topLevel ]
+		, functions = [ f | TopFunction f <- topLevel ]
+		, modNamespace = error "next free unique not defined"
+		}
+  where
+  	noEntryPoint = error "No entrypoint defined."

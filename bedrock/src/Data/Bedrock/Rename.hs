@@ -112,21 +112,21 @@ uniqFunction (Function name args rets body) = renameVariables args $
         <$> resolveName name
         <*> mapM resolve args
         <*> pure rets
-        <*> uniqExpression body
+        <*> uniqBlock body
 
-uniqExpression :: Expression -> Uniq Expression
-uniqExpression expr =
-    case expr of
+uniqBlock :: Block -> Uniq Block
+uniqBlock block =
+    case block of
         Case scrut mbBranch alts ->
             Case
                 <$> resolve scrut
-                <*> uniqMaybe uniqExpression mbBranch
+                <*> uniqMaybe uniqBlock mbBranch
                 <*> mapM uniqAlternative alts
         Bind binds simple rest -> renameVariables binds $
             Bind
                 <$> mapM resolve binds
                 <*> uniqSimple simple
-                <*> uniqExpression rest
+                <*> uniqBlock rest
         Return vars ->
             Return <$> mapM resolve vars
         Throw var ->
@@ -141,14 +141,14 @@ uniqExpression expr =
 uniqAlternative :: Alternative -> Uniq Alternative
 uniqAlternative (Alternative pattern branch) =
     case pattern of
-        LitPat{} -> Alternative pattern <$> uniqExpression branch
+        LitPat{} -> Alternative pattern <$> uniqBlock branch
         NodePat nodeName vars ->
             renameVariables vars $
                 Alternative
                     <$> (NodePat
                         <$> resolveNodeName nodeName
                         <*> mapM resolve vars)
-                    <*> uniqExpression branch
+                    <*> uniqBlock branch
 
 
 uniqMaybe :: (a -> Uniq a) -> Maybe a -> Uniq (Maybe a)
@@ -157,7 +157,7 @@ uniqMaybe fn obj =
         Nothing  -> return Nothing
         Just val -> Just <$> fn val
 
-uniqSimple :: SimpleExpression -> Uniq SimpleExpression
+uniqSimple :: Expression -> Uniq Expression
 uniqSimple simple =
     case simple of
         Literal lit ->

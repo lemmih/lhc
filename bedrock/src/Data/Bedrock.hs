@@ -55,14 +55,14 @@ data Function = Function
 	{ fnName      :: Name
 	, fnArguments :: [Variable]
 	, fnResults   :: [Type]
-	, fnBody      :: Expression
+	, fnBody      :: Block
 	} deriving (Show)
 
 data Pattern
 	= NodePat NodeName [Variable]
 	| LitPat Literal
 	deriving (Show)
-data Alternative = Alternative Pattern Expression
+data Alternative = Alternative Pattern Block
 	deriving (Show)
 
 data Literal
@@ -76,7 +76,7 @@ data Argument
 	| NodeArg NodeName [Variable]
 	deriving (Show)
 
-data SimpleExpression
+data Expression
 	= Literal Literal
 	| Application Name [Variable]
 	| CCall String [Variable]
@@ -111,9 +111,9 @@ data SimpleExpression
 	| GCMarkNode Variable
 	deriving (Show)
 
-data Expression
-	= Case Variable (Maybe Expression) [Alternative]
-	| Bind [Variable] SimpleExpression Expression
+data Block
+	= Case Variable (Maybe Block) [Alternative]
+	| Bind [Variable] Expression Block
 	| Return [Variable]
 	| Throw Variable
 	| TailCall Name [Variable]

@@ -133,11 +133,11 @@ compileFunction fn llvmFn = do
     bld <- liftIO $ LLVM.createBuilder
     liftIO $ LLVM.positionAtEnd bld entry
     setFunction llvmFn $ setBuilder bld $
-        compileExpression (fnBody fn)
+        compileBlock (fnBody fn)
 
-compileExpression :: Expression -> Gen ()
-compileExpression expr =
-    case expr of
+compileBlock :: Block -> Gen ()
+compileBlock block =
+    case block of
         Bind _ Store{} _ -> error "LLVM: Unsupported: @store"
 
 
@@ -156,28 +156,28 @@ compileExpression expr =
             typedRet <- fromCType ret (foreignReturn f)
 
             case binds of
-                [bind] -> bindVariable bind typedRet $ compileExpression rest
-                _      -> compileExpression rest
+                [bind] -> bindVariable bind typedRet $ compileBlock rest
+                _      -> compileBlock rest
         Bind [bind] (Unit (RefArg arg)) rest -> do
             value <- resolve arg
             case (variableType bind, variableType arg) of
                 (Primitive, NodePtr) -> do
                     typedValue <- asWord value
-                    bindVariable bind typedValue $ compileExpression rest
+                    bindVariable bind typedValue $ compileBlock rest
                 (NodePtr, Primitive) -> do
                     typedValue <- asPointer value
-                    bindVariable bind typedValue $ compileExpression rest
-                _ -> bindVariable bind value $ compileExpression rest
+                    bindVariable bind typedValue $ compileBlock rest
+                _ -> bindVariable bind value $ compileBlock rest
         Bind [bind] (Unit arg) rest -> do
             value <- resolveArgument arg
-            bindVariable bind value $ compileExpression rest
+            bindVariable bind value $ compileBlock rest
         Bind [bind] (Load ptr nth) rest ->
             compileLoad bind ptr nth $
-            compileExpression rest
+            compileBlock rest
 
         Bind [] (Write word nth arg) rest -> do
             compileWrite word nth arg
-            compileExpression rest
+            compileBlock rest
         Bind [bind] (Address word nth) rest -> do
             wordValue <- resolve word
             pointerTy <- asks envPointerTy
@@ -186,7 +186,7 @@ compileExpression expr =
             --let ptr = LLVM.constBitCast wordValue ppTy
             offset <- constWord (fromIntegral nth)
             offsetPtr <- buildGEP ptr [offset] ""
-            bindVariable bind offsetPtr $ compileExpression rest
+            bindVariable bind offsetPtr $ compileBlock rest
 
         -- Ignore GCAllocate and Alloc for now
         --Bind [bind] GCAllocate{} rest -> do
@@ -204,13 +204,13 @@ compileExpression expr =
             llvmArgs <- mapM resolve args
             llvmCall <- buildCall llvmFn llvmArgs ""
             liftIO $ LLVM.setInstructionCallConv llvmCall LLVM.Fast
-            compileExpression rest
+            compileBlock rest
         Bind [ret] (Application fn args) rest -> do
             llvmFn <- resolveFunction fn
             llvmArgs <- mapM resolve args
             llvmCall <- buildCall llvmFn llvmArgs ""
             liftIO $ LLVM.setInstructionCallConv llvmCall LLVM.Fast
-            bindVariable ret llvmCall $ compileExpression rest
+            bindVariable ret llvmCall $ compileBlock rest
         Return [] ->
             buildRetVoid >> return ()
         Return [var] -> do
@@ -223,16 +223,16 @@ compileExpression expr =
         Bind [var] (ReadGlobal reg) rest -> do
             global <- asks ((Map.! reg) . envGlobals)
             globalValue <- asPointer =<< buildLoad global ""
-            bindVariable var globalValue $ compileExpression rest
+            bindVariable var globalValue $ compileBlock rest
         Bind [] (WriteGlobal reg var) rest -> do
             value <- asWord =<< resolve var
             global <- asks ((Map.! reg) . envGlobals)
             buildStore value global
-            compileExpression rest
+            compileBlock rest
 
         Bind [bind] (Add a b) rest -> do
             value <- compileAdd a b
-            bindVariable bind value $ compileExpression rest
+            bindVariable bind value $ compileBlock rest
 
         Case scrut _defaultBranch alts -> do
             self <- asks envFunction
@@ -247,7 +247,7 @@ compileExpression expr =
                 branchBlock <- liftIO $ LLVM.appendBasicBlock self "branch"
                 branchBuilder <- liftIO $ LLVM.createBuilder
                 liftIO $ LLVM.positionAtEnd branchBuilder branchBlock
-                setBuilder branchBuilder $ compileExpression branch
+                setBuilder branchBuilder $ compileBlock branch
                 pValue <- compilePattern pattern
                 liftIO $ LLVM.addCase switch pValue branchBlock
             return ()
@@ -260,7 +260,7 @@ compileExpression expr =
             buildRetVoid
             return ()
         Exit -> buildRetVoid >> return ()
-        _ -> error $ "LLVM expr: " ++ show expr
+        _ -> error $ "LLVM expr: " ++ show block
 
 compileAdd :: Variable -> Variable -> Gen Value
 compileAdd a b = do

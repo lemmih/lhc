@@ -154,7 +154,7 @@ uniqMaybe fn obj =
         Nothing  -> return Nothing
         Just val -> Just <$> fn val
 
-uniqSimple :: SimpleExpression -> Uniq SimpleExpression
+uniqSimple :: Expression -> Uniq Expression
 uniqSimple simple =
     case simple of
         Literal lit ->

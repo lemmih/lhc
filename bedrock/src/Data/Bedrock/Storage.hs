@@ -31,36 +31,36 @@ lowerAlloc = do
 
 transformFunction :: Function -> Gen ()
 transformFunction fn = do
-    body <- transformExpression fn (fnBody fn)
+    body <- transformBlock fn (fnBody fn)
     let fn' = fn{fnBody = body}
     pushFunction fn'
 
-transformExpression :: Function -> Expression -> Gen Expression
-transformExpression origin expr =
-    case expr of
+transformBlock :: Function -> Block -> Gen Block
+transformBlock origin block =
+    case block of
         Case scrut defaultBranch alternatives ->
             Case scrut
                 <$> pure defaultBranch
                 <*> mapM (transformAlternative origin) alternatives
         Bind binds simple rest ->
-            transformSimpleExpresion origin binds simple =<<
-                transformExpression origin rest
+            transformExpresion origin binds simple =<<
+                transformBlock origin rest
         Return{} ->
-            return expr
+            return block
         Throw{} ->
-            return expr
+            return block
         TailCall{} ->
-            return expr
+            return block
         Invoke{} ->
-            return expr
+            return block
         Exit ->
-            return expr
+            return block
         Panic{} ->
-            return expr
+            return block
 
 transformAlternative :: Function -> Alternative -> Gen Alternative
-transformAlternative origin (Alternative pat expr) =
-    Alternative pat <$> transformExpression origin expr
+transformAlternative origin (Alternative pat block) =
+    Alternative pat <$> transformBlock origin block
 
 --gcMarkNodeName :: Name
 --gcMarkNodeName = Name [] "mark_node" 0
@@ -112,10 +112,10 @@ transformAlternative origin (Alternative pat expr) =
 --        , fnResults = [ Node ]
 --        , fnBody = body }
 
-transformSimpleExpresion
-    :: Function -> [Variable] -> SimpleExpression
-    -> Expression -> Gen Expression
-transformSimpleExpresion origin binds simple rest =
+transformExpresion
+    :: Function -> [Variable] -> Expression
+    -> Block -> Gen Block
+transformExpresion origin binds simple rest =
     case simple of
         Store nodeName args | [bind] <- binds -> do
             let size = 1 + length args

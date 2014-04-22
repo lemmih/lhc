@@ -17,19 +17,19 @@ lowerEvalApply :: HPTResult -> Gen ()
 lowerEvalApply hpt = do
     fs <- gets (Map.elems . envFunctions)
     forM_ fs $ \fn -> do
-        body' <- traverseExpression hpt fn (fnBody fn)
+        body' <- traverseBlock hpt fn (fnBody fn)
         let rets = map (setVariableSize hpt) (hptFnRets hpt Map.! fnName fn)
         pushFunction fn
             { fnBody = body'
             , fnResults = map variableType rets     }
 
-traverseExpression :: HPTResult -> Function -> Expression -> Gen Expression
-traverseExpression hpt origin expr =
+traverseBlock :: HPTResult -> Function -> Block -> Gen Block
+traverseBlock hpt origin expr =
     case expr of
         Bind binds simple rest ->
             Bind (map (setVariableSize hpt) binds)
-                <$> traverseSimple hpt origin binds simple
-                <*> traverseExpression hpt origin rest
+                <$> traverseExpression hpt origin binds simple
+                <*> traverseBlock hpt origin rest
         Case scrut defaultBranch alternatives ->
             Case (setVariableSize hpt scrut)
                 <$> pure defaultBranch
@@ -38,9 +38,9 @@ traverseExpression hpt origin expr =
             return $ Return (map (setVariableSize hpt) vars)
         other -> return other
 
-traverseSimple :: HPTResult -> Function -> [Variable]
-               -> SimpleExpression -> Gen SimpleExpression
-traverseSimple hpt origin binds simple =
+traverseExpression :: HPTResult -> Function -> [Variable]
+               -> Expression -> Gen Expression
+traverseExpression hpt origin binds simple =
     case simple of
         Eval var | [bind] <- binds      -> mkEval hpt origin bind var
         Apply obj arg | [bind] <- binds -> mkApply hpt origin bind obj arg
@@ -49,7 +49,7 @@ traverseSimple hpt origin binds simple =
         _                               -> return simple
 
 
-mkEval :: HPTResult -> Function -> Variable -> Variable -> Gen SimpleExpression
+mkEval :: HPTResult -> Function -> Variable -> Variable -> Gen Expression
 mkEval hpt origin bind var = do
     evalName <- tagName "eval" (fnName origin)
     arg <- tagVariable "ptr" var
@@ -84,7 +84,7 @@ mkEval hpt origin bind var = do
     return $ Application evalName [var]
 
 mkApply :: HPTResult -> Function -> Variable -> Variable -> Variable
-        -> Gen SimpleExpression
+        -> Gen Expression
 mkApply hpt origin bind obj arg = do
     applyName <- tagName "apply" (fnName origin)
     applyObj <- newVariable "node" (StaticNode (sizeOfNode hpt obj))
@@ -116,6 +116,6 @@ traverseAlternative :: HPTResult -> Function -> Alternative -> Gen Alternative
 traverseAlternative hpt origin alternative =
     case alternative of
         Alternative pattern branch ->
-            Alternative pattern <$> traverseExpression hpt origin branch
+            Alternative pattern <$> traverseBlock hpt origin branch
 
 

@@ -121,19 +121,19 @@ evalFunction name args = do
     fn <- lookupFunction name
     let newScope = Map.fromList $ zip (fnArguments fn) args
     local (Map.union newScope)
-        (evalExpression (fnBody fn))
+        (evalBlock (fnBody fn))
 
-evalExpression :: Expression -> Eval [Value]
-evalExpression expression =
-    case expression of
+evalBlock :: Block -> Eval [Value]
+evalBlock block =
+    case block of
         Case scrut _defaultBranch alternatives -> do
             value <- queryScope scrut
             evalAlternative value alternatives
         Bind binds simple rest -> do
-            values <- evalSimple simple
+            values <- evalExpression simple
             let newScope = Map.fromList $ zip binds values
             local (Map.union newScope) $
-                evalExpression rest
+                evalBlock rest
         TailCall fn args ->
             evalFunction fn =<< mapM queryScope args
         Exit ->
@@ -150,19 +150,19 @@ evalAlternative value [] = error $ "No matching branches: " ++ show value
 evalAlternative value (Alternative pattern branch:alts) =
     case (value, pattern) of
         (LitValue lit, LitPat litBranch) | lit == litBranch ->
-            evalExpression branch
+            evalBlock branch
         (NodeValue name values, NodePat nameBranch binds) | name == nameBranch ->
             let newScope = Map.fromList $ zip binds values in
             local (Map.union newScope)
-                (evalExpression branch)
+                (evalBlock branch)
         _ -> evalAlternative value alts
 
 loadNth :: Value -> Int -> Value
 loadNth (NodeValue name _args) 0 = NodeValue name []
 loadNth (NodeValue _ args) n     = args!!(n-1)
 
-evalSimple :: SimpleExpression -> Eval [Value]
-evalSimple simple =
+evalExpression :: Expression -> Eval [Value]
+evalExpression simple =
     case simple of
         Literal lit -> return [LitValue lit]
         Application fn args -> do

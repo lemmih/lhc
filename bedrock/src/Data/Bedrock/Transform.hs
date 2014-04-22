@@ -93,12 +93,12 @@ runGens = foldl' runGen
 
 
 
-freeVariables :: Expression -> Set Variable
-freeVariables expr = freeVariables' expr Set.empty
+freeVariables :: Block -> Set Variable
+freeVariables block = freeVariables' block Set.empty
 
-freeVariables' :: Expression -> Set Variable -> Set Variable
-freeVariables' expression =
-    case expression of
+freeVariables' :: Block -> Set Variable -> Set Variable
+freeVariables' block =
+    case block of
         Case scrut _defaultBranch alternatives ->
             foldr (.) (Set.insert scrut)
             [ flip Set.difference (freeVariablesPattern pattern Set.empty) .
@@ -125,7 +125,7 @@ freeVariablesPattern pattern =
         NodePat _ vars -> Set.union (Set.fromList vars)
         LitPat{}       -> id
 
-freeVariablesSimple :: SimpleExpression -> Set Variable -> Set Variable
+freeVariablesSimple :: Expression -> Set Variable -> Set Variable
 freeVariablesSimple simple =
     case simple of
         Literal{} ->

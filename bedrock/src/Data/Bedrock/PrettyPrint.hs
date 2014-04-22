@@ -60,10 +60,10 @@ ppList = Doc.hsep . Doc.punctuate (Doc.char ',')
 ppAlternative :: Alternative -> Doc
 ppAlternative (Alternative pattern expression) =
 	ppPattern pattern <+> text "→" Doc.<$$>
-	Doc.indent 2 (ppExpression expression)
+	Doc.indent 2 (ppBlock expression)
 
-ppSimpleExpression :: SimpleExpression -> Doc
-ppSimpleExpression simple =
+ppExpression :: Expression -> Doc
+ppExpression simple =
 	case simple of
 		Alloc n ->
 			ppSyntax "@alloc" <+> Doc.int n
@@ -119,20 +119,20 @@ ppSimpleExpression simple =
 			ppSyntax "@gc_mark_node" <+> ppVariable var
 		other -> error $ "PrettyPrint: Unhandled: " ++ show other
 
-ppExpression :: Expression -> Doc
-ppExpression expression =
-	case expression of
+ppBlock :: Block -> Doc
+ppBlock block =
+	case block of
 		Return args ->
 			ppSyntax "@return" <+>
 			ppList (map ppVariable args)
 		Bind [] simple rest ->
-			ppSimpleExpression simple <> Doc.char ';' Doc.<$$>
-			ppExpression rest
+			ppExpression simple <> Doc.char ';' Doc.<$$>
+			ppBlock rest
 		Bind names simple rest ->
 			ppList (map ppVariable names) <+>
 			text ":=" <+>
-			ppSimpleExpression simple <> Doc.char ';' Doc.<$$>
-			ppExpression rest
+			ppExpression simple <> Doc.char ';' Doc.<$$>
+			ppBlock rest
 		Case scrut _defaultBranch alts ->
 			ppSyntax "case" <+> ppVariable scrut <+> ppSyntax "of" Doc.<$$>
 			Doc.indent 2 (Doc.vsep $ map ppAlternative alts)
@@ -164,7 +164,7 @@ ppFunction fn =
 	ppTypes (fnResults fn) <+>
 	ppFnName (fnName fn) <+> Doc.hsep (map ppVariable (fnArguments fn)) <+>
 	Doc.char '=' Doc.<$$>
-	Doc.indent 2 (ppExpression (fnBody fn))
+	Doc.indent 2 (ppBlock (fnBody fn))
 
 ppEntryPoint :: Name -> Doc
 ppEntryPoint entry = text "entrypoint:" <+> ppName entry

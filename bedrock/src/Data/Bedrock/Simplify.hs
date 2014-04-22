@@ -34,37 +34,36 @@ simplifyModule m = do
 
 simplifyFunction :: Function -> M Function
 simplifyFunction fn = do
-    body <- simplifyExpression (fnBody fn)
+    body <- simplifyBlock (fnBody fn)
     return fn{fnBody = body}
 
-simplifyExpression :: Expression -> M Expression
-simplifyExpression expr =
-    case expr of
+simplifyBlock :: Block -> M Block
+simplifyBlock block =
+    case block of
         Case scrut _mbDefaultBranch
                 [Alternative (NodePat node []) branch] -> do
             clone <- cloneVariable scrut
             bindVariable scrut clone $
                 Bind [clone] (Unit (NodeArg node [])) <$>
-                    simplifyExpression branch
+                    simplifyBlock branch
         Bind [] Unit{} rest ->
-            simplifyExpression rest
+            simplifyBlock rest
         Bind [bind] (Unit arg) rest ->
-            Bind [bind] (Unit arg) <$> simplifyExpression rest
+            Bind [bind] (Unit arg) <$> simplifyBlock rest
         Bind binds simple rest ->
             Bind <$> mapM resolve binds
                 <*> pure simple
-                <*> simplifyExpression rest
+                <*> simplifyBlock rest
         Case scrut defaultBranch alts ->
             Case
                 <$> resolve scrut
                 <*> pure defaultBranch
                 <*> mapM simplifyAlternative alts
-        _ -> return expr
+        _ -> return block
 
 simplifyAlternative :: Alternative -> M Alternative
 simplifyAlternative (Alternative pattern branch) =
-    Alternative pattern
-        <$> simplifyExpression branch
+    Alternative pattern <$> simplifyBlock branch
 
 
 

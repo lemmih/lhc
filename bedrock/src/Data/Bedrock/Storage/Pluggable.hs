@@ -26,7 +26,7 @@ data StorageManager = StorageManager
     , smBegin    :: Function
     , smEnd      :: Function
     , smMark     :: Function
-    , smAllocate :: (Variable -> SimpleExpression)
+    , smAllocate :: (Variable -> Expression)
     }
 
 runGC :: Module -> GC a -> (a, Module)
@@ -61,18 +61,18 @@ lowerGC m sm = m{ functions = loweredFunctions ++ newFunctions }
 
 lowerFunction :: Name -> Function -> StorageManager -> Function
 lowerFunction entry fn = do
-    body <- lowerExpression (fnBody fn)
+    body <- lowerBlock (fnBody fn)
     sm <- ask
     let initName = fnName (smInit sm)
     if fnName fn == entry
         then return fn{ fnBody = Bind [] (Application initName []) body }
         else return fn{ fnBody = body }
 
-lowerExpression :: Expression -> StorageManager -> Expression
-lowerExpression expr =
+lowerBlock :: Block -> StorageManager -> Block
+lowerBlock expr =
     case expr of
         Bind binds simple rest ->
-            lowerSimple binds simple =<< lowerExpression rest
+            lowerExpression binds simple =<< lowerBlock rest
         Case scrut defaultBranch alts ->
             Case scrut defaultBranch <$> mapM lowerAlternative alts
         Return{} -> return expr
@@ -83,11 +83,11 @@ lowerExpression expr =
 
 lowerAlternative :: Alternative -> StorageManager -> Alternative
 lowerAlternative (Alternative pattern branch) =
-    Alternative pattern <$> lowerExpression branch
+    Alternative pattern <$> lowerBlock branch
 
-lowerSimple :: [Variable] -> SimpleExpression -> Expression
-            -> StorageManager -> Expression
-lowerSimple binds simple rest sm =
+lowerExpression :: [Variable] -> Expression -> Block
+            -> StorageManager -> Block
+lowerExpression binds simple rest sm =
     case simple of
         GCAllocate n ->
             Bind [size] (Unit (LitArg (LiteralInt $ fromIntegral n))) $

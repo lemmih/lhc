@@ -17,16 +17,17 @@ mkInvoke :: HPTResult -> Gen ()
 mkInvoke hpt = do
     fs <- gets (Map.elems . envFunctions)
     forM_ fs $ \fn -> do
-        body' <- traverseExpression hpt fn (fnBody fn)
+        body' <- traverseBlock hpt fn (fnBody fn)
         pushFunction fn{fnBody = body'}
     return ()
 
 
-traverseExpression :: HPTResult -> Function -> Expression -> Gen Expression
-traverseExpression hpt origin expr =
-    case expr of
+traverseBlock :: HPTResult -> Function -> Block -> Gen Block
+traverseBlock hpt origin block =
+    case block of
         Bind binds simple rest ->
-            Bind (map (setVariableSize hpt) binds) simple <$> traverseExpression hpt origin rest
+            Bind (map (setVariableSize hpt) binds) simple <$>
+                traverseBlock hpt origin rest
         Case scrut defaultBranch alternatives ->
             Case scrut
                 <$> pure defaultBranch
@@ -49,7 +50,7 @@ traverseAlternative :: HPTResult -> Function -> Alternative -> Gen Alternative
 traverseAlternative hpt origin alternative =
     case alternative of
         Alternative pattern branch ->
-            Alternative pattern <$> traverseExpression hpt origin branch
+            Alternative pattern <$> traverseBlock hpt origin branch
 
 
 

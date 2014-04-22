@@ -383,25 +383,25 @@ hptAlternative origin scrut (Alternative pattern branch) = do
                     Node      ->
                         forM_ vals $ \var -> do
                             setNodeScope arg =<< getNodeScope' var
-    hptExpression origin branch
+    hptBlock origin branch
 
 hptModule :: Module -> HPT s ()
 hptModule = mapM_ hptFunction . functions
 
 hptFunction :: Function -> HPT s ()
-hptFunction fn = hptExpression fn (fnBody fn)
+hptFunction fn = hptBlock fn (fnBody fn)
 
-hptExpression :: Function -> Expression -> HPT s ()
-hptExpression origin expr =
-    case expr of
+hptBlock :: Function -> Block -> HPT s ()
+hptBlock origin block =
+    case block of
         Case scrut defaultBranch alternatives -> do
             case defaultBranch of
                 Nothing -> return ()
-                Just branch -> hptExpression origin branch
+                Just branch -> hptBlock origin branch
             mapM_ (hptAlternative origin scrut) alternatives
         Bind binds simple rest -> do
-            hptSimpleExpression binds simple
-            hptExpression origin rest
+            hptExpression binds simple
+            hptBlock origin rest
         -- Copy the values from the vars out into the return registers for
         -- our function.
         Return vars -> do
@@ -431,8 +431,8 @@ hptExpression origin expr =
         Exit -> return ()
         Panic{} -> return ()
 
-hptSimpleExpression :: [Variable] -> SimpleExpression -> HPT s ()
-hptSimpleExpression binds simple =
+hptExpression :: [Variable] -> Expression -> HPT s ()
+hptExpression binds simple =
     case simple of
         Store node vars | [ptr] <- binds -> do
             hp <- newHeapPtr

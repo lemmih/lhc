@@ -63,18 +63,18 @@ throwToName = Name [] "throwTo" 0
 
 cpsFunction :: Function -> Gen ()
 cpsFunction fn = do
-    body <- cpsExpression fn (fnBody fn)
+    body <- cpsBlock fn (fnBody fn)
     let fn' = fn{fnArguments = fnArguments fn ++ [stdContinuation]
                 ,fnResults = []
                 ,fnBody = body}
     pushFunction fn'
 
-cpsExpression :: Function -> Expression -> Gen Expression
-cpsExpression origin expression =
-    case expression of
+cpsBlock :: Function -> Block -> Gen Block
+cpsBlock origin block =
+    case block of
         Bind binds simple rest ->
-            cpsSimpleExpresion origin binds simple =<<
-                cpsExpression origin rest
+            cpsExpresion origin binds simple =<<
+                cpsBlock origin rest
         Return args -> do
             node <- newVariable "contNode" Node
             return $
@@ -94,9 +94,9 @@ cpsExpression origin expression =
 exhFrameName :: Name
 exhFrameName = Name [] "ExceptionFrame" 0
 
-cpsSimpleExpresion :: Function -> [Variable]
-                   -> SimpleExpression -> Expression -> Gen Expression
-cpsSimpleExpresion origin binds simple rest =
+cpsExpresion :: Function -> [Variable]
+             -> Expression -> Block -> Gen Block
+cpsExpresion origin binds simple rest =
     case simple of
         --WithExceptionHandler exh exhArgs fn fnArgs -> do
         --    exFrameName <- tagName ("exception_frame") (fnName origin)
@@ -156,8 +156,8 @@ cpsAlternative origin (Alternative pattern expr) =
         NodePat (FunctionName fn n) args ->
             Alternative
                 (NodePat (FunctionName fn (n+1)) args)
-                <$> cpsExpression origin expr
-        _ -> Alternative pattern <$> cpsExpression origin expr
+                <$> cpsBlock origin expr
+        _ -> Alternative pattern <$> cpsBlock origin expr
 
 
 
