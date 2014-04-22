@@ -84,49 +84,51 @@ uniqFunction (Function name args rets body) = lowerMany args $
         <$> pure name -- resolveName name
         <*> resolveMany args
         <*> pure rets
-        <*> uniqExpression body
+        <*> uniqBlock body
 
+bindMany :: [(Variable, Argument)] -> Block -> Block
 bindMany lst rest = foldr (\(bind, arg) -> Bind [bind] (Unit arg)) rest lst
 
-uniqExpression expr =
-    case expr of
+uniqBlock :: Block -> Uniq Block
+uniqBlock block =
+    case block of
         Case scrut mbBranch alts -> do
             (tag:args) <- resolve scrut
             Case
                 <$> pure tag
-                <*> uniqMaybe uniqExpression mbBranch
+                <*> uniqMaybe uniqBlock mbBranch
                 <*> mapM (uniqAlternative args) alts
         Bind [bind] (Unit (RefArg var)) rest -> lower bind $ do
             nodeBinds <- resolve bind
             varArgs   <- resolve var
             bindMany (zip nodeBinds (map RefArg varArgs))
-                <$> uniqExpression rest
+                <$> uniqBlock rest
         Bind [bind] (Unit (LitArg lit)) rest -> lower bind $
             Bind
                 <$> resolve bind
                 <*> pure (Unit (LitArg lit))
-                <*> uniqExpression rest
+                <*> uniqBlock rest
         Bind [bind] (Unit (NodeArg nodeName nodeArgs)) rest -> lower bind $ do
             nodeBinds <- resolve bind
-            rest' <- uniqExpression rest
+            rest' <- uniqBlock rest
             return $ bindMany 
                 (zip nodeBinds (NodeArg nodeName [] : map RefArg nodeArgs))
                 rest'
         Bind binds (Fetch ptr) rest -> lowerMany binds $ do
             binds' <- resolveMany binds
-            rest' <- uniqExpression rest
+            rest' <- uniqBlock rest
             return $ foldr (\(n,b) -> Bind [b] (Load ptr n)) rest' (zip [0..] binds')
         Bind [bind] (Store nodeName args) rest -> do
             args' <- resolveMany args
-            rest' <- uniqExpression rest
+            rest' <- uniqBlock rest
             return $
                 Bind [] (Alloc $ 1 + length args) $
                 Bind [bind] (Store nodeName args') rest'
         Bind binds simple rest -> lowerMany binds $
             Bind
                 <$> resolveMany binds
-                <*> uniqSimple simple
-                <*> uniqExpression rest
+                <*> uniqExpression simple
+                <*> uniqBlock rest
         Return vars ->
             Return <$> resolveMany vars
         Throw var ->
@@ -141,11 +143,11 @@ uniqExpression expr =
 uniqAlternative :: [Variable] -> Alternative -> Uniq Alternative
 uniqAlternative args (Alternative pattern branch) =
     case pattern of
-        LitPat{} -> Alternative pattern <$> uniqExpression branch
+        LitPat{} -> Alternative pattern <$> uniqBlock branch
         NodePat nodeName vars -> lowerMany vars $
             Alternative
                 <$> pure (NodePat nodeName [])
-                <*> (bindMany (zip vars (map RefArg args)) <$> uniqExpression branch)
+                <*> (bindMany (zip vars (map RefArg args)) <$> uniqBlock branch)
 
 
 uniqMaybe :: (a -> Uniq a) -> Maybe a -> Uniq (Maybe a)
@@ -154,11 +156,10 @@ uniqMaybe fn obj =
         Nothing  -> return Nothing
         Just val -> Just <$> fn val
 
-uniqSimple :: Expression -> Uniq Expression
-uniqSimple simple =
-    case simple of
-        Literal lit ->
-            pure (Literal lit)
+uniqExpression :: Expression -> Uniq Expression
+uniqExpression expr =
+    case expr of
+        Literal{} -> pure expr
         Application fn vars ->
             Application fn <$> resolveMany vars
         CCall fn vars ->
@@ -167,31 +168,26 @@ uniqSimple simple =
             WithExceptionHandler
                 <$> pure exh <*> resolveMany exhArgs
                 <*> pure fn <*> resolveMany fnArgs
-        Alloc n ->
-            pure (Alloc n)
+        Alloc{} -> pure expr
         SizeOf{} -> error "uniqSimple: SizeOf"
         Store nodeName vars ->
             Store <$> pure nodeName <*> resolveMany vars
-        Fetch var ->
-            pure $ Fetch var
+        Fetch{} -> pure expr
         Load{} -> error "uniqSimple: Load"
-        Add a b ->
-            pure $ Add a b
-        Eval var ->
-            pure $ Eval var
-        Apply a b ->
-            pure $ Apply a b
+        Add{} -> pure expr
+        Eval{} -> pure expr
+        Apply{} -> pure expr
         ReadGlobal{} -> error "uniqSimple: ReadGlobal"
         WriteGlobal{} -> error "uniqSimple: WriteGlobal"
-        Unit args ->
-            pure $ Unit args
-        GCAllocate n ->
-            pure (GCAllocate n)
-        GCBegin -> pure GCBegin
-        GCEnd -> pure GCEnd
-        GCMark var ->
-            pure $ GCMark var
-        GCMarkNode var ->
-            pure $ GCMarkNode var
+        Unit{} -> pure expr
+        GCAllocate{} -> pure expr
+        GCBegin -> pure expr
+        GCEnd -> pure expr
+        GCMark{} -> pure expr
+        GCMarkNode{} -> pure expr
+        Write{} -> pure expr
+        Address{} -> pure expr
+        ReadRegister{} -> pure expr
+        WriteRegister{} -> pure expr
 
 

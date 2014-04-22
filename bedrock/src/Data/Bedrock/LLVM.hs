@@ -6,9 +6,6 @@ import           Control.Monad.Reader
 import           Data.Map                     (Map)
 import qualified Data.Map                     as Map
 import qualified Data.Set                     as Set
-import qualified LLVM.FFI.Core                as LLVM (constIntToPtr,
-                                                       constPtrToInt,
-                                                       setThreadLocal)
 import qualified LLVM.Wrapper.BitWriter       as LLVM
 import           LLVM.Wrapper.Core            (Value)
 import qualified LLVM.Wrapper.Core            as LLVM
@@ -82,9 +79,10 @@ cTypeToLLVM :: CType -> IO LLVM.Type
 cTypeToLLVM cType = do
     cx <- LLVM.getGlobalContext
     case cType of
-        I8  -> LLVM.intTypeInContext cx 8
-        I32 -> LLVM.intTypeInContext cx 32
-        I64 -> LLVM.intTypeInContext cx 64
+        CVoid -> LLVM.voidTypeInContext cx
+        I8    -> LLVM.intTypeInContext cx 8
+        I32   -> LLVM.intTypeInContext cx 32
+        I64   -> LLVM.intTypeInContext cx 64
         CPointer ty -> do
             tyRef <- cTypeToLLVM ty
             return $ LLVM.pointerType tyRef 0
@@ -180,10 +178,7 @@ compileBlock block =
             compileBlock rest
         Bind [bind] (Address word nth) rest -> do
             wordValue <- resolve word
-            pointerTy <- asks envPointerTy
-            --let ppTy = LLVM.pointerType pointerTy 0
             ptr <- asPointer wordValue
-            --let ptr = LLVM.constBitCast wordValue ppTy
             offset <- constWord (fromIntegral nth)
             offsetPtr <- buildGEP ptr [offset] ""
             bindVariable bind offsetPtr $ compileBlock rest
@@ -308,7 +303,11 @@ compilePattern :: Pattern -> Gen LLVM.Value
 compilePattern pattern = do
     case pattern of
         LitPat (LiteralInt i) -> constWord i
+        LitPat LiteralString{} ->
+            error "LLVM: Strings not allowed in patterns"
         NodePat name []       -> resolveNodeName name
+        NodePat{} ->
+            error "LLVM: Invalid node in pattern."
 
 resolveArgument :: Argument -> Gen Value
 resolveArgument arg = do
@@ -451,6 +450,7 @@ asPointer value = do
     case kind of
         LLVM.IntegerTypeKind -> castWordToPtr value
         LLVM.PointerTypeKind -> return value
+        _ -> error "LLVM: Unknown type kind."
 
 
 castWordToPtr :: Value -> Gen Value
@@ -487,8 +487,8 @@ buildPtrToInt :: Value -> LLVM.Type -> String -> Gen Value
 buildPtrToInt ptrValue intType name = withBuilder $ \bld ->
     liftIO $ LLVM.buildPtrToInt bld ptrValue intType name
 
-buildBitCast :: Value -> LLVM.Type -> String -> Gen Value
-buildBitCast value ty name = withBuilder $ \bld ->
+_buildBitCast :: Value -> LLVM.Type -> String -> Gen Value
+_buildBitCast value ty name = withBuilder $ \bld ->
     liftIO $ LLVM.buildBitCast bld value ty name
 
 buildTruncOrBitCast :: Value -> LLVM.Type -> String -> Gen Value

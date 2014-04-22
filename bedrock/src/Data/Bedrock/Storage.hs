@@ -144,6 +144,7 @@ transformExpresion origin binds simple rest =
                         Node{}    -> GCMarkNode var
                         -- Application gcMarkNodeName [var]
                         Primitive -> Unit (RefArg var)
+                        StaticNode{} -> GCMarkNode var
 
                 divertBody =
                     Bind [] GCBegin $

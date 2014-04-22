@@ -383,6 +383,8 @@ hptAlternative origin scrut (Alternative pattern branch) = do
                     Node      ->
                         forM_ vals $ \var -> do
                             setNodeScope arg =<< getNodeScope' var
+                    StaticNode{} ->
+                        error "HPT: Static node found during analysis."
     hptBlock origin branch
 
 hptModule :: Module -> HPT s ()

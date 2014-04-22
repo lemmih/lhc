@@ -118,6 +118,8 @@ freeVariables' block =
             Set.union (Set.fromList args)
         Exit ->
             id
+        Panic{} ->
+            id
 
 freeVariablesPattern :: Pattern -> Set Variable -> Set Variable
 freeVariablesPattern pattern =

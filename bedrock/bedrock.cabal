@@ -33,6 +33,9 @@ library
                        parsec, containers, mtl, vector,
                        llvm-base
 
+  ghc-options:         -fwarn-incomplete-patterns -fwarn-unused-binds
+                       -fwarn-unused-imports -Werror
+
 executable bedrock
   main-is:             cli/Main.hs
 

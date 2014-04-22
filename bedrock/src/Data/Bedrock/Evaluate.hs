@@ -160,6 +160,7 @@ evalAlternative value (Alternative pattern branch:alts) =
 loadNth :: Value -> Int -> Value
 loadNth (NodeValue name _args) 0 = NodeValue name []
 loadNth (NodeValue _ args) n     = args!!(n-1)
+loadNth _ _ = error ""
 
 evalExpression :: Expression -> Eval [Value]
 evalExpression simple =
@@ -271,6 +272,7 @@ unpackFrame = loop
                , (handlerName, blanks, args))
     loop (NodeValue (FunctionName name blanks) args) =
         return (FunctionFrame, (name, blanks, args))
+    loop _ = error ""
 
 skipFrame :: (Name, Int, [Value]) -> Eval Value
 skipFrame (name, _blanks, partialArgs) = do

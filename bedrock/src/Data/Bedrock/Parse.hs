@@ -1,26 +1,35 @@
 module Data.Bedrock.Parse where
 
-import           Control.Applicative           (pure, (*>), (<$>), (<*), (<*>))
-import           Control.Monad                 (guard)
+import           Control.Applicative                    (pure, (<$>), (<*>))
+import           Control.Monad                          (guard)
 import           Data.Char
+import           Data.Maybe
 import           Text.ParserCombinators.Parsec
-import qualified Text.ParserCombinators.Parsec as P
-import qualified Text.ParserCombinators.Parsec.Token as P
 import qualified Text.ParserCombinators.Parsec.Language as P
-import Data.Maybe
+import qualified Text.ParserCombinators.Parsec.Token    as P
 
 import           Data.Bedrock
 
 -------------------------------------------------------------------------------
 -- Parsing
 
+bedrockDef :: P.LanguageDef ()
 bedrockDef = P.emptyDef
 	{ P.commentLine = ";" -- similar to LLVM IR
 	, P.caseSensitive = True
 	, P.reservedNames = ["node", "foreign", "entrypoint", "case", "of"]
 	, P.reservedOpNames = ["=","->"] }
 
+lexer :: P.TokenParser ()
 lexer = P.makeTokenParser bedrockDef
+
+natural, integer :: Parser Integer
+identifier :: Parser String
+symbol :: String -> Parser String
+parens :: Parser a -> Parser a
+reservedOp, reserved :: String -> Parser ()
+stringLiteral, comma :: Parser String
+commaSep, commaSep1 :: Parser a -> Parser [a]
 
 identifier = P.identifier lexer
 parens     = P.parens lexer
