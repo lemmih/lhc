@@ -1,0 +1,45 @@
+foreign i32 printf(i8*, i32)
+foreign i32 puts(i8*)
+
+node Indirection *
+node Int #
+
+entrypoint: main
+
+main()
+    #str = @unit( "Hello world" )
+    #n = @ccall puts(#str)
+    #pstr = @unit( "puts returned %d\n" )
+    @ccall printf( #pstr, #n )
+    #zero = @unit( 0 )
+    *init = @store (Int #zero)
+    *fn = @store (inc _)
+    *thunk = @store (twice *fn *init)
+    %newVal = @eval( *thunk )
+    case %newVal of
+      Int #ret ->
+        #str = @unit( "ret is %d" )
+        @ccall printf(#str, #ret)
+        @exit
+
+% twice(*fn, *x)
+    *n = @store (ap *fn *x)
+    %fnNode = @eval( *fn )
+    %ret = @apply( %fnNode, *n )
+    @return( %ret )
+
+% ap(*fn, *x)
+    %fnNode = @eval( *fn )
+    %ret = @apply( %fnNode, *x )
+    @return( %ret )
+
+% inc(*intPtr)
+    %intObject = @eval( *intPtr )
+    case %intObject of
+      Int #intVal ->
+        #inc = @unit( 1 )
+        #newVal = @add #intVal #inc
+        %newObject = @unit( Int #newVal )
+        @return( %newObject )
+
+
