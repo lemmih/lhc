@@ -17,8 +17,11 @@ bedrockDef :: P.LanguageDef ()
 bedrockDef = P.emptyDef
 	{ P.commentLine = ";" -- similar to LLVM IR
 	, P.caseSensitive = True
-	, P.reservedNames = ["node", "foreign", "entrypoint", "case", "of"]
-	, P.reservedOpNames = ["=","->"] }
+	, P.reservedNames =
+			[ "node", "foreign", "entrypoint", "case", "of" ]
+	, P.reservedOpNames = ["=","->"]
+	-- , P.identStart = P.identStart P.emptyDef <|> char '@'
+	}
 
 lexer :: P.TokenParser ()
 lexer = P.makeTokenParser bedrockDef
@@ -51,10 +54,11 @@ parseName =
 		<*> pure 0
 
 parseType :: Parser Type
-parseType = choice (map try
+parseType = choice
 	[ symbol "*" >> return NodePtr
 	, symbol "%" >> return Node
-	, symbol "#" >> return Primitive ])
+	, symbol "#" >> return (Primitive IWord)
+	, Primitive <$> parseCType ]
 	<?> "type"
 
 parseVariable :: Parser Variable
@@ -64,7 +68,7 @@ parseVariable = do
 	return Variable{ variableName = name, variableType = ty }
 
 parseNodeDefinition :: Parser NodeDefinition
-parseNodeDefinition = try $ do
+parseNodeDefinition = do
 	reserved "node"
 	name <- parseName
 	args <- many parseType
@@ -81,13 +85,13 @@ parseFunction = do
 -- FIXME: Parse nodes
 parseArgument :: Parser Argument
 parseArgument =
-	RefArg <$> try parseVariable <|>
+	RefArg <$> parseVariable <|>
 	LitArg <$> parseLiteral <|>
-	(parens $ do
+	(do
 		constructor <- parseConstructor
 		binds <- many parseVariable
 		return $ NodeArg (ConstructorName constructor) binds) <|>
-	(parens $ do
+	(do
 		fn <- parseName
 		binds <- many parseVariable
 		blanks <- many (symbol "_")
@@ -108,7 +112,7 @@ parseLiteral =
 	<?> "literal"
 
 parsePattern :: Parser Pattern
-parsePattern = choice (map try
+parsePattern = choice
 	[ do
 		constructor <- parseConstructor
 		binds <- many parseVariable
@@ -119,7 +123,7 @@ parsePattern = choice (map try
 		blanks <- many (symbol "_")
 		return $ NodePat (FunctionName fn (length blanks)) binds
 	, LitPat <$> parseLiteral
-	])
+	]
 
 parseAlternative :: Parser Alternative
 parseAlternative = do
@@ -150,17 +154,6 @@ parseExpression = choice
 		  	blanks <- many (symbol "_")
 		  	return $ Store (FunctionName fn (length blanks)) args
 	, do
-		reserved "@sizeOf"
-		parens $ do
-			constructor <- parseConstructor
-			args <- many parseVariable
-			return $ SizeOf (ConstructorName constructor) args
-		  <|> do
-		  	fn <- parseName
-		  	args <- many parseVariable
-		  	blanks <- many (symbol "_")
-		  	return $ SizeOf (FunctionName fn (length blanks)) args
-	, do
 		reserved "@fetch"
 		ptr <- parseVariable
 		return $ Fetch ptr
@@ -176,30 +169,30 @@ parseExpression = choice
 			val <- parseVariable
 			return $ Apply ptr val
 	, do
-		fn <- parseName
-		args <- parens (commaSep parseVariable)
-		return $ Application fn args
-	, do
 		reserved "@ccall"
 		fn <- parseForeignName
 		args <- parens (commaSep parseVariable)
 		return $ CCall fn args
 	, do
-		reserved "@withExceptionHandler"
+		reserved "@catch"
 		exh <- parseName
 		exhArgs <- parens (commaSep parseVariable)
 		fn <- parseName
 		args <- parens (commaSep parseVariable)
-		return $ WithExceptionHandler exh exhArgs fn args
+		return $ Catch exh exhArgs fn args
 	, do
 		reserved "@add"
 		lhs <- parseVariable
 		rhs <- parseVariable
 		return $ Add lhs rhs
+	, do
+		fn <- parseName
+		args <- parens (commaSep parseVariable)
+		return $ Application fn args
 	]
 
 parseBlock :: Parser Block
-parseBlock = choice (map try
+parseBlock = choice (
 	[ do
 		reserved "@return"
 		args <- parens (commaSep parseVariable)
@@ -221,9 +214,9 @@ parseBlock = choice (map try
 		rest <- parseBlock
 		return $ Bind [] simple rest
 	, do
-		reserved "@throw"
-		e <- parseVariable
-		return $ Throw e
+		reserved "@raise"
+		e <- parens parseVariable
+		return $ Raise e
 	, do
 		reserved "@exit"
 		return $ Exit
@@ -232,7 +225,7 @@ parseBlock = choice (map try
 		fn <- parseName
 		args <- parens (commaSep parseVariable)
 		return $ TailCall fn args
-	]) <?> "expression"
+	])
 
 parseEntryPoint :: Parser Name
 parseEntryPoint = do
@@ -244,10 +237,10 @@ parseEntryPoint = do
 parseCType :: Parser CType
 parseCType = do
 	ty <- prim
-	p <- length <$> many (char '*')
+	p <- length <$> many (symbol "*")
 	return $ foldr (.) id (replicate p CPointer) ty
   where
-  	prim = choice $ map try
+  	prim = choice
 		[ reserved "i8" >> return I8
 		, reserved "i32" >> return I32
 		, reserved "i64" >> return I64

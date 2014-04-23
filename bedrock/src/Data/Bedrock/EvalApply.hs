@@ -18,24 +18,23 @@ lowerEvalApply hpt = do
     fs <- gets (Map.elems . envFunctions)
     forM_ fs $ \fn -> do
         body' <- traverseBlock hpt fn (fnBody fn)
-        let rets = map (setVariableSize hpt) (hptFnRets hpt Map.! fnName fn)
         pushFunction fn
             { fnBody = body'
-            , fnResults = map variableType rets     }
+            }
 
 traverseBlock :: HPTResult -> Function -> Block -> Gen Block
 traverseBlock hpt origin expr =
     case expr of
         Bind binds simple rest ->
-            Bind (map (setVariableSize hpt) binds)
+            Bind binds -- (map (setVariableSize hpt) binds)
                 <$> traverseExpression hpt origin binds simple
                 <*> traverseBlock hpt origin rest
         Case scrut defaultBranch alternatives ->
-            Case (setVariableSize hpt scrut)
+            Case scrut -- (setVariableSize hpt scrut)
                 <$> pure defaultBranch
                 <*> mapM (traverseAlternative hpt origin) alternatives
-        Return vars ->
-            return $ Return (map (setVariableSize hpt) vars)
+        --Return vars ->
+        --    return $ Return (map (setVariableSize hpt) vars)
         other -> return other
 
 traverseExpression :: HPTResult -> Function -> [Variable]
@@ -45,7 +44,7 @@ traverseExpression hpt origin binds simple =
         Eval var | [bind] <- binds      -> mkEval hpt origin bind var
         Apply obj arg | [bind] <- binds -> mkApply hpt origin bind obj arg
         Application fn args             ->
-            return $ Application fn (map (setVariableSize hpt) args)
+            return $ Application fn args -- (map (setVariableSize hpt) args)
         _                               -> return simple
 
 

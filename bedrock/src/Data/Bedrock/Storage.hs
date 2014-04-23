@@ -47,11 +47,13 @@ transformBlock origin block =
                 transformBlock origin rest
         Return{} ->
             return block
-        Throw{} ->
+        Raise{} ->
             return block
         TailCall{} ->
             return block
         Invoke{} ->
+            return block
+        InvokeHandler{} ->
             return block
         Exit ->
             return block
@@ -132,7 +134,7 @@ transformExpresion origin binds simple rest =
         Alloc n -> do
             continueName <- tagName "with_mem" (fnName origin)
             divertName <- tagName "without_mem" (fnName origin)
-            check <- newVariable "check" Primitive
+            check <- newVariable "check" (Primitive IWord)
             let scope = Set.toList (freeVariables rest)
             markedScope <- mapM (tagVariable "marked") scope
             let continue = TailCall continueName scope
@@ -143,8 +145,10 @@ transformExpresion origin binds simple rest =
                         NodePtr   -> GCMark var
                         Node{}    -> GCMarkNode var
                         -- Application gcMarkNodeName [var]
-                        Primitive -> Unit (RefArg var)
+                        Primitive{}-> Unit (RefArg var)
+                        -- This shouldn't really happen
                         StaticNode{} -> GCMarkNode var
+                        FramePtr  -> GCMark var
 
                 divertBody =
                     Bind [] GCBegin $

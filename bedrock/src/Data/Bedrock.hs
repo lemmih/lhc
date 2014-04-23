@@ -6,7 +6,12 @@ data Name = Name
 	, nameUnique     :: Int
 	} deriving (Show, Eq, Ord)
 type NodeSize = Int
-data Type = NodePtr | Node | StaticNode NodeSize | Primitive
+data Type
+	= NodePtr
+	| Node
+	| StaticNode NodeSize
+	| Primitive CType
+	| FramePtr
 	deriving (Show, Eq, Ord)
 data Variable = Variable
 	{ variableName :: Name
@@ -23,9 +28,10 @@ data CType
 	= I8
 	| I32
 	| I64
+	| IWord
 	| CPointer CType
 	| CVoid
-	deriving (Show)
+	deriving (Show, Eq, Ord)
 
 data Foreign = Foreign
 	{ foreignName :: String
@@ -77,13 +83,11 @@ data Argument
 	deriving (Show)
 
 data Expression
-	= Literal Literal
-	| Application Name [Variable]
+	= Application Name [Variable]
 	| CCall String [Variable]
-	| WithExceptionHandler Name [Variable] Name [Variable]
+	| Catch Name [Variable] Name [Variable]
 	-- Built-in
 	| Alloc Int
-	| SizeOf NodeName [Variable]
 	| Store NodeName [Variable]
 	| Write Variable Int Argument
 	| Address Variable Int
@@ -115,9 +119,10 @@ data Block
 	= Case Variable (Maybe Block) [Alternative]
 	| Bind [Variable] Expression Block
 	| Return [Variable]
-	| Throw Variable
+	| Raise Variable
 	| TailCall Name [Variable]
 	| Invoke Variable [Variable]
+	| InvokeHandler Variable Variable
 	| Exit
 	| Panic String
 	deriving (Show)

@@ -19,7 +19,17 @@ ppType :: Type -> Doc
 ppType NodePtr        = Doc.char '*'
 ppType Node           = Doc.char '%'
 ppType (StaticNode n) = Doc.char '%' <> Doc.int n <> Doc.char '%'
-ppType Primitive      = Doc.char '#'
+ppType (Primitive IWord) = Doc.char '#'
+ppType (Primitive ty) = ppCType ty
+ppType FramePtr       = Doc.red (Doc.char '*')
+
+ppCType :: CType -> Doc
+ppCType I8 = text "i8"
+ppCType I32 = text "i32"
+ppCType I64 = text "i64"
+ppCType IWord = text "word"
+ppCType (CPointer ty) = ppCType ty <> Doc.char '*'
+ppCType CVoid = text "void"
 
 ppNodeDefinition :: NodeDefinition -> Doc
 ppNodeDefinition (NodeDefinition name args) =
@@ -34,7 +44,7 @@ ppArgument arg =
 	case arg of
 		RefArg name       -> ppVariable name
 		LitArg lit        -> ppLiteral lit
-		NodeArg name args -> Doc.parens (ppNode name (map ppVariable args))
+		NodeArg name args -> ppNode name (map ppVariable args)
 
 ppLiteral :: Literal -> Doc
 ppLiteral literal =
@@ -47,6 +57,8 @@ ppNode (ConstructorName constructor) args =
 	Doc.hsep (Doc.magenta (ppName constructor) : args)
 ppNode (FunctionName fn blanks) args =
 	Doc.hsep (Doc.magenta (ppName fn) : args ++ replicate blanks (Doc.char '_'))
+--ppNode (CatchFrame fn blanks) args =
+--	Doc.hsep (Doc.green (ppName fn) : args ++ replicate blanks (Doc.char '_'))
 
 ppPattern :: Pattern -> Doc
 ppPattern pattern =
@@ -75,9 +87,6 @@ ppExpression simple =
 			ppVariable ptr <> Doc.brackets (Doc.int idx) <+> ppArgument arg
 		Address ptr idx ->
 			ppSyntax "&" <> ppVariable ptr <> Doc.brackets (Doc.int idx)
-		SizeOf node args ->
-			ppSyntax "@sizeOf" <+>
-			Doc.parens (ppNode node (map ppVariable args))
 		Fetch ptr ->
 			ppSyntax "@fetch" <+> ppVariable ptr
 		Load ptr nth ->
@@ -89,8 +98,8 @@ ppExpression simple =
 		CCall fn args ->
 			ppSyntax "@ccall" <+>
 			text fn <> Doc.parens (ppList $ map ppVariable args)
-		WithExceptionHandler exh exhArgs fn args ->
-			ppSyntax "@withExceptionHandler" <+>
+		Catch exh exhArgs fn args ->
+			ppSyntax "@catch" <+>
 			ppName exh <> Doc.parens (ppList $ map ppVariable exhArgs) <+>
 			ppName fn <> Doc.parens (ppList $ map ppVariable args)
 		Unit arg ->
@@ -117,7 +126,6 @@ ppExpression simple =
 			ppSyntax "@gc_mark" <+> ppVariable var
 		GCMarkNode var ->
 			ppSyntax "@gc_mark_node" <+> ppVariable var
-		other -> error $ "PrettyPrint: Unhandled: " ++ show other
 
 ppBlock :: Block -> Doc
 ppBlock block =
@@ -126,24 +134,27 @@ ppBlock block =
 			ppSyntax "@return" <+>
 			ppList (map ppVariable args)
 		Bind [] simple rest ->
-			ppExpression simple <> Doc.char ';' Doc.<$$>
+			ppExpression simple Doc.<$$>
 			ppBlock rest
 		Bind names simple rest ->
 			ppList (map ppVariable names) <+>
-			text ":=" <+>
-			ppExpression simple <> Doc.char ';' Doc.<$$>
+			text "=" <+>
+			ppExpression simple Doc.<$$>
 			ppBlock rest
 		Case scrut _defaultBranch alts ->
 			ppSyntax "case" <+> ppVariable scrut <+> ppSyntax "of" Doc.<$$>
 			Doc.indent 2 (Doc.vsep $ map ppAlternative alts)
-		Throw obj ->
-			ppSyntax "@throw" <+> ppVariable obj
+		Raise obj ->
+			ppSyntax "@raise" <+> ppVariable obj
 		TailCall fn args ->
 			ppSyntax "@tail" <+>
 			ppName fn <> Doc.parens (ppList (map ppVariable args))
 		Invoke cont args ->
 			ppSyntax "@invoke" <>
 			Doc.parens (ppList (ppVariable cont : map ppVariable args))
+		InvokeHandler cont exception ->
+			ppSyntax "@invokeHandler" <>
+			Doc.parens (ppList $ map ppVariable [cont, exception])
 		Exit ->
 			ppSyntax "@exit"
 		Panic msg ->

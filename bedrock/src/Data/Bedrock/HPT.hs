@@ -4,17 +4,22 @@
 module Data.Bedrock.HPT
     ( runHPT
     , HPTResult(..)
+    , NameSet
+    , HeapPtrSet
+    , Objects
     , setVariableSize
     , sizeOfNode
+    , sizeOfObjects
     , variableIndex
     , mergeObjectList
     , ppHPTResult
     ) where
 
 import           Control.Applicative          ((<$>), Applicative)
-import           Control.Monad.Reader
+import           Control.Monad.Reader hiding ( liftIO )
 import           Control.Monad.ST
-import           Control.Monad.Writer
+import           Control.Monad.ST.Unsafe
+import           Control.Monad.Writer hiding ( liftIO )
 import           Data.IntSet                  (IntSet)
 import qualified Data.IntSet                  as IntSet
 import           Data.List
@@ -33,6 +38,7 @@ import           Data.Bedrock
 import           Data.Bedrock.Misc
 import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.Rename
+import           Data.Bedrock.Exceptions (isCatchFrame)
 
 
 data HPTResult = HPTResult
@@ -49,6 +55,7 @@ data HPTResult = HPTResult
 data HPTState s = HPTState
     { envFnArgs              :: FnArgs
     , envFnRets              :: FnRets
+    , envFnRaise             :: FnRaise
     , envNodeArgs            :: NodeArgs
     , envPtrScope            :: PtrScope s
     , envNodeScope           :: NodeScope s
@@ -74,6 +81,7 @@ type NameSet = IntSet
 --      more efficient data structure.
 type FnArgs = Map Name [Variable]
 type FnRets = Map Name [Variable]
+type FnRaise = Map Name Variable
 type NodeArgs = Map Name [Variable]
 
 -- Variables are shared if they're used more than once.
@@ -104,7 +112,8 @@ runHPT mOrigin = runST (do
         fnArgs = Map.fromList
             [ (fnName fn, fnArguments fn) | fn <- functions m ]
         (fnRets, nextFree) = mkFnRets (modNamespace m) m
-        (nodeArgs, ns) = mkNodeArgs nextFree m
+        (fnRaise, nextFree') = mkFnRaise nextFree m
+        (nodeArgs, ns) = mkNodeArgs nextFree' m
         nPointers = nsNextPointerId ns
         nNodes = nsNextNodeId ns
     heapVector <- MVector.replicate nStores Map.empty
@@ -115,6 +124,7 @@ runHPT mOrigin = runST (do
     let env = HPTState
             { envFnArgs = fnArgs
             , envFnRets = fnRets
+            , envFnRaise = fnRaise
             , envNodeArgs = nodeArgs
             , envPtrScope = ptrScope
             , envNodeScope = nodeScope
@@ -184,6 +194,15 @@ mkFnRets free m = worker free [] (functions m)
             var = Variable (Name [] "ret" idNum) ty
         in assignID n' (var:acc) tys
 
+mkFnRaise :: AvailableNamespace -> Module -> (FnRaise, AvailableNamespace)
+mkFnRaise free m = worker free [] (functions m)
+  where
+    worker n acc [] = (Map.fromList acc, n)
+    worker n acc (fn:fns) =
+        let (idNum, n') = newIDByType n Node
+            elt = (fnName fn, Variable (Name [] "raise" idNum) Node) 
+        in worker n' (elt : acc) fns
+
 mkNodeArgs :: AvailableNamespace -> Module -> (NodeArgs, AvailableNamespace)
 mkNodeArgs free m = worker free [] (nodes m)
   where
@@ -218,10 +237,13 @@ countStores = getSum . execWriter . mapM_ countFn . functions
 
 
 sizeOfNode :: HPTResult -> Variable -> Int
-sizeOfNode hpt var =
-    foldr max 0 (map Vector.length (Map.elems objects)) + 1
+sizeOfNode hpt var = sizeOfObjects objects
   where
     objects = hptNodeScope hpt Vector.! variableIndex var
+
+sizeOfObjects :: Objects -> Int
+sizeOfObjects objects =
+    foldr max 0 (map Vector.length (Map.elems objects)) + 1
 
 setVariableSize :: HPTResult -> Variable -> Variable
 setVariableSize hpt var =
@@ -246,6 +268,13 @@ getFunctionArgumentRegisters name = do
                               show name
         Just names -> return names
 
+getFunctionRaiseRegister :: Name -> HPT s Variable
+getFunctionRaiseRegister name = do
+    raises <- asks envFnRaise
+    case Map.lookup name raises of
+        Nothing -> error $ "HPT: Internal error"
+        Just raise -> return raise
+
 getNodeArgumentRegisters :: Name -> HPT s [Variable]
 getNodeArgumentRegisters name = do
     args <- asks envNodeArgs
@@ -261,11 +290,17 @@ singletonObject name vars =
 
 singletonNameSet :: Variable -> NameSet
 singletonNameSet var
-    | variableType var == Primitive = IntSet.empty
-    | otherwise                     = IntSet.singleton (variableIndex var)
+    | isPrimitive (variableType var) = IntSet.empty
+    | otherwise                      = IntSet.singleton (variableIndex var)
+  where
+    isPrimitive Primitive{} = True
+    isPrimitive _ = False
 
 variableIndex :: Variable -> Int
 variableIndex = nameUnique . variableName
+
+_liftIO :: IO a -> HPT s a
+_liftIO = liftST . unsafeIOToST
 
 liftST :: ST s a -> HPT s a
 liftST action = HPT $ WriterT $ ReaderT $ \_ -> do
@@ -349,8 +384,12 @@ hptCopyVariables src dst | variableIndex src == variableIndex dst =
     return ()
 hptCopyVariables src dst =
     case variableType src of
-        Primitive -> return ()
+        Primitive{} -> return ()
         NodePtr -> do
+            eachIteration $ do
+                ptrs <- getPtrScope src
+                setPtrScope dst ptrs
+        FramePtr -> do
             eachIteration $ do
                 ptrs <- getPtrScope src
                 setPtrScope dst ptrs
@@ -375,8 +414,12 @@ hptAlternative origin scrut (Alternative pattern branch) = do
                 objects <- getNodeScope scrut
                 let vals = IntSet.toList (extract objects name nth)
                 case variableType arg of
-                    Primitive -> return ()
+                    Primitive{} -> return ()
                     NodePtr   ->
+                        forM_ vals $ \ptr -> do
+                            setOfPtrs <- getPtrScope' ptr
+                            setPtrScope arg setOfPtrs
+                    FramePtr   ->
                         forM_ vals $ \ptr -> do
                             setOfPtrs <- getPtrScope' ptr
                             setPtrScope arg setOfPtrs
@@ -402,16 +445,16 @@ hptBlock origin block =
                 Just branch -> hptBlock origin branch
             mapM_ (hptAlternative origin scrut) alternatives
         Bind binds simple rest -> do
-            hptExpression binds simple
+            hptExpression origin binds simple
             hptBlock origin rest
         -- Copy the values from the vars out into the return registers for
         -- our function.
         Return vars -> do
             rets <- getFunctionReturnRegisters (fnName origin)
             forM_ (zip vars rets) $ uncurry hptCopyVariables
-        Throw{} ->
-            error "Calls to @throw must have been lower before doing HPT\
-                  \ analysis."
+        Raise node -> do
+            myRaise <- getFunctionRaiseRegister (fnName origin)
+            hptCopyVariables node myRaise
         -- Copy values from 'fn' return registers into ours.
         -- copy values from vars into argument registers of 'fn'
         TailCall fn vars -> do
@@ -420,21 +463,94 @@ hptBlock origin block =
             foreignArgs <- getFunctionArgumentRegisters fn
             forM_ (zip foreignRets originRets) $ uncurry hptCopyVariables
             forM_ (zip vars foreignArgs) $ uncurry hptCopyVariables
-        Invoke obj args -> do
+        Invoke obj args -> eachIteration $ do
             objects <- getNodeScope obj
-            forM_ (Map.keys objects) $ \name -> do
-                case name of
-                    FunctionName fn blanks | blanks == length args -> do
-                        fnArgs <- getFunctionArgumentRegisters fn
-                        let missingArgs = takeLast blanks fnArgs
-                        forM_ (zip args missingArgs) $
-                            uncurry hptCopyVariables
-                    _ -> error $ "HPT Invoke: " ++ show name
+            hptInvoke objects args
+        InvokeHandler obj arg -> eachIteration $ do
+
+            objects <- getNodeScope obj
+            hptInvokeHandler objects arg
         Exit -> return ()
         Panic{} -> return ()
 
-hptExpression :: [Variable] -> Expression -> HPT s ()
-hptExpression binds simple =
+hptInvokeHandler :: Objects -> Variable -> HPT s ()
+hptInvokeHandler objects arg = do
+    frames <- stackTrace objects
+    forM_ frames $ \frame ->
+        case frame of
+            FunctionStackFrame _fn _blanks nextFramePtrs -> do
+                nextFrame <- derefHeap nextFramePtrs
+                hptInvokeHandler nextFrame arg
+            -- blanks must be 2
+            CatchStackFrame exh blanks nextFramePtrs -> do
+                exhArgs <- getFunctionArgumentRegisters exh
+                let [exceptionArg, contArg] = takeLast blanks exhArgs
+                eachIteration $
+                    setPtrScope contArg nextFramePtrs
+                hptCopyVariables arg exceptionArg
+
+hptInvoke :: Objects -> [Variable] -> HPT s ()
+hptInvoke objects args = do
+    frames <- stackTrace objects
+    forM_ frames $ \frame ->
+        case frame of
+            FunctionStackFrame fn blanks _nextFrame -> do
+                fnArgs <- getFunctionArgumentRegisters fn
+                let missingArgs = takeLast blanks fnArgs
+                forM_ (zip args missingArgs) $
+                    uncurry hptCopyVariables
+            CatchStackFrame _exh _blanks nextFramePtrs -> do
+                nextFrame <- derefHeap nextFramePtrs
+                hptInvoke nextFrame args
+
+derefPtrs :: NameSet -> HPT s HeapPtrSet
+derefPtrs ptrs =
+    IntSet.unions <$> mapM getPtrScope' (IntSet.toList ptrs)
+
+derefHeap :: HeapPtrSet -> HPT s Objects
+derefHeap hps = do
+    mergeObjectList <$> mapM getHeapObjects (IntSet.toList hps)
+
+
+data StackFrame
+    = FunctionStackFrame Name Int HeapPtrSet
+    | CatchStackFrame
+        Name Int
+        HeapPtrSet
+    deriving (Show)
+stackTrace :: Objects -> HPT s [StackFrame]
+stackTrace objects = fmap concat $
+    forM (Map.toList objects) $ \(name, objArgs) ->
+        case name of
+            FunctionName fn blanks -> do
+                _liftIO $ print (fn, blanks)
+                fnArgs <- getFunctionArgumentRegisters fn
+                let isFrameVariable var = variableType var == FramePtr
+
+                case findIndices isFrameVariable fnArgs of
+                    -- Reach top-level and there are no more frames
+                    [] -> return []
+                    [frameIdx] -> do
+                        let stackPtrs = objArgs Vector.! frameIdx
+                        stackHps <- derefPtrs stackPtrs
+                        return [FunctionStackFrame fn blanks stackHps]
+                    _ -> error "HPT: Too many FramePtr arguments"
+            -- CatchFrame *normal_stack *handler
+            ConstructorName cons | isCatchFrame cons -> do
+                let stackPtrs = objArgs Vector.! 0
+                    handlerPtrs = objArgs Vector.! 1
+                stackHps <- derefPtrs stackPtrs
+                
+                handlerHps <- derefPtrs handlerPtrs
+                handlerObjs <- derefHeap handlerHps
+
+                return
+                    [ CatchStackFrame exh blanks stackHps
+                    | FunctionName exh blanks <- Map.keys handlerObjs]
+            _ -> error $ "stackTrace: " ++ show (name)
+
+hptExpression :: Function -> [Variable] -> Expression -> HPT s ()
+hptExpression origin binds simple =
     case simple of
         Store node vars | [ptr] <- binds -> do
             hp <- newHeapPtr
@@ -503,5 +619,36 @@ hptExpression binds simple =
         GCBegin -> return ()
         GCEnd -> return ()
         GCMark var | [ptr] <- binds ->
-            hptCopyVariables ptr var
-        _ -> error $ "Unhandled simple: " ++ show simple
+            hptCopyVariables var ptr
+        GCMarkNode node | [bind] <- binds ->
+            hptCopyVariables node bind
+        Catch exh exhVars fn fnVars -> do
+            exhRets <- getFunctionReturnRegisters exh
+            fnRets  <- getFunctionReturnRegisters fn
+
+            fnArgs <- getFunctionArgumentRegisters fn
+            forM_ (zip fnVars fnArgs) $ uncurry hptCopyVariables
+
+            exhArgs <- getFunctionArgumentRegisters exh
+            forM_ (zip exhVars exhArgs) $ uncurry hptCopyVariables
+
+            fnRaise <- getFunctionRaiseRegister fn
+            exhRaise <- getFunctionRaiseRegister exh
+            myRaise <- getFunctionRaiseRegister (fnName origin)
+            -- exh catches all exceptions from 'fn'
+            -- we throw all exceptions raised by 'exh'
+            hptCopyVariables fnRaise (last exhArgs)
+            hptCopyVariables exhRaise myRaise
+            -- FIXME: copy (exceptions of fn) (last exhArgs)
+
+            forM_ (zip exhRets binds) $ uncurry hptCopyVariables
+            forM_ (zip fnRets binds) $ uncurry hptCopyVariables
+        Alloc{} -> return ()
+        Write{} -> error $ "HPT: Deal with Write"
+        Address{} -> error $ "HPT: Deal with Address"
+        Load{} -> error $ "HPT: Deal with Load"
+        ReadRegister{} -> return ()
+        WriteRegister{} -> return ()
+        ReadGlobal{} -> return ()
+        WriteGlobal{} -> return ()
+        _ -> error $ "HPT: unHPandled simple: " ++ show simple

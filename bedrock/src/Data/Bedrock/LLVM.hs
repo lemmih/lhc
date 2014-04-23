@@ -83,6 +83,7 @@ cTypeToLLVM cType = do
         I8    -> LLVM.intTypeInContext cx 8
         I32   -> LLVM.intTypeInContext cx 32
         I64   -> LLVM.intTypeInContext cx 64
+        IWord -> LLVM.intTypeInContext cx 64
         CPointer ty -> do
             tyRef <- cTypeToLLVM ty
             return $ LLVM.pointerType tyRef 0
@@ -90,7 +91,8 @@ cTypeToLLVM cType = do
 typesToLLVM :: [Type] -> Gen LLVM.Type
 typesToLLVM []        = asks envVoidTy
 typesToLLVM [NodePtr] = asks envPointerTy
-typesToLLVM [_]       = asks envWordTy
+typesToLLVM [FramePtr] = asks envPointerTy
+typesToLLVM [Primitive ty] = liftIO $ cTypeToLLVM ty
 typesToLLVM _         = error $ "typesToLLVM: Unsupported type"
 
 compileForeign :: LLVM.Module -> Foreign -> IO ()
@@ -159,10 +161,10 @@ compileBlock block =
         Bind [bind] (Unit (RefArg arg)) rest -> do
             value <- resolve arg
             case (variableType bind, variableType arg) of
-                (Primitive, NodePtr) -> do
+                (Primitive{}, ptr) | ptr `elem` [NodePtr,FramePtr] -> do
                     typedValue <- asWord value
                     bindVariable bind typedValue $ compileBlock rest
-                (NodePtr, Primitive) -> do
+                (ptr, Primitive{}) | ptr `elem` [NodePtr,FramePtr] -> do
                     typedValue <- asPointer value
                     bindVariable bind typedValue $ compileBlock rest
                 _ -> bindVariable bind value $ compileBlock rest
@@ -338,7 +340,7 @@ resolve :: Variable -> Gen LLVM.Value
 resolve variable = do
     m <- asks envVariables
     case Map.lookup variable m of
-        Nothing    -> error "LLVM.resolve"
+        Nothing    -> error $ "LLVM.resolve: " ++ show variable
         Just value -> return value
 
 resolveNodeName :: NodeName -> Gen LLVM.Value

@@ -22,6 +22,9 @@ modifyModule fn = modify $ \st -> st{envModule = fn (envModule st)}
 pushFunction :: Function -> Gen ()
 pushFunction fn = modifyModule $ \m -> m{functions = functions m ++ [fn]}
 
+pushNode :: NodeDefinition -> Gen ()
+pushNode n = modifyModule $ \m -> m{ nodes = n : nodes m }
+
 newUnique :: Gen Int
 newUnique = do
     u <- gets envUnique
@@ -110,10 +113,12 @@ freeVariables' block =
             freeVariables' rest
         Return args ->
             Set.union (Set.fromList args)
-        Throw name ->
+        Raise name ->
             Set.insert name
         Invoke cont args ->
             Set.union (Set.fromList (cont:args))
+        InvokeHandler cont exception ->
+            Set.insert cont . Set.insert exception
         TailCall _name args ->
             Set.union (Set.fromList args)
         Exit ->
@@ -130,13 +135,11 @@ freeVariablesPattern pattern =
 freeVariablesSimple :: Expression -> Set Variable -> Set Variable
 freeVariablesSimple simple =
     case simple of
-        Literal{} ->
-            id
         Application _fn args ->
             Set.union (Set.fromList args)
         CCall _fn args ->
             Set.union (Set.fromList args)
-        WithExceptionHandler _exh exhArgs _fn fnArgs ->
+        Catch _exh exhArgs _fn fnArgs ->
             Set.union (Set.fromList (exhArgs ++ fnArgs))
         Alloc{} ->
             id

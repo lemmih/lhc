@@ -102,7 +102,7 @@ lowerExpression binds simple rest sm =
             error "Storage.Pluggable: Can't deal with GCMarkNode"
         _ -> ret simple
   where
-    size = Variable (Name [] "size" 0) Primitive
+    size = Variable (Name [] "size" 0) (Primitive IWord)
     ret s = Bind binds s rest
 
 -----------------------------------------------------------

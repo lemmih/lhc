@@ -23,8 +23,8 @@ fixedGC = do
         , foreignArguments = [I32, I32] }
     initName <- newName "fixed_gc_init"
     hp <- newVariable "hp" NodePtr
-    wordSize <- newVariable "size" Primitive
-    heapSize <- newVariable "heapSize" Primitive
+    wordSize <- newVariable "size" (Primitive IWord)
+    heapSize <- newVariable "heapSize" (Primitive IWord)
     beginName <- newName "fixed_gc_begin"
     endName <- newName "fixed_gc_end"
     markName <- newName "fixed_gc_mark"

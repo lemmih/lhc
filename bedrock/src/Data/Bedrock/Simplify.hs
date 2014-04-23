@@ -40,12 +40,12 @@ simplifyFunction fn = do
 simplifyBlock :: Block -> M Block
 simplifyBlock block =
     case block of
-        Case scrut _mbDefaultBranch
+        {-Case scrut _mbDefaultBranch
                 [Alternative (NodePat node []) branch] -> do
             clone <- cloneVariable scrut
             bindVariable scrut clone $
                 Bind [clone] (Unit (NodeArg node [])) <$>
-                    simplifyBlock branch
+                    simplifyBlock branch-}
         Bind [] Unit{} rest ->
             simplifyBlock rest
         Bind [bind] (Unit arg) rest ->
@@ -72,8 +72,8 @@ simplifyAlternative (Alternative pattern branch) =
 --------------------------------------------------------
 -- Utils
 
-cloneVariable :: Variable -> M Variable
-cloneVariable var = do
+_cloneVariable :: Variable -> M Variable
+_cloneVariable var = do
     ns <- get
     let (idNum, ns') = newIDByType ns (variableType var)
         name = (variableName var){ nameUnique = idNum }
@@ -89,7 +89,7 @@ _resolveArgument :: Argument -> M Argument
 _resolveArgument (RefArg ref) = RefArg <$> resolve ref
 _resolveArgument arg = return arg
 
-bindVariable :: Variable -> Variable -> M a -> M a
-bindVariable old new = local $ \env ->
+_bindVariable :: Variable -> Variable -> M a -> M a
+_bindVariable old new = local $ \env ->
     env{ envRenaming = Map.insert old new (envRenaming env) }    
 

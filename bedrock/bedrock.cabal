@@ -28,6 +28,7 @@ library
                        Data.Bedrock.Storage
                        Data.Bedrock.Transform
                        Data.Bedrock.Misc
+                       Data.Bedrock.NodeSizing
                        Data.Bedrock.Simplify
                        Data.Bedrock.LLVM
                        Data.Bedrock.GlobalVariables

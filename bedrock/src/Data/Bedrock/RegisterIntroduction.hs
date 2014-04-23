@@ -45,8 +45,9 @@ lower old action =
         StaticNode n -> do
             newNames <- replicateM n (newName (Just Node) (variableName old))
             let newVars =
-                    [ Variable name Primitive | name <- newNames ]
+                    [ Variable name (Primitive IWord) | name <- newNames ]
             local (Map.insert old newVars) action
+        Node -> error $ "RegisterIntroduction: Found node: " ++ show old
         _  -> action
 
 lowerMany :: [Variable] -> Uniq a -> Uniq a
@@ -131,12 +132,16 @@ uniqBlock block =
                 <*> uniqBlock rest
         Return vars ->
             Return <$> resolveMany vars
-        Throw var ->
-            pure $ Throw var
+        Raise var ->
+            pure $ Raise var
         TailCall fn vars ->
             TailCall fn <$> resolveMany vars
+        -- FIXME: the code for Invoke is wrong.
         Invoke fn vars ->
             Invoke <$> pure fn <*> resolveMany vars
+        InvokeHandler{} -> error $
+            "Register introduction: @InvokeHandler must have been lowered\
+            \ by now"
         Exit -> pure Exit
         Panic msg -> pure (Panic msg)
 
@@ -144,10 +149,12 @@ uniqAlternative :: [Variable] -> Alternative -> Uniq Alternative
 uniqAlternative args (Alternative pattern branch) =
     case pattern of
         LitPat{} -> Alternative pattern <$> uniqBlock branch
-        NodePat nodeName vars -> lowerMany vars $
+        NodePat nodeName vars -> lowerMany vars $ do
+            flatVars <- resolveMany vars
             Alternative
                 <$> pure (NodePat nodeName [])
-                <*> (bindMany (zip vars (map RefArg args)) <$> uniqBlock branch)
+                <*> (bindMany (zip flatVars (map RefArg args))
+                        <$> uniqBlock branch)
 
 
 uniqMaybe :: (a -> Uniq a) -> Maybe a -> Uniq (Maybe a)
@@ -159,17 +166,15 @@ uniqMaybe fn obj =
 uniqExpression :: Expression -> Uniq Expression
 uniqExpression expr =
     case expr of
-        Literal{} -> pure expr
         Application fn vars ->
             Application fn <$> resolveMany vars
         CCall fn vars ->
             CCall fn <$> resolveMany vars
-        WithExceptionHandler exh exhArgs fn fnArgs ->
-            WithExceptionHandler
+        Catch exh exhArgs fn fnArgs ->
+            Catch
                 <$> pure exh <*> resolveMany exhArgs
                 <*> pure fn <*> resolveMany fnArgs
         Alloc{} -> pure expr
-        SizeOf{} -> error "uniqSimple: SizeOf"
         Store nodeName vars ->
             Store <$> pure nodeName <*> resolveMany vars
         Fetch{} -> pure expr

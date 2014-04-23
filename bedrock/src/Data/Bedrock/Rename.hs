@@ -60,7 +60,7 @@ resolveName :: Name -> Uniq Name
 resolveName name = do
     m <- ask
     case Map.lookup name m of
-        Nothing  -> error $ "Unresolved identifier: " ++ nameIdentifier name
+        Nothing  -> error $ "Unresolved identifier: " ++ show (name, Map.keys m)
         Just new -> return new
 
 resolveNodeName :: NodeName -> Uniq NodeName
@@ -70,6 +70,8 @@ resolveNodeName nodeName =
             ConstructorName <$> resolveName name
         FunctionName name blanks ->
             FunctionName <$> resolveName name <*> pure blanks
+        --CatchFrame name blanks ->
+        --    CatchFrame <$> resolveName name <*> pure blanks
 
 resolve :: Variable -> Uniq Variable
 resolve var = do
@@ -129,12 +131,14 @@ uniqBlock block =
                 <*> uniqBlock rest
         Return vars ->
             Return <$> mapM resolve vars
-        Throw var ->
-            Throw <$> resolve var
+        Raise var ->
+            Raise <$> resolve var
         TailCall fn vars ->
             TailCall <$> resolveName fn <*> mapM resolve vars
         Invoke fn vars ->
             Invoke <$> resolve fn <*> mapM resolve vars
+        InvokeHandler cont exception ->
+            InvokeHandler <$> resolve cont <*> resolve exception
         Exit -> pure Exit
         Panic msg -> pure (Panic msg)
 
@@ -160,19 +164,16 @@ uniqMaybe fn obj =
 uniqSimple :: Expression -> Uniq Expression
 uniqSimple simple =
     case simple of
-        Literal lit ->
-            pure (Literal lit)
         Application fn vars ->
             Application <$> resolveName fn <*> mapM resolve vars
         CCall fn vars ->
             CCall fn <$> mapM resolve vars
-        WithExceptionHandler exh exhArgs fn fnArgs ->
-            WithExceptionHandler
+        Catch exh exhArgs fn fnArgs ->
+            Catch
                 <$> resolveName exh <*> mapM resolve exhArgs
                 <*> resolveName fn <*> mapM resolve fnArgs
         Alloc n ->
             pure (Alloc n)
-        SizeOf{} -> error "uniqSimple: SizeOf"
         Store nodeName vars ->
             Store <$> resolveNodeName nodeName <*> mapM resolve vars
         Write ptr idx arg ->

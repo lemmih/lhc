@@ -1,22 +1,66 @@
-main =
-    value, n := @withExceptionHandler exceptionHandler() throwException( (False) );
-    @print value;
-    @print n;
+foreign i32 puts(i8*)
+
+entrypoint: main
+
+node True
+node False
+node Exception
+node NoException
+
+main()
+    @catch toplevelHandler() fn()
+    @exit
+
+toplevelHandler(%exception)
+    #str = @unit( "Boink, boink. Exception escaped to the top-level.")
+    @ccall puts(#str)
+    @exit
+
+fn()
+    %false = @unit( False )
+    %true  = @unit( True )
+
+    i8* msg = @unit( "Catch frame without raise..." )
+    @ccall puts(i8* msg)
+    %value = @catch exceptionHandler() throwException( %false )
+    i8* str1 = showNode(%value)
+    @ccall puts(i8* str1)
 	
-    value, n := @withExceptionHandler exceptionHandler() throwException( (True) );
-    @print value;
-    @print n;
+    i8* msg = @unit( "Catch frame with raise..." )
+    @ccall puts(i8* msg)
+    %value = @catch exceptionHandler() throwException( %true )
+    i8* str2 = showNode(%value)
+    @ccall puts(i8* str2)
+
+    i8* msg = @unit( "Raise without catch frame..." )
+    @ccall puts(i8* msg)
+    %value = throwException( %true )
+    i8* str3 = showNode(%value)
+    @ccall puts(i8* str3)
 
     @return()
 
-exceptionHandler exception =
-    @return (exception, 1)
 
-throwException input =
-	case input of
+i8* showNode(%value)
+    case %value of
+        Exception ->
+            i8* str = @unit( "Exception" )
+            @return(i8* str)
+        NoException ->
+            i8* str = @unit( "NoException" )
+            @return(i8* str)
+
+
+% exceptionHandler(%exception)
+    @return(%exception)
+
+% throwException(%input)
+	case %input of
 		True ->
-			@throw (Exception)
-		| False ->
-			@return( (NoException), 0 )
+            %exp = @unit( Exception )
+			@raise( %exp )
+		False ->
+            %ret = @unit( NoException )
+			@return( %ret )
 
 
