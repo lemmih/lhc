@@ -493,7 +493,6 @@ hptBlock origin block =
 hptInvokeHandler :: Objects -> Variable -> HPT s ()
 hptInvokeHandler objects arg = do
     frames <- stackTrace objects
-    _liftIO $ print ("InvokeHandler", frames)
     forM_ frames $ \frame ->
         case frame of
             FunctionStackFrame _fn _blanks (Just nextFramePtrs) -> do
@@ -511,7 +510,6 @@ hptInvokeHandler objects arg = do
 hptInvoke :: Objects -> [Variable] -> HPT s ()
 hptInvoke objects args = do
     frames <- stackTrace objects
-    _liftIO $ print ("Invoke", frames)
     forM_ frames $ \frame ->
         case frame of
             FunctionStackFrame fn blanks _nextFrame -> do
