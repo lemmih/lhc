@@ -76,7 +76,7 @@ mkEval hpt origin bind var = do
     pushFunction Function
         { fnName = evalName
         , fnArguments = [arg]
-        , fnResults = [StaticNode (sizeOfNode hpt bind)]
+        , fnResults = [StaticNode (sizeOfVariable hpt bind)]
         , fnBody = body }
     return $ Application evalName [var]
 
@@ -84,9 +84,9 @@ mkApply :: HPTResult -> Function -> Variable -> Variable -> Variable
         -> Gen Expression
 mkApply hpt origin bind obj arg = do
     applyName <- tagName "apply" (fnName origin)
-    applyObj <- newVariable "node" (StaticNode (sizeOfNode hpt obj))
+    applyObj <- newVariable "node" (StaticNode (sizeOfVariable hpt obj))
     applyArg <- tagVariable "ptr" arg
-    applyRet <- newVariable "ret" (StaticNode (sizeOfNode hpt bind))
+    applyRet <- newVariable "ret" (StaticNode (sizeOfVariable hpt bind))
     let objects = hptNodeScope hpt Vector.! variableIndex obj
         names = Map.keys objects
         body =
@@ -104,7 +104,7 @@ mkApply hpt origin bind obj arg = do
     pushFunction Function
         { fnName = applyName
         , fnArguments = [applyObj, applyArg]
-        , fnResults = [StaticNode (sizeOfNode hpt bind)]
+        , fnResults = [StaticNode (sizeOfVariable hpt bind)]
         , fnBody = body }
     return $ Application applyName [obj, arg]
 

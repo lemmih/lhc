@@ -8,6 +8,7 @@ module Data.Bedrock.HPT
     , HeapPtrSet
     , Objects
     , setVariableSize
+    , sizeOfVariable
     , sizeOfNode
     , sizeOfObjects
     , variableIndex
@@ -236,19 +237,35 @@ countStores = getSum . execWriter . mapM_ countFn . functions
 
 
 
-sizeOfNode :: HPTResult -> Variable -> Int
-sizeOfNode hpt var = sizeOfObjects objects
+sizeOfVariable :: HPTResult -> Variable -> Int
+sizeOfVariable hpt var =
+    case variableType var of
+        NodePtr      -> 1
+        FramePtr     -> 1
+        Node         -> sizeOfObjects hpt objects
+        StaticNode n -> n
+        Primitive{}  -> 1
   where
     objects = hptNodeScope hpt Vector.! variableIndex var
 
-sizeOfObjects :: Objects -> Int
-sizeOfObjects objects =
-    foldr max 0 (map Vector.length (Map.elems objects)) + 1
+sizeOfObjects :: HPTResult -> Objects -> Int
+sizeOfObjects hpt objects =
+    foldr max 0 [ sizeOfNode hpt node | node <- Map.keys objects ]
+
+sizeOfNode :: HPTResult -> NodeName -> Int
+sizeOfNode hpt (ConstructorName node) =
+    1 + sum (map (sizeOfVariable hpt) args)
+  where
+    args = hptNodeArgs hpt Map.! node
+sizeOfNode hpt (FunctionName fn blanks) =
+    1 + sum (map (sizeOfVariable hpt) args)
+  where
+    args = dropLast blanks (hptFnArgs hpt Map.! fn)
 
 setVariableSize :: HPTResult -> Variable -> Variable
 setVariableSize hpt var =
     case variableType var of
-        Node -> var{variableType = StaticNode (sizeOfNode hpt var)}
+        Node -> var{variableType = StaticNode (sizeOfVariable hpt var)}
         _    -> var
 
 
@@ -476,11 +493,13 @@ hptBlock origin block =
 hptInvokeHandler :: Objects -> Variable -> HPT s ()
 hptInvokeHandler objects arg = do
     frames <- stackTrace objects
+    _liftIO $ print ("InvokeHandler", frames)
     forM_ frames $ \frame ->
         case frame of
-            FunctionStackFrame _fn _blanks nextFramePtrs -> do
+            FunctionStackFrame _fn _blanks (Just nextFramePtrs) -> do
                 nextFrame <- derefHeap nextFramePtrs
                 hptInvokeHandler nextFrame arg
+            FunctionStackFrame _ _ Nothing -> error "HPT: End of stack"
             -- blanks must be 2
             CatchStackFrame exh blanks nextFramePtrs -> do
                 exhArgs <- getFunctionArgumentRegisters exh
@@ -492,6 +511,7 @@ hptInvokeHandler objects arg = do
 hptInvoke :: Objects -> [Variable] -> HPT s ()
 hptInvoke objects args = do
     frames <- stackTrace objects
+    _liftIO $ print ("Invoke", frames)
     forM_ frames $ \frame ->
         case frame of
             FunctionStackFrame fn blanks _nextFrame -> do
@@ -507,13 +527,18 @@ derefPtrs :: NameSet -> HPT s HeapPtrSet
 derefPtrs ptrs =
     IntSet.unions <$> mapM getPtrScope' (IntSet.toList ptrs)
 
+derefVars :: NameSet -> HPT s Objects
+derefVars vars =
+    mergeObjectList <$> mapM getNodeScope' (IntSet.toList vars)
+
+
 derefHeap :: HeapPtrSet -> HPT s Objects
 derefHeap hps = do
     mergeObjectList <$> mapM getHeapObjects (IntSet.toList hps)
 
 
 data StackFrame
-    = FunctionStackFrame Name Int HeapPtrSet
+    = FunctionStackFrame Name Int (Maybe HeapPtrSet)
     | CatchStackFrame
         Name Int
         HeapPtrSet
@@ -528,20 +553,19 @@ stackTrace objects = fmap concat $
 
                 case findIndices isFrameVariable fnArgs of
                     -- Reach top-level and there are no more frames
-                    [] -> return [FunctionStackFrame fn blanks undefined]
+                    [] -> return [FunctionStackFrame fn blanks Nothing]
                     [frameIdx] -> do
                         let stackPtrs = objArgs Vector.! frameIdx
                         stackHps <- derefPtrs stackPtrs
-                        return [FunctionStackFrame fn blanks stackHps]
+                        return [FunctionStackFrame fn blanks (Just stackHps)]
                     _ -> error "HPT: Too many FramePtr arguments"
             -- CatchFrame *normal_stack *handler
             ConstructorName cons | isCatchFrame cons -> do
                 let stackPtrs = objArgs Vector.! 0
-                    handlerPtrs = objArgs Vector.! 1
+                    handlerVars = objArgs Vector.! 1
                 stackHps <- derefPtrs stackPtrs
                 
-                handlerHps <- derefPtrs handlerPtrs
-                handlerObjs <- derefHeap handlerHps
+                handlerObjs <- derefVars handlerVars
 
                 return
                     [ CatchStackFrame exh blanks stackHps

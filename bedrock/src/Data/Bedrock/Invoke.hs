@@ -8,7 +8,6 @@ import qualified  Data.IntSet as IntSet
 import qualified Data.Vector             as Vector
 import Data.List
 
-
 import           Data.Bedrock
 import           Data.Bedrock.HPT
 import           Data.Bedrock.Misc
@@ -21,11 +20,8 @@ mkInvoke hpt = do
     fs <- gets (Map.elems . envFunctions)
     forM_ fs $ \fn -> do
         body' <- traverseBlock hpt fn (fnBody fn)
-        let rets = map (setVariableSize hpt) (hptFnRets hpt Map.! fnName fn)
         pushFunction fn
             { fnBody = body'
-            --, fnArguments = map (setVariableSize hpt) (fnArguments fn)
-            --, fnResults = map variableType rets
             }
     return ()
 
@@ -61,6 +57,11 @@ derefPtrs hpt ptrs = IntSet.unions
     [ hptPtrScope hpt Vector.! ptr
     | ptr <- IntSet.toList ptrs ]
 
+derefVars :: HPTResult -> NameSet -> Objects
+derefVars hpt vars = mergeObjectList
+    [ hptNodeScope hpt Vector.! var
+    | var <- IntSet.toList vars ]
+
 derefHeap :: HPTResult -> HeapPtrSet -> Objects
 derefHeap hpt vars = mergeObjectList
     [ hptHeap hpt Vector.! hp
@@ -80,8 +81,8 @@ mkInvokeAlts hpt objects args = do
                 nextFrameLocs = derefPtrs hpt nextFramePtrs
                 nextFrameObjects = derefHeap hpt nextFrameLocs
             nextFramePtr <- newVariable "nextFrame" NodePtr
-            nextFrame <- newVariable "nextFrame" (StaticNode (sizeOfObjects nextFrameObjects))
-            exhPtr <- newVariable "exhPtr" NodePtr
+            nextFrame <- newVariable "nextFrame" (StaticNode (sizeOfObjects hpt nextFrameObjects))
+            exhPtr <- newVariable "exhPtr" Node
             Alternative (NodePat (ConstructorName cons) [nextFramePtr, exhPtr]) .
                 Bind [nextFrame] (Fetch nextFramePtr) .
                 Case nextFrame Nothing
@@ -106,7 +107,7 @@ mkInvokeHandlerAlts hpt objects arg = do
                     let nextFramePtrs = objArgs Vector.! framePtrIndex
                         nextFrameLocs = derefPtrs hpt nextFramePtrs
                         nextFrameObjects = derefHeap hpt nextFrameLocs
-                        size = sizeOfObjects nextFrameObjects
+                        size = sizeOfObjects hpt nextFrameObjects
                     let nextFramePtr = partialArgs !! framePtrIndex
                     nextFrame <- newVariable "nextFrame" (StaticNode size)
                     Alternative (NodePat name partialArgs) .
@@ -114,14 +115,11 @@ mkInvokeHandlerAlts hpt objects arg = do
                         Case nextFrame Nothing
                             <$> mkInvokeHandlerAlts hpt nextFrameObjects arg
         mkAlt (ConstructorName cons, objArgs) | isCatchFrame cons = do
-            let exhPtrs = objArgs Vector.! 1
-                exhLocs = derefPtrs hpt exhPtrs
-                exhObjects = derefHeap hpt exhLocs
+            let exhVars = objArgs Vector.! 1
+                exhObjects = derefVars hpt exhVars
             nextFramePtr <- newVariable "nextFrame" NodePtr
-            exhPtr <- newVariable "exhPtr" NodePtr
-            exh <- newVariable "exh" (StaticNode (sizeOfObjects exhObjects))
-            Alternative (NodePat (ConstructorName cons) [nextFramePtr, exhPtr]) .
-                Bind [exh] (Fetch exhPtr) .
+            exh <- newVariable "exh" (StaticNode (sizeOfObjects hpt exhObjects))
+            Alternative (NodePat (ConstructorName cons) [nextFramePtr, exh]) .
                 Case exh Nothing
                     <$> mkInvokeAlts hpt exhObjects [arg, nextFramePtr]
 

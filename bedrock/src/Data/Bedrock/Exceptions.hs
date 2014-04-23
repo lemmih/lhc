@@ -109,31 +109,18 @@ cpsExpresion origin binds simple rest =
             let exceptionFrame = Variable
                     { variableName = exFrameName
                     , variableType = FramePtr }
-                exContPtr = Variable
-                    { variableName = Name [] "exCont" 0
-                    , variableType = NodePtr }
-            -- We have to create an indirection to shuffle
-            -- around the arguments to the exception handler.
-            -- This indirection can be removed later.
-            --indirectName <- tagName "indirect" exh
-            --exhFn <- lookupFunction exh
-            --pushFunction Function
-            --    { fnName      = indirectName
-            --    , fnArguments = init (fnArguments exhFn) ++
-            --                    [stdContinuation, last (fnArguments exhFn)]
-            --    , fnBody      = TailCall exh
-            --        (map RefArg $ fnArguments exhFn ++ [stdContinuation])
-            --    }
-            -- FIXME:
+                exSusp = Variable
+                    { variableName = Name [] "exSusp" 0
+                    , variableType = Node }
             exhFrameName <- newName exhFrameIdentifier
-            pushNode $ NodeDefinition exhFrameName [FramePtr, NodePtr]
+            pushNode $ NodeDefinition exhFrameName [FramePtr, Node]
             mkContinuation $ \continuationFrame ->
                 -- FIXME: continuationFrame needs to be stored.
-                Bind [exContPtr] (Store (FunctionName exh 2) exhArgs) $
+                Bind [exSusp] (Unit (NodeArg (FunctionName exh 2) exhArgs)) $
                 Bind [exceptionFrame]
                     (Store (ConstructorName exhFrameName)
                         [ continuationFrame
-                        , exContPtr ]) $
+                        , exSusp ]) $
                 TailCall fn (fnArgs ++ [exceptionFrame])
         Application fn fnArgs ->
             mkContinuation $ \continuationFrame ->
