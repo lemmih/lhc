@@ -9,7 +9,7 @@ import Text.Printf
 import           Data.Bedrock.EvalApply
 import           Data.Bedrock.Exceptions
 import           Data.Bedrock.GlobalVariables
-import           Data.Bedrock.HPT                  (runHPT)
+import           Data.Bedrock.HPT                  (ppHPTResult,runHPT)
 import           Data.Bedrock.Invoke
 import           Data.Bedrock.LLVM                 as LLVM
 import           Data.Bedrock.Parse
@@ -56,6 +56,7 @@ compileFromFile path = do
             writeRocks n renamed "renamed"
             writeRocks n noLaziness "no-lazy"
             writeRocks n noExceptions "no-exceptions"
+            ppHPTResult hpt2
             writeRocks n noInvoke "no-invoke"
             writeRocks n noUnknownSize "no-unknown-size"
             writeRocks n noNodes "no-nodes"

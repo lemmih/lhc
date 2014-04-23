@@ -523,13 +523,12 @@ stackTrace objects = fmap concat $
     forM (Map.toList objects) $ \(name, objArgs) ->
         case name of
             FunctionName fn blanks -> do
-                _liftIO $ print (fn, blanks)
                 fnArgs <- getFunctionArgumentRegisters fn
                 let isFrameVariable var = variableType var == FramePtr
 
                 case findIndices isFrameVariable fnArgs of
                     -- Reach top-level and there are no more frames
-                    [] -> return []
+                    [] -> return [FunctionStackFrame fn blanks undefined]
                     [frameIdx] -> do
                         let stackPtrs = objArgs Vector.! frameIdx
                         stackHps <- derefPtrs stackPtrs

@@ -24,8 +24,9 @@ mkInvoke hpt = do
         let rets = map (setVariableSize hpt) (hptFnRets hpt Map.! fnName fn)
         pushFunction fn
             { fnBody = body'
-            , fnArguments = map (setVariableSize hpt) (fnArguments fn)
-            , fnResults = map variableType rets }
+            --, fnArguments = map (setVariableSize hpt) (fnArguments fn)
+            --, fnResults = map variableType rets
+            }
     return ()
 
 

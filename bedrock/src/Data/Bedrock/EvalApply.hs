@@ -26,15 +26,13 @@ traverseBlock :: HPTResult -> Function -> Block -> Gen Block
 traverseBlock hpt origin expr =
     case expr of
         Bind binds simple rest ->
-            Bind binds -- (map (setVariableSize hpt) binds)
+            Bind binds
                 <$> traverseExpression hpt origin binds simple
                 <*> traverseBlock hpt origin rest
         Case scrut defaultBranch alternatives ->
-            Case scrut -- (setVariableSize hpt scrut)
+            Case scrut
                 <$> pure defaultBranch
                 <*> mapM (traverseAlternative hpt origin) alternatives
-        --Return vars ->
-        --    return $ Return (map (setVariableSize hpt) vars)
         other -> return other
 
 traverseExpression :: HPTResult -> Function -> [Variable]
@@ -44,7 +42,7 @@ traverseExpression hpt origin binds simple =
         Eval var | [bind] <- binds      -> mkEval hpt origin bind var
         Apply obj arg | [bind] <- binds -> mkApply hpt origin bind obj arg
         Application fn args             ->
-            return $ Application fn args -- (map (setVariableSize hpt) args)
+            return $ Application fn args
         _                               -> return simple
 
 
@@ -108,7 +106,7 @@ mkApply hpt origin bind obj arg = do
         , fnArguments = [applyObj, applyArg]
         , fnResults = [StaticNode (sizeOfNode hpt bind)]
         , fnBody = body }
-    return $ Application applyName (map (setVariableSize hpt) [obj, arg])
+    return $ Application applyName [obj, arg]
 
 
 traverseAlternative :: HPTResult -> Function -> Alternative -> Gen Alternative
