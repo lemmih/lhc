@@ -3,6 +3,8 @@ module Main (main) where
 import Control.Applicative
 import System.Console.CmdTheLine
 
+import Data.Bedrock.Compile
+
 doParse :: [FilePath] -> Bool -> IO ()
 doParse _ _ = return ()
 
@@ -22,7 +24,8 @@ parseInfo = defTI
 
 
 doRun :: [FilePath] -> IO ()
-doRun = print
+doRun ~[path] = do
+    compileFromFile path
 
 runTerm :: Term (IO ())
 runTerm = doRun <$> inputFiles
