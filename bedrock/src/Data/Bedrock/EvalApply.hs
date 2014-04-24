@@ -71,7 +71,7 @@ mkEval hpt origin bind var = do
             let args = hptNodeArgs hpt Map.! con
                 ret = Variable evalRet (StaticNode (length args+1)) in
             Alternative (NodePat name args) $
-            Bind [ret] (Unit (NodeArg name args)) $
+            Bind [ret] (MkNode name args) $
             Return [ret]
     pushFunction Function
         { fnName = evalName
@@ -98,7 +98,7 @@ mkApply hpt origin bind obj arg = do
         mkAlt name@(FunctionName fn n) =
             let args = dropLast n $ hptFnArgs hpt Map.! fn in
             Alternative (NodePat name args) $
-            Bind [applyRet] (Unit (NodeArg (FunctionName fn (n-1)) (args++[applyArg]))) $
+            Bind [applyRet] (MkNode (FunctionName fn (n-1)) (args++[applyArg])) $
             Return [applyRet]
         mkAlt _ = error "mkApply"
     pushFunction Function

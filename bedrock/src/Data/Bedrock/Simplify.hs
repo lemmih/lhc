@@ -46,10 +46,8 @@ simplifyBlock block =
             bindVariable scrut clone $
                 Bind [clone] (Unit (NodeArg node [])) <$>
                     simplifyBlock branch-}
-        Bind [] Unit{} rest ->
+        Bind [] TypeCast{} rest ->
             simplifyBlock rest
-        Bind [bind] (Unit arg) rest ->
-            Bind [bind] (Unit arg) <$> simplifyBlock rest
         Bind binds simple rest ->
             Bind <$> mapM resolve binds
                 <*> pure simple
@@ -84,10 +82,6 @@ resolve :: Variable -> M Variable
 resolve var = do
     m <- asks envRenaming
     return $ Map.findWithDefault var var m
-
-_resolveArgument :: Argument -> M Argument
-_resolveArgument (RefArg ref) = RefArg <$> resolve ref
-_resolveArgument arg = return arg
 
 _bindVariable :: Variable -> Variable -> M a -> M a
 _bindVariable old new = local $ \env ->

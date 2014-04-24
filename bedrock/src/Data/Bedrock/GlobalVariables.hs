@@ -45,7 +45,7 @@ lowerBlock block =
         Bind [bind] (ReadRegister reg) rest -> do
             var <- asks (Map.! reg)
             rest' <- lowerBlock rest
-            return $ Bind [bind] (Unit (RefArg var)) rest'
+            return $ Bind [bind] (TypeCast var) rest'
         Bind [] (WriteRegister reg var) rest ->
             local (Map.insert reg var) $
                 lowerBlock rest

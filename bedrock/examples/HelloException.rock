@@ -12,27 +12,27 @@ main()
     @exit
 
 toplevelHandler(%exception)
-    #str = @unit( "Boink, boink. Exception escaped to the top-level.")
+    #str = @literal "Boink, boink. Exception escaped to the top-level."
     @ccall puts(#str)
     @exit
 
 fn()
-    %false = @unit( False )
-    %true  = @unit( True )
+    %false = @node( False )
+    %true  = @node( True )
 
-    i8* msg = @unit( "Catch frame without raise..." )
+    i8* msg = @literal "Catch frame without raise..."
     @ccall puts(i8* msg)
     %value = @catch exceptionHandler() throwException( %false )
     i8* str1 = showNode(%value)
     @ccall puts(i8* str1)
 	
-    i8* msg = @unit( "Catch frame with raise..." )
+    i8* msg = @literal "Catch frame with raise..."
     @ccall puts(i8* msg)
     %value = @catch exceptionHandler() throwException( %true )
     i8* str2 = showNode(%value)
     @ccall puts(i8* str2)
 
-    i8* msg = @unit( "Raise without catch frame..." )
+    i8* msg = @literal "Raise without catch frame..."
     @ccall puts(i8* msg)
     %value = throwException( %true )
     i8* str3 = showNode(%value)
@@ -44,10 +44,10 @@ fn()
 i8* showNode(%value)
     case %value of
         Exception ->
-            i8* str = @unit( "Exception" )
+            i8* str = @literal "Exception"
             @return(i8* str)
         NoException ->
-            i8* str = @unit( "NoException" )
+            i8* str = @literal "NoException"
             @return(i8* str)
 
 
@@ -57,10 +57,10 @@ i8* showNode(%value)
 % throwException(%input)
 	case %input of
 		True ->
-            %exp = @unit( Exception )
+            %exp = @node( Exception )
 			@raise( %exp )
 		False ->
-            %ret = @unit( NoException )
+            %ret = @node( NoException )
 			@return( %ret )
 
 

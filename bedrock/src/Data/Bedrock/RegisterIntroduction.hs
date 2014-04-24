@@ -87,8 +87,9 @@ uniqFunction (Function name args rets body) = lowerMany args $
         <*> pure rets
         <*> uniqBlock body
 
-bindMany :: [(Variable, Argument)] -> Block -> Block
-bindMany lst rest = foldr (\(bind, arg) -> Bind [bind] (Unit arg)) rest lst
+bindMany :: [(Variable, Variable)] -> Block -> Block
+bindMany lst rest =
+    foldr (\(bind, var) -> Bind [bind] (TypeCast var)) rest lst
 
 uniqBlock :: Block -> Uniq Block
 uniqBlock block =
@@ -99,22 +100,22 @@ uniqBlock block =
                 <$> pure tag
                 <*> uniqMaybe uniqBlock mbBranch
                 <*> mapM (uniqAlternative args) alts
-        Bind [bind] (Unit (RefArg var)) rest -> lower bind $ do
+        Bind [bind] (TypeCast var) rest -> lower bind $ do
             nodeBinds <- resolve bind
             varArgs   <- resolve var
-            bindMany (zip nodeBinds (map RefArg varArgs))
+            bindMany (zip nodeBinds varArgs)
                 <$> uniqBlock rest
-        Bind [bind] (Unit (LitArg lit)) rest -> lower bind $
+        Bind [bind] (Literal lit) rest -> lower bind $
             Bind
                 <$> resolve bind
-                <*> pure (Unit (LitArg lit))
+                <*> pure (Literal lit)
                 <*> uniqBlock rest
-        Bind [bind] (Unit (NodeArg nodeName nodeArgs)) rest -> lower bind $ do
-            nodeBinds <- resolve bind
+        Bind [bind] (MkNode nodeName nodeArgs) rest -> lower bind $ do
+            (tagBind:nodeBinds) <- resolve bind
             rest' <- uniqBlock rest
-            return $ bindMany 
-                (zip nodeBinds (NodeArg nodeName [] : map RefArg nodeArgs))
-                rest'
+            return $
+                Bind [tagBind] (MkNode nodeName []) $
+                bindMany (zip nodeBinds nodeArgs) rest'
         Bind binds (Fetch ptr) rest -> lowerMany binds $ do
             binds' <- resolveMany binds
             rest' <- uniqBlock rest
@@ -153,7 +154,7 @@ uniqAlternative args (Alternative pattern branch) =
             flatVars <- resolveMany vars
             Alternative
                 <$> pure (NodePat nodeName [])
-                <*> (bindMany (zip flatVars (map RefArg args))
+                <*> (bindMany (zip flatVars args)
                         <$> uniqBlock branch)
 
 
@@ -184,7 +185,9 @@ uniqExpression expr =
         Apply{} -> pure expr
         ReadGlobal{} -> error "uniqSimple: ReadGlobal"
         WriteGlobal{} -> error "uniqSimple: WriteGlobal"
-        Unit{} -> pure expr
+        TypeCast{} -> pure expr
+        MkNode{} -> pure expr
+        Literal{} -> pure expr
         GCAllocate{} -> pure expr
         GCBegin -> pure expr
         GCEnd -> pure expr

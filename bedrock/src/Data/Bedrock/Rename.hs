@@ -78,15 +78,15 @@ resolve var = do
     name <- resolveName (variableName var)
     return var{ variableName = name }
 
-resolveArgument :: Argument -> Uniq Argument
-resolveArgument arg =
-    case arg of
-        RefArg var            ->
-            RefArg <$> resolve var
-        LitArg lit            ->
-            pure (LitArg lit)
-        NodeArg nodeName vars ->
-            NodeArg <$> resolveNodeName nodeName <*> mapM resolve vars
+--resolveArgument :: Argument -> Uniq Argument
+--resolveArgument arg =
+--    case arg of
+--        RefArg var            ->
+--            RefArg <$> resolve var
+--        LitArg lit            ->
+--            pure (LitArg lit)
+--        NodeArg nodeName vars ->
+--            NodeArg <$> resolveNodeName nodeName <*> mapM resolve vars
 
 uniqModule :: Module -> Uniq Module
 uniqModule m =
@@ -176,8 +176,8 @@ uniqSimple simple =
             pure (Alloc n)
         Store nodeName vars ->
             Store <$> resolveNodeName nodeName <*> mapM resolve vars
-        Write ptr idx arg ->
-            Write <$> resolve ptr <*> pure idx <*> resolveArgument arg
+        Write ptr idx var ->
+            Write <$> resolve ptr <*> pure idx <*> resolve var
         Address var idx ->
             Address <$> resolve var <*> pure idx
         Fetch var ->
@@ -197,8 +197,11 @@ uniqSimple simple =
             pure $ ReadGlobal reg
         WriteGlobal reg var ->
             WriteGlobal reg <$> resolve var
-        Unit arg ->
-            Unit <$> resolveArgument arg
+        TypeCast var ->
+            TypeCast <$> resolve var
+        Literal lit -> pure $ Literal lit
+        MkNode name vars ->
+            MkNode <$> resolveNodeName name <*> mapM resolve vars
         GCAllocate n ->
             pure (GCAllocate n)
         GCBegin -> pure GCBegin

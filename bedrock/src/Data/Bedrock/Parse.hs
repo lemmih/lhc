@@ -82,22 +82,6 @@ parseFunction = do
 	body <- parseBlock
 	return (Function name args retTypes body)
 
--- FIXME: Parse nodes
-parseArgument :: Parser Argument
-parseArgument =
-	RefArg <$> parseVariable <|>
-	LitArg <$> parseLiteral <|>
-	(do
-		constructor <- parseConstructor
-		binds <- many parseVariable
-		return $ NodeArg (ConstructorName constructor) binds) <|>
-	(do
-		fn <- parseName
-		binds <- many parseVariable
-		blanks <- many (symbol "_")
-		return $ NodeArg (FunctionName fn (length blanks)) binds)
-	<?> "argument"
-
 parseConstructor :: Parser Name
 parseConstructor = try (do
 	name <- parseName
@@ -111,17 +95,24 @@ parseLiteral =
 	LiteralString <$> stringLiteral
 	<?> "literal"
 
-parsePattern :: Parser Pattern
-parsePattern = choice
+parseNode :: Parser (NodeName, [Variable])
+parseNode = choice 
 	[ do
 		constructor <- parseConstructor
 		binds <- many parseVariable
-		return $ NodePat (ConstructorName constructor) binds
+		return (ConstructorName constructor, binds)
 	, do
 		fn <- parseName
 		binds <- many parseVariable
 		blanks <- many (symbol "_")
-		return $ NodePat (FunctionName fn (length blanks)) binds
+		return (FunctionName fn (length blanks), binds)
+	]
+
+parsePattern :: Parser Pattern
+parsePattern = choice
+	[ do
+		(name, binds) <- parseNode
+		return $ NodePat name binds
 	, LitPat <$> parseLiteral
 	]
 
@@ -135,9 +126,16 @@ parseAlternative = do
 parseExpression :: Parser Expression
 parseExpression = choice
 	[ do
-		reserved "@unit"
-		arg <- parens parseArgument
-		return $ Unit arg
+		reserved "@cast"
+		var <- parseVariable
+		return $ TypeCast var
+	, do
+		reserved "@literal"
+		Literal <$> parseLiteral
+	, do
+		reserved "@node"
+		(name, binds) <- parens parseNode
+		return $ MkNode name binds
 	, do
 		reserved "@alloc"
 		n <- natural

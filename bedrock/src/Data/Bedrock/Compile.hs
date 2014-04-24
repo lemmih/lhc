@@ -39,7 +39,7 @@ compileFromFile path = do
                 -- FIXME: rename mkInvoke to lowerInvoke.
                 noInvoke     = runGen noExceptions (mkInvoke hpt2)
                 noUnknownSize= unique $ runGen noInvoke (lowerNodeSize hpt2)
-                noNodes      = registerIntroduction noUnknownSize
+                noNodes      = unique $ registerIntroduction noUnknownSize
                 -- Hm, I don't think this step can be done after
                 -- register introduction...
                 -- Insert GC intrinsics for marking roots, checking the heap,

@@ -7,19 +7,20 @@ node Int #
 entrypoint: main
 
 main()
-    i8* str = @unit( "Hello world" )
+    i8* str = @literal "Hello world"
     i32 n = @ccall puts(i8* str)
-    i8* pstr = @unit( "puts returned %d\n" )
+    i8* pstr = @literal "puts returned %d\n"
     @ccall printf( i8* pstr, i32 n )
-    #zero = @unit( 0 )
+    #zero = @literal 0
     *init = @store( Int #zero )
     *fn = @store( inc _ )
     *thunk = @store (twice *fn *init)
     %newVal = @eval( *thunk )
     case %newVal of
       Int #ret ->
-        i8* str = @unit( "ret is %d" )
-        @ccall printf(i8* str, #ret)
+        i8* str = @literal "ret is %d"
+        i32 t = @cast #ret
+        @ccall printf(i8* str, i32 t)
         @exit
 
 % twice(*fn, *x)
@@ -37,9 +38,9 @@ main()
     %intObject = @eval( *intPtr )
     case %intObject of
       Int #intVal ->
-        #inc = @unit( 1 )
+        #inc = @literal 1
         #newVal = @add #intVal #inc
-        %newObject = @unit( Int #newVal )
+        %newObject = @node( Int #newVal )
         @return( %newObject )
 
 

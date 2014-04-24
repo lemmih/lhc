@@ -39,12 +39,12 @@ ppVariable :: Variable -> Doc
 ppVariable Variable{ variableName = name, variableType = ty } =
 	ppType ty <> ppName name
 
-ppArgument :: Argument -> Doc
-ppArgument arg =
-	case arg of
-		RefArg name       -> ppVariable name
-		LitArg lit        -> ppLiteral lit
-		NodeArg name args -> ppNode name (map ppVariable args)
+--ppArgument :: Argument -> Doc
+--ppArgument arg =
+--	case arg of
+--		RefArg name       -> ppVariable name
+--		LitArg lit        -> ppLiteral lit
+--		NodeArg name args -> ppNode name (map ppVariable args)
 
 ppLiteral :: Literal -> Doc
 ppLiteral literal =
@@ -82,9 +82,9 @@ ppExpression simple =
 		Store node args ->
 			ppSyntax "@store" <+>
 			Doc.parens (ppNode node (map ppVariable args))
-		Write ptr idx arg ->
+		Write ptr idx var ->
 			ppSyntax "@write" <+>
-			ppVariable ptr <> Doc.brackets (Doc.int idx) <+> ppArgument arg
+			ppVariable ptr <> Doc.brackets (Doc.int idx) <+> ppVariable var
 		Address ptr idx ->
 			ppSyntax "&" <> ppVariable ptr <> Doc.brackets (Doc.int idx)
 		Fetch ptr ->
@@ -102,8 +102,12 @@ ppExpression simple =
 			ppSyntax "@catch" <+>
 			ppName exh <> Doc.parens (ppList $ map ppVariable exhArgs) <+>
 			ppName fn <> Doc.parens (ppList $ map ppVariable args)
-		Unit arg ->
-			ppSyntax "@unit" <> Doc.parens (ppArgument arg)
+		TypeCast var ->
+			ppSyntax "@cast" <> Doc.parens (ppVariable var)
+		MkNode name vars ->
+			ppSyntax "@node" <> Doc.parens (ppNode name (map ppVariable vars))
+		Literal lit ->
+			ppSyntax "@literal" <+> ppLiteral lit
 		Eval var ->
 			ppSyntax "@eval" <+> ppVariable var
 		Apply a b ->

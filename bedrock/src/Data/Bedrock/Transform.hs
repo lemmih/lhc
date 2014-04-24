@@ -147,8 +147,8 @@ freeVariablesSimple simple =
             id
         Store _constructor args ->
             Set.union (Set.fromList args)
-        Write ptr _idx arg ->
-            Set.insert ptr . freeVariablesArguments [arg]
+        Write ptr _idx var ->
+            Set.insert ptr . Set.insert var
         Fetch ptr ->
             Set.insert ptr
         Load ptr _idx ->
@@ -158,21 +158,18 @@ freeVariablesSimple simple =
         ReadRegister{} -> id
         WriteRegister _reg var -> Set.insert var
         Address var _idx -> Set.insert var
-        Unit arg ->
-            freeVariablesArguments [arg]
+        TypeCast var -> Set.insert var
         Eval var ->
             Set.insert var
         Apply obj arg ->
             Set.insert obj . Set.insert arg
-        _ -> error $ "freeVariablesSimple: " ++ show simple
-
-freeVariablesArguments :: [Argument] -> Set Variable -> Set Variable
-freeVariablesArguments = flip (foldr freeVariablesArgument)
-
-freeVariablesArgument :: Argument -> Set Variable -> Set Variable
-freeVariablesArgument arg =
-    case arg of
-        RefArg name -> Set.insert name
-        NodeArg _node args -> Set.union (Set.fromList args)
-        LitArg{} -> id
+        ReadGlobal{} -> id
+        WriteGlobal _reg var -> Set.insert var
+        MkNode _ vars -> Set.union (Set.fromList vars)
+        Literal{} -> id
+        GCBegin{} -> id
+        GCEnd{} -> id
+        GCMark var -> Set.insert var
+        GCMarkNode var -> Set.insert var
+        -- _ -> error $ "freeVariablesSimple: " ++ show simple
 

@@ -40,7 +40,7 @@ newtype Gen a = Gen { unGen :: ReaderT Env IO a }
 
 compile :: Module -> FilePath -> IO ()
 compile bedrock dst = do
-    m <- mCreateWithName "lhc"
+    m <- LLVM.moduleCreateWithName "lhc"
     cx <- LLVM.getGlobalContext
     voidTy <- LLVM.voidTypeInContext cx
 
@@ -139,6 +139,12 @@ compileBlock :: Block -> Gen ()
 compileBlock block =
     case block of
         Bind _ Store{} _ -> error "LLVM: Unsupported: @store"
+        Bind _ GCAllocate{} _ -> error "LLVM: Unsupported: @GCAllocate"
+        Bind _ Alloc{} _ -> error "LLVM: Unsupported: @alloc"
+        Bind _ GCBegin{} _ -> error "LLVM: Unsupported: @gc_begin"
+        Bind _ GCEnd{} _ -> error "LLVM: Unsupported: @gc_end"
+        Bind _ GCMark{} _ -> error "LLVM: Unsupported: @gc_mark"
+        Bind _ GCMarkNode{} _ -> error "LLVM: Unsupported: @gc_mark_node"
 
 
 
@@ -158,7 +164,7 @@ compileBlock block =
             case binds of
                 [bind] -> bindVariable bind typedRet $ compileBlock rest
                 _      -> compileBlock rest
-        Bind [bind] (Unit (RefArg arg)) rest -> do
+        Bind [bind] (TypeCast arg) rest -> do
             value <- resolve arg
             case (variableType bind, variableType arg) of
                 (Primitive{}, ptr) | ptr `elem` [NodePtr,FramePtr] -> do
@@ -168,12 +174,15 @@ compileBlock block =
                     typedValue <- asPointer value
                     bindVariable bind typedValue $ compileBlock rest
                 _ -> bindVariable bind value $ compileBlock rest
-        Bind [bind] (Unit arg) rest -> do
-            value <- resolveArgument arg
+        Bind [bind] (MkNode name []) rest -> do
+            value <- resolveNodeName name
             bindVariable bind value $ compileBlock rest
-        Bind [bind] (Load ptr nth) rest ->
-            compileLoad bind ptr nth $
-            compileBlock rest
+        Bind [bind] (Literal lit) rest -> do
+            value <- resolveLiteral lit
+            bindVariable bind value $ compileBlock rest
+        Bind [bind] (Load ptr nth) rest -> do
+            value <- compileLoad ptr nth
+            bindVariable bind value $ compileBlock rest
 
         Bind [] (Write word nth arg) rest -> do
             compileWrite word nth arg
@@ -185,16 +194,6 @@ compileBlock block =
             offsetPtr <- buildGEP ptr [offset] ""
             bindVariable bind offsetPtr $ compileBlock rest
 
-        -- Ignore GCAllocate and Alloc for now
-        --Bind [bind] GCAllocate{} rest -> do
-        --    value <- constWord 1
-        --    bindVariable bind value $ compileExpression rest
-        --Bind [] Alloc{} rest -> compileExpression rest
-        --Bind [] GCBegin{} rest -> compileExpression rest
-        --Bind [] GCEnd{} rest -> compileExpression rest
-        --Bind [bind] (GCMark ptr) rest -> do
-        --    value <- resolve ptr
-        --    bindVariable bind value $ compileExpression rest
 
         Bind [] (Application fn args) rest -> do
             llvmFn <- resolveFunction fn
@@ -265,9 +264,9 @@ compileAdd a b = do
     b' <- resolve b
     buildAdd a' b' ""
 
-compileWrite :: Variable -> Int -> Argument -> Gen Value
-compileWrite word nth arg = do
-    argValue <- asWord =<< resolveArgument arg
+compileWrite :: Variable -> Int -> Variable -> Gen Value
+compileWrite word nth var = do
+    argValue <- asWord =<< resolve var
     
     wordValue <- resolve word
     ptr <- asPointer wordValue
@@ -276,30 +275,14 @@ compileWrite word nth arg = do
     offsetPtr <- buildGEP ptr [offset] ""
     buildStore argValue offsetPtr
 
-_compileStore :: Variable -> NodeName -> [Variable] -> Gen a -> Gen a
-_compileStore bind nodeName args action = do
-    wordTy <- asks envWordTy
-    size <- constWord (fromIntegral $ 1 + length args)
-    ptrValue <- buildArrayMalloc wordTy size ""
-    intValue <- buildPtrToInt ptrValue wordTy ""
-    tagValue <- resolveNodeName nodeName
-    buildStore tagValue ptrValue
-    forM_ (zip [1..] args) $ \(nth, arg) -> do
-        offset <- constWord nth
-        offsetPtr <- buildGEP ptrValue [offset] ""
-        argValue <- resolve arg
-        buildStore argValue offsetPtr
-    bindVariable bind intValue $ action
-
-compileLoad :: Variable -> Variable -> Int -> Gen a -> Gen a
-compileLoad bind ptr nth action = do
+compileLoad :: Variable -> Int -> Gen Value
+compileLoad ptr nth = do
     wordValue <- resolve ptr
 
     ptrValue    <- asPointer wordValue
     offset      <- constWord (fromIntegral nth)
     offsetValue <- buildGEP ptrValue [offset] ""
-    load        <- buildLoad offsetValue (uniqueVariable bind)
-    bindVariable bind load action
+    buildLoad offsetValue ""
 
 compilePattern :: Pattern -> Gen LLVM.Value
 compilePattern pattern = do
@@ -311,13 +294,12 @@ compilePattern pattern = do
         NodePat{} ->
             error "LLVM: Invalid node in pattern."
 
-resolveArgument :: Argument -> Gen Value
-resolveArgument arg = do
-    case arg of
-        RefArg ref            -> resolve ref
-        LitArg (LiteralInt i) -> constWord i
-        LitArg (LiteralString str) -> buildGlobalStringPtr str ""
-        NodeArg name _args    -> resolveNodeName name
+resolveLiteral :: Literal -> Gen Value
+resolveLiteral lit = do
+    case lit of
+        LiteralInt i      -> constWord i
+        LiteralString str -> buildGlobalStringPtr str ""
+        
 
 
 
@@ -513,8 +495,8 @@ _buildArrayAlloca :: LLVM.Type -> Value -> String -> Gen Value
 _buildArrayAlloca ty val name = withBuilder $ \bld ->
     liftIO $ LLVM.buildArrayAlloca bld ty val name
 
-buildArrayMalloc :: LLVM.Type -> Value -> String -> Gen Value
-buildArrayMalloc ty val name = withBuilder $ \bld ->
+_buildArrayMalloc :: LLVM.Type -> Value -> String -> Gen Value
+_buildArrayMalloc ty val name = withBuilder $ \bld ->
     liftIO $ LLVM.buildArrayMalloc bld ty val name
 
 buildStore :: Value -> Value -> Gen Value
@@ -533,6 +515,3 @@ buildGlobalStringPtr :: String -> String -> Gen Value
 buildGlobalStringPtr str name = withBuilder $ \bld ->
     liftIO $ LLVM.buildGlobalStringPtr bld str name
 
--- Sublime Text 2 does not like functions with 'module' in their name.
-mCreateWithName :: String -> IO LLVM.Module
-mCreateWithName = LLVM.moduleCreateWithName

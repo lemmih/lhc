@@ -76,12 +76,6 @@ data Literal
 	| LiteralString String
 	deriving (Show, Eq)
 
-data Argument
-	= RefArg Variable
-	| LitArg Literal
-	| NodeArg NodeName [Variable]
-	deriving (Show)
-
 data Expression
 	= Application Name [Variable]
 	| CCall String [Variable]
@@ -89,7 +83,7 @@ data Expression
 	-- Built-in
 	| Alloc Int
 	| Store NodeName [Variable]
-	| Write Variable Int Argument
+	| Write Variable Int Variable
 	| Address Variable Int
 
 	| Fetch Variable
@@ -101,7 +95,9 @@ data Expression
 	| WriteRegister String Variable
 	| ReadGlobal String
 	| WriteGlobal String Variable
-	| Unit Argument
+	| TypeCast Variable
+	| MkNode NodeName [Variable]
+	| Literal Literal
 
 	-- Eval/Apply
 	| Eval Variable

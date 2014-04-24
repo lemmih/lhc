@@ -589,14 +589,11 @@ hptExpression origin binds simple =
                 ptrs <- IntSet.toList <$> getPtrScope ptrRef
                 objects <- mapM getHeapObjects ptrs
                 setNodeScope node (mergeObjectList objects)
-        Unit arg | [bind] <- binds -> do
-            case arg of
-                -- All such simple renamings should have been removed
-                -- for performance reasons.
-                RefArg var -> hptCopyVariables var bind
-                LitArg{} -> return ()
-                NodeArg name vars ->
-                    setNodeScope bind $ singletonObject name vars
+        TypeCast var | [bind] <- binds ->
+            hptCopyVariables var bind
+        MkNode name vars | [bind] <- binds -> do
+            setNodeScope bind $ singletonObject name vars
+        Literal{} -> return ()
         Application fn vars -> do
             foreignRets <- getFunctionReturnRegisters fn
             foreignArgs <- getFunctionArgumentRegisters fn

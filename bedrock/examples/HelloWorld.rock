@@ -4,6 +4,6 @@ foreign i32 puts(i8*)
 entrypoint: main
 
 main()
-    #msg = @unit( "Hello world!" )
-    @ccall puts(#msg)
+    i8* msg = @literal "Hello world!"
+    @ccall puts(i8* msg)
     @exit

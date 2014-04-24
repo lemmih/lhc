@@ -116,7 +116,7 @@ cpsExpresion origin binds simple rest =
             pushNode $ NodeDefinition exhFrameName [FramePtr, Node]
             mkContinuation $ \continuationFrame ->
                 -- FIXME: continuationFrame needs to be stored.
-                Bind [exSusp] (Unit (NodeArg (FunctionName exh 2) exhArgs)) $
+                Bind [exSusp] (MkNode (FunctionName exh 2) exhArgs) $
                 Bind [exceptionFrame]
                     (Store (ConstructorName exhFrameName)
                         [ continuationFrame

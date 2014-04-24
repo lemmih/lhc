@@ -123,11 +123,13 @@ transformExpresion origin binds simple rest =
             let size = 1 + length args
             hp <- newVariable "hp" NodePtr
             hp' <- newVariable "hp'" NodePtr
+            tmp <- newVariable "tmp" Node
             return $
                 Bind [hp] (ReadRegister "hp") $
-                Bind [bind] (Unit (RefArg hp)) $
-                Bind [] (Write hp 0 (NodeArg nodeName [])) $
-                foldr (\(nth, arg) -> Bind [] (Write hp nth (RefArg arg)))
+                Bind [bind] (TypeCast hp) $
+                Bind [tmp] (MkNode nodeName []) $
+                Bind [] (Write hp 0 tmp) $
+                foldr (\(nth, arg) -> Bind [] (Write hp nth arg))
                     (Bind [hp'] (Address hp size) $
                      Bind [] (WriteRegister "hp" hp') rest) 
                     (zip [1..] args)
@@ -145,7 +147,7 @@ transformExpresion origin binds simple rest =
                         NodePtr   -> GCMark var
                         Node{}    -> GCMarkNode var
                         -- Application gcMarkNodeName [var]
-                        Primitive{}-> Unit (RefArg var)
+                        Primitive{}-> TypeCast var
                         -- This shouldn't really happen
                         StaticNode{} -> GCMarkNode var
                         FramePtr  -> GCMark var
