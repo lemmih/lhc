@@ -53,8 +53,14 @@ runGC m action =
 --GCMark -> call
 --GCMarkNode -> ?
 
-lowerGC :: Module -> StorageManager -> Module
-lowerGC m sm = m{ functions = loweredFunctions ++ newFunctions }
+lowerGC :: GC StorageManager -> Module -> Module
+lowerGC smGen m =
+    lowerGC' sm m'
+  where
+    (sm, m') = runGC m smGen
+
+lowerGC' :: StorageManager -> Module -> Module
+lowerGC' sm m = m{ functions = loweredFunctions ++ newFunctions }
   where
     loweredFunctions = mapM (lowerFunction (entryPoint m)) (functions m) sm
     newFunctions = map ($sm) [smInit, smBegin, smEnd, smMark]

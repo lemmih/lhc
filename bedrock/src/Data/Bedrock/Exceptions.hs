@@ -1,7 +1,6 @@
 module Data.Bedrock.Exceptions
     ( runGen
     , cpsTransformation
-    , loadFile
     , stdContinuation
     , isCatchFrame
     ) where
@@ -11,11 +10,8 @@ import           Control.Monad.State
 import           Data.List                     ((\\))
 import qualified Data.Set                      as Set
 import qualified Data.Map as Map
-import           Text.ParserCombinators.Parsec (parseFromFile)
 
 import           Data.Bedrock
-import           Data.Bedrock.Parse
-import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.Transform
 
 
@@ -162,9 +158,3 @@ cpsAlternative origin (Alternative pattern expr) =
 stdContinuation :: Variable
 stdContinuation = Variable (Name [] "cont" 0) FramePtr
 
-loadFile :: FilePath -> IO ()
-loadFile path = do
-    ret <- parseFromFile parseModule path
-    case ret of
-        Left err -> print err
-        Right m  -> print (ppModule $ runGen m $ cpsTransformation)

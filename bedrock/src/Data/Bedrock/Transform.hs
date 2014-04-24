@@ -1,7 +1,6 @@
 module Data.Bedrock.Transform where
 
 import           Control.Monad.State
-import           Data.List           (foldl')
 import           Data.Map            (Map)
 import qualified Data.Map            as Map
 import           Data.Set            (Set)
@@ -67,8 +66,8 @@ tagVariable tag var = do
 --        Just fn -> return fn
 --        Nothing -> error $ "Missing function: " ++ show name
 
-runGen :: Module -> Gen a -> Module
-runGen initModule gen =
+runGen :: Gen a -> Module -> Module
+runGen gen initModule =
     envModule (execState gen m)
   where
     m = Env
@@ -77,10 +76,6 @@ runGen initModule gen =
         , envFunctions = Map.fromList
             [ (fnName fn, fn) | fn <- functions initModule]
         }
-
-runGens :: Module -> [Gen ()] -> Module
-runGens = foldl' runGen
-
 
 --usedNodes :: Expression -> Set NodeName
 --usedNodes = flip usedNodes' Set.empty
@@ -171,5 +166,4 @@ freeVariablesSimple simple =
         GCEnd{} -> id
         GCMark var -> Set.insert var
         GCMarkNode var -> Set.insert var
-        -- _ -> error $ "freeVariablesSimple: " ++ show simple
 
