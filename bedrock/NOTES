@@ -115,6 +115,12 @@ Stepping in generational garbage collectors:
   Each object notes down how many times it has survived a collection. Once it
   has survived enough, it'll be promoted.
 
+Exceptions: One shadow stack vs. two shadow stacks:
+  One shadow stack:
+    Fewer registers used.
+    More expensive throws.
+    Returning across a catch frame doesn't change.
+
 Targeting LLVM for a functional language:
   We need low-overhead allocation, tail calls, accurate GC, green threads, and
   exception handling. LLVM tries to provide support for garbage collection and
