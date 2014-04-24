@@ -82,5 +82,5 @@ main = runChoice (noCommand, defTI{ termName = "bedrock"}) commands
     commands =
         [ (parseTerm, parseInfo)
         , (runTerm, runInfo)
-        , (compileTerm, lowerInfo) ]
+        , (compileTerm, compileInfo) ]
 
