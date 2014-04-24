@@ -1,37 +1,41 @@
+foreign i32 puts(i8*)
+
 node Nothing
 node Just *
 node True
 node False
 node Int #
 
-main =
-    %tmp1 := @unit( (True) );
-    %v1 := nothingOrJust( %tmp1 );
-    @print %v1;
+entrypoint: main
 
-    %tmp2 := @unit( (True) );
-    %v2 := nothingOrJust( %tmp2 );
-    @print %v2;
+main()
+    i8* msg = @literal "NodeGC test - Compile with the tracing GC \
+                       \to see an effect"
+    @ccall puts(i8* msg)
 
-    %s := sum( %v1, %v2 );
-    @print %s;
+    %tmp1 = @node( True )
+    %v1 = nothingOrJust( %tmp1 )
+
+    %tmp2 = @node( True )
+    %v2 = nothingOrJust( %tmp2 )
+
+    %s = sum( %v1, %v2 )
 
     @exit
 
-% nothingOrJust %boolean =
+% nothingOrJust(%boolean)
     case %boolean of
         True ->
-            @alloc 2;
-            #tmp3 := @unit( 0 );
-            *heapObj := @store (Int #tmp3);
-            %tmp4 := @unit( (Just *heapObj) );
+            #tmp3 = @literal 0
+            *heapObj = @store (Int #tmp3)
+            %tmp4 = @node( Just *heapObj )
             @return( %tmp4 )
-        | False ->
-            %tmp5 := @unit( (Nothing) );
+        False ->
+            %tmp5 = @node( Nothing )
             @return( %tmp5 )
 
-% sum %mbA %mbB  =
-    %nothing := @unit( (Nothing) );
+% sum(%mbA, %mbB)
+    %nothing = @node( Nothing )
     case %mbA of
         Nothing ->
             @return( %nothing )
@@ -40,14 +44,13 @@ main =
                 Nothing ->
                     @return( %nothing )
                 | Just *ptrB ->
-                    %nodeA := @fetch *ptrA;
-                    %nodeB := @fetch *ptrB;
+                    %nodeA := @fetch *ptrA
+                    %nodeB := @fetch *ptrB
                     case %nodeA of
                         Int #lhs ->
                             case %nodeB of
                                 Int #rhs ->
-                                    #s := @add #lhs #rhs;
-                                    @alloc 2;
-                                    *hp := @store (Int #s);
-                                    %ret := @unit( (Just *hp) );
+                                    #s := @add #lhs #rhs
+                                    *hp := @store (Int #s)
+                                    %ret := @unit( Just *hp )
                                     @return( %ret )
