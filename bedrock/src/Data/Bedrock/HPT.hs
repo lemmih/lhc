@@ -41,6 +41,7 @@ import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.Rename
 import           Data.Bedrock.Exceptions (isCatchFrame)
 
+import Data.Bedrock.PrettyPrint ()
 
 data HPTResult = HPTResult
     { hptFnArgs    :: FnArgs
@@ -402,19 +403,18 @@ hptCopyVariables src dst | variableIndex src == variableIndex dst =
 hptCopyVariables src dst =
     case variableType src of
         Primitive{} -> return ()
-        NodePtr -> do
-            eachIteration $ do
-                ptrs <- getPtrScope src
-                setPtrScope dst ptrs
-        FramePtr -> do
-            eachIteration $ do
-                ptrs <- getPtrScope src
-                setPtrScope dst ptrs
-        Node -> do
-            eachIteration $ do
-                objects <- getNodeScope src
-                setNodeScope dst objects
-        StaticNode{} -> return ()
+        NodePtr -> eachIteration $ do
+            ptrs <- getPtrScope src
+            setPtrScope dst ptrs
+        FramePtr -> eachIteration $ do
+            ptrs <- getPtrScope src
+            setPtrScope dst ptrs
+        Node -> eachIteration $ do
+            objects <- getNodeScope src
+            setNodeScope dst objects
+        StaticNode{} -> eachIteration $ do
+            objects <- getNodeScope src
+            setNodeScope dst objects
 
 extract :: Objects -> NodeName -> Int -> NameSet
 extract objs name nth =
@@ -591,8 +591,15 @@ hptExpression origin binds simple =
                 setNodeScope node (mergeObjectList objects)
         TypeCast var | [bind] <- binds ->
             hptCopyVariables var bind
-        MkNode name vars | [bind] <- binds -> do
-            setNodeScope bind $ singletonObject name vars
+        MkNode node vars | [bind] <- binds -> do
+            setNodeScope bind $ singletonObject node vars
+            case node of
+                FunctionName fn _ -> do
+                    args <- getFunctionArgumentRegisters fn
+                    forM_ (zip vars args) $ uncurry hptCopyVariables
+                ConstructorName name -> do
+                    args <- getNodeArgumentRegisters name
+                    forM_ (zip vars args) $ uncurry hptCopyVariables
         Literal{} -> return ()
         Application fn vars -> do
             foreignRets <- getFunctionReturnRegisters fn

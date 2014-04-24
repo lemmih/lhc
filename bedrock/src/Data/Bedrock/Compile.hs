@@ -64,7 +64,7 @@ compileFromFile path = do
             writeRocks n withGCCode "with-gc-code"
             writeRocks n noGC "no-gc"
             writeRocks n noGlobalRegs "no-globals"
-            print (ppModule noGlobalRegs)
+            --print (ppModule noGlobalRegs)
             --print (ppModule m5)
             --print (ppModule m6)
             --evaluate m4
