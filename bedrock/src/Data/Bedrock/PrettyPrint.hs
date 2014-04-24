@@ -1,7 +1,8 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Data.Bedrock.PrettyPrint where
 
 import           Text.PrettyPrint.ANSI.Leijen (Doc, char, int, text, (<+>),
-                                               (<>))
+                                               (<>), Pretty(..))
 import qualified Text.PrettyPrint.ANSI.Leijen as Doc
 
 import           Data.Bedrock
@@ -9,42 +10,35 @@ import           Data.Bedrock
 -------------------------------------------------------------------------------
 -- Pretty print
 
-ppName :: Name -> Doc
-ppName name =
-	if nameUnique name == 0
-		then text (nameIdentifier name)
-		else text (nameIdentifier name) <> char '^' <> int (nameUnique name)
+instance Pretty Name where
+	pretty name =
+		if nameUnique name == 0
+			then text (nameIdentifier name)
+			else text (nameIdentifier name) <> char '^' <> int (nameUnique name)
 
-ppType :: Type -> Doc
-ppType NodePtr        = Doc.char '*'
-ppType Node           = Doc.char '%'
-ppType (StaticNode n) = Doc.char '%' <> Doc.int n <> Doc.char '%'
-ppType (Primitive IWord) = Doc.char '#'
-ppType (Primitive ty) = ppCType ty
-ppType FramePtr       = Doc.red (Doc.char '*')
+instance Pretty Type where
+	pretty NodePtr        = Doc.char '*'
+	pretty Node           = Doc.char '%'
+	pretty (StaticNode n) = Doc.char '%' <> Doc.int n <> Doc.char '%'
+	pretty (Primitive IWord) = Doc.char '#'
+	pretty (Primitive ty) = pretty ty
+	pretty FramePtr       = Doc.red (Doc.char '*')
 
-ppCType :: CType -> Doc
-ppCType I8 = text "i8"
-ppCType I32 = text "i32"
-ppCType I64 = text "i64"
-ppCType IWord = text "word"
-ppCType (CPointer ty) = ppCType ty <> Doc.char '*'
-ppCType CVoid = text "void"
+instance Pretty CType where
+	pretty I8 = text "i8"
+	pretty I32 = text "i32"
+	pretty I64 = text "i64"
+	pretty IWord = text "word"
+	pretty (CPointer ty) = pretty ty <> Doc.char '*'
+	pretty CVoid = text "void"
 
-ppNodeDefinition :: NodeDefinition -> Doc
-ppNodeDefinition (NodeDefinition name args) =
-	text "node" <+> ppNode (ConstructorName name) (map ppType args)
+instance Pretty NodeDefinition where
+	pretty (NodeDefinition name args) =
+		text "node" <+> ppNode (ConstructorName name) (map pretty args)
 
-ppVariable :: Variable -> Doc
-ppVariable Variable{ variableName = name, variableType = ty } =
-	ppType ty <> ppName name
-
---ppArgument :: Argument -> Doc
---ppArgument arg =
---	case arg of
---		RefArg name       -> ppVariable name
---		LitArg lit        -> ppLiteral lit
---		NodeArg name args -> ppNode name (map ppVariable args)
+instance Pretty Variable where
+	pretty Variable{ variableName = name, variableType = ty } =
+		pretty ty <> pretty name
 
 ppLiteral :: Literal -> Doc
 ppLiteral literal =
@@ -54,16 +48,16 @@ ppLiteral literal =
 
 ppNode :: NodeName -> [Doc] -> Doc
 ppNode (ConstructorName constructor) args =
-	Doc.hsep (Doc.magenta (ppName constructor) : args)
+	Doc.hsep (Doc.magenta (pretty constructor) : args)
 ppNode (FunctionName fn blanks) args =
-	Doc.hsep (Doc.magenta (ppName fn) : args ++ replicate blanks (Doc.char '_'))
+	Doc.hsep (Doc.magenta (pretty fn) : args ++ replicate blanks (Doc.char '_'))
 --ppNode (CatchFrame fn blanks) args =
 --	Doc.hsep (Doc.green (ppName fn) : args ++ replicate blanks (Doc.char '_'))
 
 ppPattern :: Pattern -> Doc
 ppPattern pattern =
 	case pattern of
-		NodePat name binds -> ppNode name (map ppVariable binds)
+		NodePat name binds -> ppNode name (map pretty binds)
 		LitPat lit         -> ppLiteral lit
 
 ppList :: [Doc] -> Doc
@@ -81,45 +75,45 @@ ppExpression simple =
 			ppSyntax "@alloc" <+> Doc.int n
 		Store node args ->
 			ppSyntax "@store" <+>
-			Doc.parens (ppNode node (map ppVariable args))
+			Doc.parens (ppNode node (map pretty args))
 		Write ptr idx var ->
 			ppSyntax "@write" <+>
-			ppVariable ptr <> Doc.brackets (Doc.int idx) <+> ppVariable var
+			pretty ptr <> Doc.brackets (Doc.int idx) <+> pretty var
 		Address ptr idx ->
-			ppSyntax "&" <> ppVariable ptr <> Doc.brackets (Doc.int idx)
+			ppSyntax "&" <> pretty ptr <> Doc.brackets (Doc.int idx)
 		Fetch ptr ->
-			ppSyntax "@fetch" <+> ppVariable ptr
+			ppSyntax "@fetch" <+> pretty ptr
 		Load ptr nth ->
-			ppSyntax "@load" <+> ppVariable ptr <> Doc.brackets (Doc.int nth)
+			ppSyntax "@load" <+> pretty ptr <> Doc.brackets (Doc.int nth)
 		Add lhs rhs ->
-			ppSyntax "@add" <+> ppVariable lhs <+> ppVariable rhs
+			ppSyntax "@add" <+> pretty lhs <+> pretty rhs
 		Application fn args ->
-			ppName fn <> Doc.parens (ppList $ map ppVariable args)
+			pretty fn <> Doc.parens (ppList $ map pretty args)
 		CCall fn args ->
 			ppSyntax "@ccall" <+>
-			text fn <> Doc.parens (ppList $ map ppVariable args)
+			text fn <> Doc.parens (ppList $ map pretty args)
 		Catch exh exhArgs fn args ->
 			ppSyntax "@catch" <+>
-			ppName exh <> Doc.parens (ppList $ map ppVariable exhArgs) <+>
-			ppName fn <> Doc.parens (ppList $ map ppVariable args)
+			pretty exh <> Doc.parens (ppList $ map pretty exhArgs) <+>
+			pretty fn <> Doc.parens (ppList $ map pretty args)
 		TypeCast var ->
-			ppSyntax "@cast" <> Doc.parens (ppVariable var)
+			ppSyntax "@cast" <> Doc.parens (pretty var)
 		MkNode name vars ->
-			ppSyntax "@node" <> Doc.parens (ppNode name (map ppVariable vars))
+			ppSyntax "@node" <> Doc.parens (ppNode name (map pretty vars))
 		Literal lit ->
 			ppSyntax "@literal" <+> ppLiteral lit
 		Eval var ->
-			ppSyntax "@eval" <+> ppVariable var
+			ppSyntax "@eval" <+> pretty var
 		Apply a b ->
-			ppSyntax "@apply" <+> ppVariable a <+> ppVariable b
+			ppSyntax "@apply" <+> pretty a <+> pretty b
 		ReadRegister reg ->
 			ppSyntax "@register" <+> text reg
 		WriteRegister reg var ->
-			ppSyntax "@register" <+> text reg <+> Doc.equals <+> ppVariable var
+			ppSyntax "@register" <+> text reg <+> Doc.equals <+> pretty var
 		ReadGlobal reg ->
 			ppSyntax "@global" <+> text reg
 		WriteGlobal reg var ->
-			ppSyntax "@global" <+> text reg <+> Doc.equals <+> ppVariable var
+			ppSyntax "@global" <+> text reg <+> Doc.equals <+> pretty var
 		GCAllocate n ->
 			ppSyntax "@gc_allocate" <+> Doc.int n
 		GCBegin ->
@@ -127,38 +121,38 @@ ppExpression simple =
 		GCEnd ->
 			ppSyntax "@gc_end"
 		GCMark var ->
-			ppSyntax "@gc_mark" <+> ppVariable var
+			ppSyntax "@gc_mark" <+> pretty var
 		GCMarkNode var ->
-			ppSyntax "@gc_mark_node" <+> ppVariable var
+			ppSyntax "@gc_mark_node" <+> pretty var
 
 ppBlock :: Block -> Doc
 ppBlock block =
 	case block of
 		Return args ->
 			ppSyntax "@return" <+>
-			ppList (map ppVariable args)
+			ppList (map pretty args)
 		Bind [] simple rest ->
 			ppExpression simple Doc.<$$>
 			ppBlock rest
 		Bind names simple rest ->
-			ppList (map ppVariable names) <+>
+			ppList (map pretty names) <+>
 			text "=" <+>
 			ppExpression simple Doc.<$$>
 			ppBlock rest
 		Case scrut _defaultBranch alts ->
-			ppSyntax "case" <+> ppVariable scrut <+> ppSyntax "of" Doc.<$$>
+			ppSyntax "case" <+> pretty scrut <+> ppSyntax "of" Doc.<$$>
 			Doc.indent 2 (Doc.vsep $ map ppAlternative alts)
 		Raise obj ->
-			ppSyntax "@raise" <+> ppVariable obj
+			ppSyntax "@raise" <+> pretty obj
 		TailCall fn args ->
 			ppSyntax "@tail" <+>
-			ppName fn <> Doc.parens (ppList (map ppVariable args))
+			pretty fn <> Doc.parens (ppList (map pretty args))
 		Invoke cont args ->
 			ppSyntax "@invoke" <>
-			Doc.parens (ppList (ppVariable cont : map ppVariable args))
+			Doc.parens (ppList (pretty cont : map pretty args))
 		InvokeHandler cont exception ->
 			ppSyntax "@invokeHandler" <>
-			Doc.parens (ppList $ map ppVariable [cont, exception])
+			Doc.parens (ppList $ map pretty [cont, exception])
 		Exit ->
 			ppSyntax "@exit"
 		Panic msg ->
@@ -168,25 +162,25 @@ ppSyntax :: String -> Doc
 ppSyntax = Doc.green . text
 
 ppFnName :: Name -> Doc
-ppFnName = Doc.blue . ppName
+ppFnName = Doc.blue . pretty
 
 ppTypes :: [Type] -> Doc
 ppTypes [] = text "void"
-ppTypes lst = Doc.hsep $ map ppType lst
+ppTypes lst = Doc.hsep $ map pretty lst
 
 ppFunction :: Function -> Doc
 ppFunction fn =
 	ppTypes (fnResults fn) <+>
-	ppFnName (fnName fn) <+> Doc.hsep (map ppVariable (fnArguments fn)) <+>
+	ppFnName (fnName fn) <+> Doc.hsep (map pretty (fnArguments fn)) <+>
 	Doc.char '=' Doc.<$$>
 	Doc.indent 2 (ppBlock (fnBody fn))
 
 ppEntryPoint :: Name -> Doc
-ppEntryPoint entry = text "entrypoint:" <+> ppName entry
+ppEntryPoint entry = text "entrypoint:" <+> pretty entry
 
 ppModule :: Module -> Doc
 ppModule m =
-	Doc.vsep (map ppNodeDefinition (nodes m)) Doc.<$$>
+	Doc.vsep (map pretty (nodes m)) Doc.<$$>
 	ppEntryPoint (entryPoint m) Doc.<$$>
 	Doc.vsep (map ppFunction (functions m))
 
