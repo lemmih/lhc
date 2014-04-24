@@ -47,4 +47,5 @@ library
 executable bedrock
   main-is:             cli/Main.hs
 
-  build-depends:       base ==4.*, cmdtheline, bedrock
+  build-depends:       base ==4.*, cmdtheline, bedrock,
+                       process, filepath

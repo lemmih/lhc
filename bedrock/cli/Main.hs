@@ -2,6 +2,8 @@ module Main (main) where
 
 import Control.Applicative
 import System.Console.CmdTheLine
+import System.FilePath
+import System.Process
 
 import Data.Bedrock.Compile
 
@@ -23,12 +25,26 @@ parseInfo = defTI
     , termDoc = "Parse and pretty-print bedrock source files." }
 
 
-doRun :: [FilePath] -> IO ()
-doRun ~[path] = do
-    compileFromFile path
+
+keepIntermediateFiles :: Term KeepIntermediateFiles
+keepIntermediateFiles = value . flag $
+    (optInfo ["keep-intermediate-files","k"])
+    { optDoc = "Keep interdiate files" }
+
+verbose :: Term Verbose
+verbose = value . flag $
+    (optInfo ["verbose", "v"])
+    { optDoc = "Verbose" }
+
+doRun :: KeepIntermediateFiles -> Verbose -> [FilePath] -> IO ()
+doRun keepIntermediateFiles verbose ~[path] = do
+    compileFromFileWithOpts keepIntermediateFiles verbose path
+    pid <- spawnProcess "lli" [replaceExtension path "bc"]
+    waitForProcess pid
+    return ()
 
 runTerm :: Term (IO ())
-runTerm = doRun <$> inputFiles
+runTerm = doRun <$> keepIntermediateFiles <*> verbose <*> inputFiles
   where
     inputFiles = filesExist $ nonEmpty $ posAny [] posInfo
         { posName = "INPUT"
@@ -40,16 +56,23 @@ runInfo = defTI
     , termDoc  = "Compile and run bedrock program." }
 
 
-doLower :: IO ()
-doLower = return ()
 
-lowerTerm :: Term (IO ())
-lowerTerm = pure doLower
 
-lowerInfo :: TermInfo
-lowerInfo = defTI
-    { termName = "lower"
-    , termDoc  = "Remove eval/apply, catch/throw, alloc." }
+doCompile :: KeepIntermediateFiles -> Verbose -> [FilePath] -> IO ()
+doCompile keepIntermediateFiles verbose ~[path] = do
+    compileFromFileWithOpts keepIntermediateFiles verbose path
+    
+
+compileTerm :: Term (IO ())
+compileTerm = doCompile <$> keepIntermediateFiles <*> verbose <*> inputFiles
+  where
+    inputFiles = filesExist $ nonEmpty $ posAny [] posInfo
+        { posName = "INPUT"
+        , posDoc  = "Bedrock program files."}
+compileInfo :: TermInfo
+compileInfo = defTI
+    { termName = "compile"
+    , termDoc  = "Compile .rock -> .bc" }
 
 
 main :: IO ()
@@ -59,5 +82,5 @@ main = runChoice (noCommand, defTI{ termName = "bedrock"}) commands
     commands =
         [ (parseTerm, parseInfo)
         , (runTerm, runInfo)
-        , (lowerTerm, lowerInfo) ]
+        , (compileTerm, compileInfo) ]
 
