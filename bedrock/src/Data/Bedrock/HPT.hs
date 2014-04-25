@@ -5,7 +5,8 @@ module Data.Bedrock.HPT
     ( runHPT
     , HPTResult(..)
     , NameSet
-    , HeapPtrSet
+    , HeapLocationSet(..)
+    , heapLocationSetUnions
     , Objects
     , setVariableSize
     , sizeOfVariable
@@ -16,11 +17,11 @@ module Data.Bedrock.HPT
     , ppHPTResult
     ) where
 
-import           Control.Applicative          ((<$>), Applicative)
-import           Control.Monad.Reader hiding ( liftIO )
+import           Control.Applicative          (Applicative, (<$>))
+import           Control.Monad.Reader         hiding (liftIO)
 import           Control.Monad.ST
 import           Control.Monad.ST.Unsafe
-import           Control.Monad.Writer hiding ( liftIO )
+import           Control.Monad.Writer         hiding (liftIO)
 import           Data.IntSet                  (IntSet)
 import qualified Data.IntSet                  as IntSet
 import           Data.List
@@ -29,28 +30,30 @@ import qualified Data.Map                     as Map
 import           Data.STRef
 import           Data.Vector                  (Vector)
 import qualified Data.Vector                  as Vector
-import           Data.Vector.Mutable          (IOVector, MVector)
+import           Data.Vector.Mutable          (MVector)
 import qualified Data.Vector.Mutable          as MVector
 import qualified Text.PrettyPrint.ANSI.Leijen as Doc
 import           Text.Printf
 
 
 import           Data.Bedrock
+import           Data.Bedrock.Exceptions      (isCatchFrame)
 import           Data.Bedrock.Misc
 import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.Rename
-import           Data.Bedrock.Exceptions (isCatchFrame)
 
-import Data.Bedrock.PrettyPrint ()
+import           Data.Bedrock.PrettyPrint     ()
 
 data HPTResult = HPTResult
-    { hptFnArgs    :: FnArgs
-    , hptFnRets    :: FnRets
-    , hptNodeArgs  :: NodeArgs
-    , hptPtrScope  :: Vector HeapPtrSet
-    , hptNodeScope :: Vector Objects
-    , hptHeap      :: Vector Objects
-    }
+    { hptFnArgs              :: FnArgs
+    , hptFnRets              :: FnRets
+    , hptNodeArgs            :: NodeArgs
+    , hptPtrScope            :: Vector HeapLocationSet
+    , hptNodeScope           :: Vector Objects
+    , hptHeap                :: Vector Objects
+    , hptSharedVariables     :: Vector Bool
+    , hptSharedHeapLocations :: Vector Bool
+    } deriving (Eq)
 
 
 
@@ -62,9 +65,9 @@ data HPTState s = HPTState
     , envPtrScope            :: PtrScope s
     , envNodeScope           :: NodeScope s
     , envHeap                :: Heap s
-    , envSharedVariables     :: PtrSharingMap
-    , envSharedHeapLocations :: HeapSharingMap
-    , envFreeHeapPtr         :: STRef s HeapPtr
+    , envSharedVariables     :: PtrSharingMap s
+    , envSharedHeapLocations :: HeapSharingMap s
+    , envFreeHeapLocation    :: STRef s HeapLocation
     }
 newtype HPT s a = HPT
     { unHPT :: WriterT (Endo (HPT s ())) (ReaderT (HPTState s) (ST s)) a }
@@ -72,9 +75,10 @@ newtype HPT s a = HPT
         ( Functor, Monad, Applicative
         , MonadWriter (Endo (HPT s ())), MonadReader (HPTState s) )
 
-type HeapPtr = Int
+type HeapLocation = Int
 -- Use newtypes?
-type HeapPtrSet = IntSet
+newtype HeapLocationSet = HeapLocationSet { unHeapLocationSet :: IntSet }
+    deriving (Eq, Show)
 type NameSet = IntSet
 
 -- Indexes for function argument an return variables.
@@ -89,20 +93,16 @@ type NodeArgs = Map Name [Variable]
 -- Variables are shared if they're used more than once.
 -- Heap locations are shared if referred to by a shared variable or
 -- if they are updated into a shared heap location.
-type PtrSharingMap = IOVector Bool
--- Set Name
-type HeapSharingMap = IOVector Bool
--- Set HeapPtr
+type PtrSharingMap s = MVector s Bool
+type HeapSharingMap s = MVector s Bool
 
 type Objects = Map NodeName (Vector NameSet)
-type PtrScope s = MVector s HeapPtrSet
+type PtrScope s = MVector s HeapLocationSet
 type NodeScope s = MVector s Objects
 type Heap s = MVector s Objects
 
 --type DirtyScope = MVector Bool
 --type DirtyHeap  = MVector Bool
-
-
 
 
 
@@ -119,10 +119,17 @@ runHPT mOrigin = runST (do
         nPointers = nsNextPointerId ns
         nNodes = nsNextNodeId ns
     heapVector <- MVector.replicate nStores Map.empty
-    heapPtr <- newSTRef 0
+    heapLoc <- newSTRef 0
 
-    ptrScope <- MVector.replicate nPointers IntSet.empty
+    ptrScope <- MVector.replicate nPointers (HeapLocationSet IntSet.empty)
     nodeScope <- MVector.replicate nNodes Map.empty
+    sharedVariables <- MVector.replicate nPointers False
+    sharedHeapLocations <- MVector.replicate nStores False
+    let shared =
+            [ var | (var, n) <- Map.toList (analyseUsage m)
+            , n > 1, isPointerType (variableType var) ]
+    forM_ shared $ \var ->
+        MVector.write sharedVariables (variableIndex var) True
     let env = HPTState
             { envFnArgs = fnArgs
             , envFnRets = fnRets
@@ -131,47 +138,68 @@ runHPT mOrigin = runST (do
             , envPtrScope = ptrScope
             , envNodeScope = nodeScope
             , envHeap = heapVector
-            , envSharedVariables = error "shared vars"
-            , envSharedHeapLocations = error "shared heaps"
-            , envFreeHeapPtr = heapPtr }
+            , envSharedVariables = sharedVariables
+            , envSharedHeapLocations = sharedHeapLocations
+            , envFreeHeapLocation = heapLoc }
         hpt = hptModule m
     iterEndo <- runReaderT (execWriterT (unHPT hpt)) env
     initHeap <- Vector.freeze (envHeap env)
     initPtrScope <- Vector.freeze (envPtrScope env)
     initNodeScope <- Vector.freeze (envNodeScope env)
+    initSharedVars <- Vector.freeze (envSharedVariables env)
+    initSharedHeap <- Vector.freeze (envSharedHeapLocations env)
     let iter = appEndo iterEndo (return ())
-    runHPTLoop initHeap initPtrScope initNodeScope env iter)
+        hptResults = HPTResult
+                { hptFnArgs = fnArgs
+                , hptFnRets = fnRets
+                , hptNodeArgs = nodeArgs
+                , hptPtrScope = initPtrScope
+                , hptNodeScope = initNodeScope
+                , hptHeap = initHeap
+                , hptSharedVariables = initSharedVars
+                , hptSharedHeapLocations = initSharedHeap }
+    runHPTLoop hptResults env iter)
 
-runHPTLoop :: Vector Objects -> Vector HeapPtrSet -> Vector Objects
-           -> HPTState s -> HPT s () -> ST s HPTResult
-runHPTLoop oldHeap oldPtrScope oldNodeScope env iter = do
-    -- putStrLn "Iteration..."
+runHPTLoop :: HPTResult -> HPTState s -> HPT s () -> ST s HPTResult
+runHPTLoop oldResult env iter = do
     _ <- runReaderT (execWriterT (unHPT iter)) env
     newHeap <- Vector.freeze (envHeap env)
     newPtrScope <- Vector.freeze (envPtrScope env)
     newNodeScope <- Vector.freeze (envNodeScope env)
-    if oldHeap == newHeap && oldPtrScope == newPtrScope &&
-       oldNodeScope == newNodeScope
-        then do
-            -- ppEnv newHeap newScope
-            return HPTResult
+    newSharedVars <- Vector.freeze (envSharedVariables env)
+    newSharedHeap <- Vector.freeze (envSharedHeapLocations env)
+    let newResult = HPTResult
                 { hptFnArgs = envFnArgs env
                 , hptFnRets = envFnRets env
                 , hptNodeArgs = envNodeArgs env
                 , hptPtrScope = newPtrScope
                 , hptNodeScope = newNodeScope
-                , hptHeap = newHeap }
-        else runHPTLoop newHeap newPtrScope newNodeScope env iter
+                , hptHeap = newHeap
+                , hptSharedVariables = newSharedVars
+                , hptSharedHeapLocations = newSharedHeap }
+    -- XXX: Comparing the entire oldResult against the newResult is
+    -- a bit silly.
+    if oldResult == newResult
+        then return newResult
+        else runHPTLoop newResult env iter
 
 ppHPTResult :: HPTResult -> IO ()
 ppHPTResult hpt = do
     forM_ (zip [0..] (Vector.toList heap)) $ \(hp, hpValue) ->
-        printf "HP[%d]: %s\n" (hp::Int) (ppObjects hpValue)
-    forM_ (zip [0..] (Vector.toList ptrScope)) $ \(idx, ptrs) ->
-        printf "*%d: %s\n" (idx::Int) (show $ IntSet.toList ptrs)
+        printf "HP[%d]: %s %s\n" (hp::Int) (ppObjects hpValue) (isSharedHP hp)
+    forM_ (zip [0..] (Vector.toList ptrScope)) $ \(idx, HeapLocationSet ptrs) ->
+        printf "*%d: %s %s\n" (idx::Int) (show $ IntSet.toList ptrs) (isSharedVar idx)
     forM_ (zip [0..] (Vector.toList nodeScope)) $ \(idx, objs) ->
         printf "%%%d: %s\n" (idx::Int) (ppObjects objs)
   where
+    isSharedHP hp =
+        if hptSharedHeapLocations hpt Vector.! hp
+            then "(shared)"
+            else ""
+    isSharedVar var =
+        if hptSharedVariables hpt Vector.! var
+            then "(shared)"
+            else ""
     heap = hptHeap hpt
     ptrScope = hptPtrScope hpt
     nodeScope = hptNodeScope hpt
@@ -202,7 +230,7 @@ mkFnRaise free m = worker free [] (functions m)
     worker n acc [] = (Map.fromList acc, n)
     worker n acc (fn:fns) =
         let (idNum, n') = newIDByType n Node
-            elt = (fnName fn, Variable (Name [] "raise" idNum) Node) 
+            elt = (fnName fn, Variable (Name [] "raise" idNum) Node)
         in worker n' (elt : acc) fns
 
 mkNodeArgs :: AvailableNamespace -> Module -> (NodeArgs, AvailableNamespace)
@@ -300,6 +328,36 @@ getNodeArgumentRegisters name = do
         Nothing -> error "Node argument not defined"
         Just names -> return names
 
+isVariableShared :: Variable -> HPT s Bool
+isVariableShared = isVariableShared' . variableIndex
+
+isVariableShared' :: Int -> HPT s Bool
+isVariableShared' index = do
+    vector <- asks envSharedVariables
+    liftST $ MVector.read vector index
+
+markVariableShared :: Variable -> HPT s ()
+markVariableShared = markVariableShared' . variableIndex
+
+markVariableShared' :: Int -> HPT s ()
+markVariableShared' index = do
+    vector <- asks envSharedVariables
+    liftST $ MVector.write vector index True
+
+_isHeapLocationShared :: HeapLocation -> HPT s Bool
+_isHeapLocationShared hpLocation = do
+    vector <- asks envSharedHeapLocations
+    liftST $ MVector.read vector hpLocation
+
+markHeapLocationShared :: HeapLocation -> HPT s ()
+markHeapLocationShared hpLocation = do
+    vector <- asks envSharedHeapLocations
+    liftST $ MVector.write vector hpLocation True
+
+markHeapLocationSetShared :: HeapLocationSet -> HPT s ()
+markHeapLocationSetShared (HeapLocationSet hpSet) =
+    forM_ (IntSet.toList hpSet) $ markHeapLocationShared
+
 singletonObject :: NodeName -> [Variable] -> Objects
 singletonObject name vars =
     Map.singleton
@@ -325,9 +383,9 @@ liftST action = HPT $ WriterT $ ReaderT $ \_ -> do
     ret <- action
     return (ret, mempty)
 
-newHeapPtr :: HPT s HeapPtr
-newHeapPtr = do
-    hpRef <- asks envFreeHeapPtr
+newHeapLocation :: HPT s HeapLocation
+newHeapLocation = do
+    hpRef <- asks envFreeHeapLocation
     hp <- liftST $ readSTRef hpRef
     liftST $ modifySTRef hpRef succ
     return hp
@@ -340,25 +398,29 @@ getNodeScope' index = do
     scope <- asks envNodeScope
     liftST $ MVector.read scope index
 
-getPtrScope :: Variable -> HPT s HeapPtrSet
+getPtrScope :: Variable -> HPT s HeapLocationSet
 getPtrScope = getPtrScope' . variableIndex
 
-getPtrScope' :: Int -> HPT s HeapPtrSet
+getPtrScope' :: Int -> HPT s HeapLocationSet
 getPtrScope' index = do
     scope <- asks envPtrScope
     liftST $ MVector.read scope index
 
-getHeapObjects :: HeapPtr -> HPT s Objects
+getHeapObjects :: HeapLocation -> HPT s Objects
 getHeapObjects hp = do
     heap <- asks envHeap
     liftST $ MVector.read heap hp
 
-setHeapObjects :: HeapPtr -> Objects -> HPT s ()
+setHeapObjects :: HeapLocation -> Objects -> HPT s ()
 setHeapObjects hp objects = do
     heap <- asks envHeap
     liftST $ do
         oldObjects <- MVector.read heap hp
         MVector.write heap hp (mergeObjects objects oldObjects)
+
+setHeapSetObjects :: HeapLocationSet -> Objects -> HPT s ()
+setHeapSetObjects (HeapLocationSet hpSet) objects =
+    forM_ (IntSet.toList hpSet) $ \hp -> setHeapObjects hp objects
 
 setNodeScope :: Variable -> Objects -> HPT s ()
 setNodeScope = setNodeScope' . variableIndex
@@ -370,13 +432,15 @@ setNodeScope' index objects = do
         oldObjects <- MVector.read scope index
         MVector.write scope index (mergeObjects objects oldObjects)
 
-setPtrScope :: Variable -> HeapPtrSet -> HPT s ()
-setPtrScope var heapPtrs = do
+setPtrScope :: Variable -> HeapLocationSet -> HPT s ()
+setPtrScope var heapLocs = do
     scope <- asks envPtrScope
     liftST $ do
         oldPtrs <- MVector.read scope index
-        MVector.write scope index (IntSet.union heapPtrs oldPtrs)
+        MVector.write scope index (merge heapLocs oldPtrs)
   where
+    merge (HeapLocationSet s1) (HeapLocationSet s2) =
+        HeapLocationSet $ IntSet.union s1 s2
     index = variableIndex var
 
 mergeObjects :: Objects -> Objects -> Objects
@@ -403,18 +467,15 @@ hptCopyVariables src dst | variableIndex src == variableIndex dst =
 hptCopyVariables src dst =
     case variableType src of
         Primitive{} -> return ()
-        NodePtr -> eachIteration $ do
+        ty | isPointerType ty -> eachIteration $ do
+            shared <- isVariableShared src
+            when shared $ markVariableShared dst
             ptrs <- getPtrScope src
             setPtrScope dst ptrs
-        FramePtr -> eachIteration $ do
-            ptrs <- getPtrScope src
-            setPtrScope dst ptrs
-        Node -> eachIteration $ do
+        ty | isNodeType ty -> eachIteration $ do
             objects <- getNodeScope src
             setNodeScope dst objects
-        StaticNode{} -> eachIteration $ do
-            objects <- getNodeScope src
-            setNodeScope dst objects
+        _ -> error "hptCopyVariables"
 
 extract :: Objects -> NodeName -> Int -> NameSet
 extract objs name nth =
@@ -496,7 +557,7 @@ hptInvokeHandler objects arg = do
     forM_ frames $ \frame ->
         case frame of
             FunctionStackFrame _fn _blanks (Just nextFramePtrs) -> do
-                nextFrame <- derefHeap nextFramePtrs
+                nextFrame <- getHeapSetObjects nextFramePtrs
                 hptInvokeHandler nextFrame arg
             FunctionStackFrame _ _ Nothing -> error "HPT: End of stack"
             -- blanks must be 2
@@ -518,28 +579,31 @@ hptInvoke objects args = do
                 forM_ (zip args missingArgs) $
                     uncurry hptCopyVariables
             CatchStackFrame _exh _blanks nextFramePtrs -> do
-                nextFrame <- derefHeap nextFramePtrs
+                nextFrame <- getHeapSetObjects nextFramePtrs
                 hptInvoke nextFrame args
 
-derefPtrs :: NameSet -> HPT s HeapPtrSet
+derefPtrs :: NameSet -> HPT s HeapLocationSet
 derefPtrs ptrs =
-    IntSet.unions <$> mapM getPtrScope' (IntSet.toList ptrs)
+    heapLocationSetUnions <$> mapM getPtrScope' (IntSet.toList ptrs)
+
+heapLocationSetUnions :: [HeapLocationSet] -> HeapLocationSet
+heapLocationSetUnions = HeapLocationSet . IntSet.unions . map unHeapLocationSet
 
 derefVars :: NameSet -> HPT s Objects
 derefVars vars =
     mergeObjectList <$> mapM getNodeScope' (IntSet.toList vars)
 
 
-derefHeap :: HeapPtrSet -> HPT s Objects
-derefHeap hps = do
+getHeapSetObjects :: HeapLocationSet -> HPT s Objects
+getHeapSetObjects (HeapLocationSet hps) = do
     mergeObjectList <$> mapM getHeapObjects (IntSet.toList hps)
 
 
 data StackFrame
-    = FunctionStackFrame Name Int (Maybe HeapPtrSet)
+    = FunctionStackFrame Name Int (Maybe HeapLocationSet)
     | CatchStackFrame
         Name Int
-        HeapPtrSet
+        HeapLocationSet
     deriving (Show)
 stackTrace :: Objects -> HPT s [StackFrame]
 stackTrace objects = fmap concat $
@@ -562,7 +626,7 @@ stackTrace objects = fmap concat $
                 let stackPtrs = objArgs Vector.! 0
                     handlerVars = objArgs Vector.! 1
                 stackHps <- derefPtrs stackPtrs
-                
+
                 handlerObjs <- derefVars handlerVars
 
                 return
@@ -574,9 +638,9 @@ hptExpression :: Function -> [Variable] -> Expression -> HPT s ()
 hptExpression origin binds simple =
     case simple of
         Store node vars | [ptr] <- binds -> do
-            hp <- newHeapPtr
+            hp <- newHeapLocation
             setHeapObjects hp $ singletonObject node vars
-            setPtrScope ptr (IntSet.singleton hp)
+            setPtrScope ptr (HeapLocationSet $ IntSet.singleton hp)
             case node of
                 FunctionName fn _ -> do
                     args <- getFunctionArgumentRegisters fn
@@ -584,11 +648,9 @@ hptExpression origin binds simple =
                 ConstructorName name -> do
                     args <- getNodeArgumentRegisters name
                     forM_ (zip vars args) $ uncurry hptCopyVariables
-        Fetch ptrRef | [node] <- binds -> do
-            eachIteration $ do
-                ptrs <- IntSet.toList <$> getPtrScope ptrRef
-                objects <- mapM getHeapObjects ptrs
-                setNodeScope node (mergeObjectList objects)
+        Fetch ptrRef | [node] <- binds ->
+            eachIteration $
+                setNodeScope node =<< getHeapSetObjects =<< getPtrScope ptrRef
         TypeCast var | [bind] <- binds ->
             hptCopyVariables var bind
         MkNode node vars | [bind] <- binds -> do
@@ -608,22 +670,20 @@ hptExpression origin binds simple =
             forM_ (zip foreignRets binds) $ uncurry hptCopyVariables
         CCall{} -> return ()
         Eval ptrRef | [objRef] <- binds -> eachIteration $ do
-            ptrs <- IntSet.toList <$> getPtrScope ptrRef
-            objects <- mergeObjectList <$> mapM getHeapObjects ptrs
+            shared <- isVariableShared ptrRef
+            hpLocs <- getPtrScope ptrRef
+            objects <- getHeapSetObjects hpLocs
             forM_ (Map.toList objects) $ \(nodeName, args) -> do
                 case nodeName of
                     FunctionName name 0 -> do
                         [foreignRet] <- getFunctionReturnRegisters name
                         foreignObjs <- getNodeScope foreignRet
                         setNodeScope objRef foreignObjs
-                        -- FIXME: We only need to update the ptrs if
-                        --   there is sharing.
-                        forM_ ptrs $ \ptr -> setHeapObjects ptr foreignObjs
+                        when shared $ do
+                            setHeapSetObjects hpLocs foreignObjs
+                            markHeapLocationSetShared hpLocs
                     _ -> setNodeScope objRef (Map.singleton nodeName args)
         Apply fn arg | [objRef] <- binds -> eachIteration $ do
-            -- fn is node
-            -- arg is nodePtr
-            -- objRef is node
             objects <- getNodeScope fn
             forM_ (Map.toList objects) $ \(nodeName, args) -> do
                 case nodeName of
@@ -677,3 +737,69 @@ hptExpression origin binds simple =
         ReadGlobal{} -> return ()
         WriteGlobal{} -> return ()
         _ -> error $ "HPT: unHPandled simple: " ++ show simple
+
+
+
+newtype SumMap = SumMap { unSumMap :: Map Variable Int }
+instance Monoid SumMap where
+    mempty = SumMap mempty
+    mappend a b = SumMap $ Map.unionWith (+) (unSumMap a) (unSumMap b)
+analyseUsage :: Module -> Map Variable Int
+analyseUsage m =
+    unSumMap (execWriter (analyseModule m))
+  where
+    push var = tell $ SumMap $ Map.singleton var 1
+    pushMany vars = tell $ SumMap $ Map.fromList (zip vars [1,1..])
+    analyseModule = mapM_ analyseFunction . functions
+    analyseFunction = analyseBlock . fnBody
+    analyseBlock block =
+        case block of
+            Case scrut _defaultBranch alts -> do
+                push scrut
+                mapM_ analyseAlternative alts
+            Bind _binds expr rest -> do
+                analyseExpression expr
+                analyseBlock rest
+            Return vars         -> pushMany vars
+            Raise var           -> push var
+            TailCall _fn vars   -> pushMany vars
+            Invoke v1 vs        -> pushMany (v1:vs)
+            InvokeHandler v1 v2 -> pushMany [v1,v2]
+            Exit                -> return ()
+            Panic{}             -> return ()
+    analyseAlternative (Alternative _ block) = analyseBlock block
+    analyseExpression expr =
+        case expr of
+            Application _fn vars   -> pushMany vars
+            CCall _fn vars         -> pushMany vars
+            Catch _ exhVars _ vars -> pushMany exhVars >> pushMany vars
+            Alloc{}                -> return ()
+            Store _name vars       -> pushMany vars
+            Write v1 _ v2          -> pushMany [v1,v2]
+            Address var _          -> push var
+            Fetch var              -> push var
+            Load var _             -> push var
+            Add v1 v2              -> pushMany [v1,v2]
+            ReadRegister{}         -> return ()
+            WriteRegister _ var    -> push var
+            ReadGlobal{}           -> return ()
+            WriteGlobal _ var      -> push var
+            TypeCast var           -> push var
+            MkNode _name vars      -> pushMany vars
+            Literal{}              -> return ()
+            Eval var               -> push var
+            Apply v1 v2            -> pushMany [v1,v2]
+            GCAllocate{}           -> return ()
+            GCBegin{}              -> return ()
+            GCEnd{}                -> return ()
+            GCMark var             -> push var
+            GCMarkNode var         -> push var
+    
+
+
+
+
+
+
+
+

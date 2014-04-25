@@ -51,7 +51,7 @@ mkEval hpt origin bind var = do
     evalName <- tagName "eval" (fnName origin)
     arg <- tagVariable "ptr" var
 
-    let ptrs = hptPtrScope hpt Vector.! variableIndex var
+    let HeapLocationSet ptrs = hptPtrScope hpt Vector.! variableIndex var
         objects = mergeObjectList $ map (hptHeap hpt Vector.!) (IntSet.toList ptrs)
         maxArgs = maximum (map Vector.length (Map.elems objects))
     preEvalObject <- newVariable "node" (StaticNode (maxArgs+1))

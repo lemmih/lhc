@@ -49,8 +49,10 @@ runPipeline keepIntermediateFiles verbose title m0 =
             tag :?> action -> do
                 m' <- runAction n m tag (action hpt)
                 worker hpt (n+1) m' steps
-            PerformHPT ->
-                worker (runHPT m) n m steps
+            PerformHPT -> do
+                let hpt' = runHPT m
+                when verbose $ ppHPTResult hpt'
+                worker hpt' n m steps
     runAction n m tag action = do
         when verbose $
             printf "[%d] Running step %s\n" (n::Int) (show tag)

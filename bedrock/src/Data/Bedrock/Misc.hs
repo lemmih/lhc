@@ -33,3 +33,20 @@ newGlobalID :: AvailableNamespace -> (Int, AvailableNamespace)
 newGlobalID ns =
     ( nsNextGlobalId ns
     , ns{nsNextGlobalId = nsNextGlobalId ns + 1})
+
+
+
+-- NB: Node pointers. Not pointers to external memory.
+isPointerType :: Type -> Bool
+isPointerType NodePtr  = True
+isPointerType FramePtr = True
+isPointerType _ = False
+
+isNodeType :: Type -> Bool
+isNodeType Node = True
+isNodeType StaticNode{} = True
+isNodeType _ = False
+
+
+
+

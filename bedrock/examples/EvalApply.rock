@@ -21,6 +21,8 @@ main()
         i8* str = @literal "ret is %d"
         i32 t = @cast #ret
         @ccall printf(i8* str, i32 t)
+
+        ; %again = @fetch *thunk
         @exit
 
 % twice(*fn, *x)

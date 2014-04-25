@@ -53,18 +53,21 @@ traverseExpression hpt expr =
         Store node vars -> Store node (map (setVariableSize hpt) vars)
         _ -> expr
 
-derefPtrs :: HPTResult -> NameSet -> HeapPtrSet
-derefPtrs hpt ptrs = IntSet.unions
+-- FIXME: merge with HPT
+derefPtrs :: HPTResult -> NameSet -> HeapLocationSet
+derefPtrs hpt ptrs = heapLocationSetUnions
     [ hptPtrScope hpt Vector.! ptr
     | ptr <- IntSet.toList ptrs ]
 
+-- FIXME: merge with HPT
 derefVars :: HPTResult -> NameSet -> Objects
 derefVars hpt vars = mergeObjectList
     [ hptNodeScope hpt Vector.! var
     | var <- IntSet.toList vars ]
 
-derefHeap :: HPTResult -> HeapPtrSet -> Objects
-derefHeap hpt vars = mergeObjectList
+-- FIXME: merge with HPT
+derefHeap :: HPTResult -> HeapLocationSet -> Objects
+derefHeap hpt (HeapLocationSet vars) = mergeObjectList
     [ hptHeap hpt Vector.! hp
     | hp <- IntSet.toList vars ]
 
