@@ -1,5 +1,5 @@
 module Data.Bedrock.Invoke
-    ( mkInvoke ) where
+    ( lowerInvoke ) where
 
 import           Control.Applicative     (pure, (<$>), (<*>))
 import           Control.Monad.State
@@ -15,8 +15,9 @@ import           Data.Bedrock.Transform
 import           Data.Bedrock.Exceptions (isCatchFrame)
 
 
-mkInvoke :: HPTResult -> Gen ()
-mkInvoke hpt = do
+-- Lower calls to @Invoke and @InvokeHandler
+lowerInvoke :: HPTResult -> Gen ()
+lowerInvoke hpt = do
     fs <- gets (Map.elems . envFunctions)
     forM_ fs $ \fn -> do
         body' <- traverseBlock hpt fn (fnBody fn)

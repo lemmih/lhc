@@ -5,7 +5,6 @@ import           System.FilePath
 import           Text.ParserCombinators.Parsec     (parseFromFile)
 import           Text.Printf
 
---import           Data.Bedrock
 import           Data.Bedrock.EvalApply
 import           Data.Bedrock.Exceptions
 import           Data.Bedrock.GlobalVariables
@@ -78,7 +77,7 @@ compileFromFileWithOpts keepIntermediateFiles verbose path = do
                 , "no-laziness"     :?> runGen . lowerEvalApply
                 , "no-exceptions"   :> unique . runGen cpsTransformation
                 , PerformHPT
-                , "no-invoke"       :?> runGen . mkInvoke
+                , "no-invoke"       :?> runGen . lowerInvoke
                 , "no-unknown-size" :?> runGen . lowerNodeSize
                 , "no-nodes"        :> unique . registerIntroduction
                 , "no-allocs"       :> unique . runGen lowerAlloc
