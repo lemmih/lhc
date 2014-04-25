@@ -75,6 +75,7 @@ mkEval hpt origin bind var = do
             Return [ret]
     pushFunction Function
         { fnName = evalName
+        , fnAttributes = []
         , fnArguments = [arg]
         , fnResults = [StaticNode (sizeOfVariable hpt bind)]
         , fnBody = body }
@@ -103,6 +104,7 @@ mkApply hpt origin bind obj arg = do
         mkAlt _ = error "mkApply"
     pushFunction Function
         { fnName = applyName
+        , fnAttributes = []
         , fnArguments = [applyObj, applyArg]
         , fnResults = [StaticNode (sizeOfVariable hpt bind)]
         , fnBody = body }

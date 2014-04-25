@@ -4,6 +4,7 @@ module Data.Bedrock.PrettyPrint where
 import           Text.PrettyPrint.ANSI.Leijen (Doc, char, int, text, (<+>),
                                                (<>), Pretty(..))
 import qualified Text.PrettyPrint.ANSI.Leijen as Doc
+import Data.List
 
 import           Data.Bedrock
 
@@ -12,9 +13,12 @@ import           Data.Bedrock
 
 instance Pretty Name where
 	pretty name =
-		if nameUnique name == 0
-			then text (nameIdentifier name)
-			else text (nameIdentifier name) <> char '^' <> int (nameUnique name)
+		text (intercalate "." (nameModule name ++ [nameIdentifier name]))
+		<> unique
+	  where
+	  	unique = if nameUnique name == 0
+	  		then Doc.empty
+	  		else char '^' <> int (nameUnique name)
 
 instance Pretty Type where
 	pretty NodePtr        = Doc.char '*'
@@ -168,8 +172,12 @@ ppTypes :: [Type] -> Doc
 ppTypes [] = text "void"
 ppTypes lst = Doc.hsep $ map pretty lst
 
+instance Pretty Attribute where
+	pretty NoCPS = text "NoCPS"
+
 ppFunction :: Function -> Doc
 ppFunction fn =
+	pretty (fnAttributes fn) Doc.<$$>
 	ppTypes (fnResults fn) <+>
 	ppFnName (fnName fn) <+> Doc.hsep (map pretty (fnArguments fn)) <+>
 	Doc.char '=' Doc.<$$>

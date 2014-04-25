@@ -80,9 +80,10 @@ uniqNode (NodeDefinition name args) =
     NodeDefinition <$> resolveName name <*> pure args
 -}
 uniqFunction :: Function -> Uniq Function
-uniqFunction (Function name args rets body) = lowerMany args $
+uniqFunction (Function name attrs args rets body) = lowerMany args $
     Function
         <$> pure name -- resolveName name
+        <*> pure attrs
         <*> resolveMany args
         <*> pure rets
         <*> uniqBlock body
@@ -95,11 +96,14 @@ uniqBlock :: Block -> Uniq Block
 uniqBlock block =
     case block of
         Case scrut mbBranch alts -> do
-            (tag:args) <- resolve scrut
-            Case
-                <$> pure tag
-                <*> uniqMaybe uniqBlock mbBranch
-                <*> mapM (uniqAlternative args) alts
+            scruts <- resolve scrut
+            case scruts of
+                [] -> pure Exit
+                (tag:args) ->
+                    Case
+                        <$> pure tag
+                        <*> uniqMaybe uniqBlock mbBranch
+                        <*> mapM (uniqAlternative args) alts
         Bind [bind] (TypeCast var) rest -> lower bind $ do
             nodeBinds <- resolve bind
             varArgs   <- resolve var

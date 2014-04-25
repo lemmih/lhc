@@ -29,17 +29,17 @@ fixedGC = do
     endName <- newName "fixed_gc_end"
     markName <- newName "fixed_gc_mark"
     markPtr  <- newVariable "root" NodePtr
-    let initFn = Function initName [] [] $
+    let initFn = Function initName [] [] [] $
             Bind [wordSize] (Literal (LiteralInt 8)) $
             Bind [heapSize] (Literal (LiteralInt 1024)) $
             Bind [hp] (CCall "calloc" [wordSize, heapSize]) $
             Bind [] (WriteGlobal "hp" hp) $
             Return []
-        beginFn = Function beginName [] [] $
+        beginFn = Function beginName [] [] [] $
             Panic "FixedGC: Collection not supported!"
-        endFn = Function endName [] [] $
+        endFn = Function endName [] [] [] $
             Panic "FixedGC: Collection not supported!"
-        markFn = Function markName [markPtr] [NodePtr] $
+        markFn = Function markName [] [markPtr] [NodePtr] $
             Panic "FixedGC: Collection not supported!"
         allocate _size = Literal (LiteralInt 1)
     return StorageManager

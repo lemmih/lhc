@@ -109,9 +109,10 @@ uniqNode (NodeDefinition name args) =
     NodeDefinition <$> resolveName name <*> pure args
 
 uniqFunction :: Function -> Uniq Function
-uniqFunction (Function name args rets body) = renameVariables args $
+uniqFunction (Function name attrs args rets body) = renameVariables args $
     Function
         <$> resolveName name
+        <*> pure attrs
         <*> mapM resolve args
         <*> pure rets
         <*> uniqBlock body

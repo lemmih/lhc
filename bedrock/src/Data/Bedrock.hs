@@ -22,7 +22,8 @@ data AvailableNamespace = AvailableNamespace
 	{ nsNextPointerId   :: Int
 	, nsNextNodeId      :: Int
 	, nsNextPrimitiveId :: Int
-	, nsNextGlobalId    :: Int }
+	, nsNextGlobalId    :: Int
+	} deriving (Show)
 
 data CType
 	= I8
@@ -46,7 +47,7 @@ data Module = Module
 	, functions  :: [Function]
 	, modNamespace :: AvailableNamespace
 	-- CAFs?
-	}
+	} deriving (Show)
 
 data NodeName
 	= ConstructorName Name
@@ -57,11 +58,16 @@ data NodeName
 data NodeDefinition = NodeDefinition Name [Type]
 	deriving (Show)
 
+data Attribute
+	= NoCPS
+	deriving (Show,Eq)
+
 data Function = Function
-	{ fnName      :: Name
-	, fnArguments :: [Variable]
-	, fnResults   :: [Type]
-	, fnBody      :: Block
+	{ fnName       :: Name
+	, fnAttributes :: [Attribute]
+	, fnArguments  :: [Variable]
+	, fnResults    :: [Type]
+	, fnBody       :: Block
 	} deriving (Show)
 
 data Pattern

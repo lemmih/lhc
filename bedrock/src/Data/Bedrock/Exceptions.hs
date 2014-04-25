@@ -19,45 +19,10 @@ cpsTransformation :: Gen ()
 cpsTransformation = do
     fs <- gets (Map.elems . envFunctions)
     mapM_ cpsFunction fs
-    -- FIXME: Exception handling is broken.
-    -- mkThrowTo
-
---_mkThrowTo :: Gen ()
---_mkThrowTo = do
---    fns <- gets (functions . envModule)
-
---    let nextContinuationPtr = Variable (Name [] "nextContPtr" 0) NodePtr
---        thisContinuation = Variable (Name [] "thisCont" 0) Node
---        exception = Variable (Name [] "exception" 0) NodePtr
---        handler = Variable (Name [] "handler" 0) Node
---        body =
---            Case thisContinuation Nothing (exhAlternative:alternatives)
---        exhAlternative =
---            Alternative
---                (NodePat
---                    (ConstructorName exhFrameName)
---                    [nextContinuationPtr, handler])
---                (Invoke handler [exception, nextContinuationPtr])
---        alternatives =
---            [ Alternative
---                (NodePat
---                    (FunctionName (fnName fn) blanks)
---                    (reverse . drop blanks . reverse $ fnArguments fn))
---                (TailCall throwToName
---                    [fnArguments fn !! idx, exception])
---            | fn <- fns
---            , idx <- elemIndices stdContinuation (fnArguments fn)
---            , blanks <- [0 .. length (fnArguments fn) - 1 - idx] ]
---    pushFunction Function
---        { fnName = throwToName
---        , fnArguments = [thisContinuation, exception]
---        , fnResults = []
---        , fnBody = body }
-
---throwToName :: Name
---throwToName = Name [] "throwTo" 0
 
 cpsFunction :: Function -> Gen ()
+cpsFunction fn | NoCPS `elem` fnAttributes fn =
+    pushFunction fn
 cpsFunction fn = do
     body <- cpsBlock fn (fnBody fn)
     let fn' = fn{fnArguments = fnArguments fn ++ [stdContinuation]
@@ -65,6 +30,7 @@ cpsFunction fn = do
                 ,fnBody = body}
     pushFunction fn'
 
+-- FIXME: Support tail calling functions with NoCPS attributes.
 cpsBlock :: Function -> Block -> Gen Block
 cpsBlock origin block =
     case block of
@@ -96,6 +62,7 @@ isCatchFrame :: Name -> Bool
 isCatchFrame (Name [] ident _) = exhFrameIdentifier == ident
 isCatchFrame _ = False
 
+-- FIXME: Support calling functions with NoCPS attributes.
 cpsExpresion :: Function -> [Variable]
              -> Expression -> Block -> Gen Block
 cpsExpresion origin binds simple rest =
@@ -111,7 +78,6 @@ cpsExpresion origin binds simple rest =
             exhFrameName <- newName exhFrameIdentifier
             pushNode $ NodeDefinition exhFrameName [FramePtr, Node]
             mkContinuation $ \continuationFrame ->
-                -- FIXME: continuationFrame needs to be stored.
                 Bind [exSusp] (MkNode (FunctionName exh 2) exhArgs) $
                 Bind [exceptionFrame]
                     (Store (ConstructorName exhFrameName)
@@ -135,6 +101,7 @@ cpsExpresion origin binds simple rest =
         contFnName <- tagName "continuation" (fnName origin)
         pushFunction $
             Function { fnName      = contFnName
+                     , fnAttributes = []
                      , fnArguments = continuationArgs ++ binds
                      , fnResults   = []
                      , fnBody      = rest }

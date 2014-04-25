@@ -160,11 +160,13 @@ transformExpresion origin binds simple rest =
                     TailCall continueName markedScope
             pushFunction Function
                 { fnName = continueName
+                , fnAttributes = []
                 , fnArguments = scope
                 , fnResults = []
                 , fnBody = rest }
             pushFunction Function
                 { fnName = divertName
+                , fnAttributes = []
                 , fnArguments = scope
                 , fnResults = []
                 , fnBody = divertBody }

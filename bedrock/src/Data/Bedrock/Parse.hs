@@ -31,7 +31,7 @@ identifier :: Parser String
 symbol :: String -> Parser String
 parens :: Parser a -> Parser a
 reservedOp, reserved :: String -> Parser ()
-stringLiteral, comma :: Parser String
+stringLiteral, comma, dot :: Parser String
 commaSep, commaSep1 :: Parser a -> Parser [a]
 
 identifier = P.identifier lexer
@@ -40,18 +40,26 @@ reserved   = P.reserved lexer
 reservedOp = P.reservedOp lexer
 symbol     = P.symbol lexer
 comma      = P.comma lexer
+dot        = P.dot lexer
 integer    = P.integer lexer
 stringLiteral = P.stringLiteral lexer
 commaSep   = P.commaSep lexer
 commaSep1  = P.commaSep1 lexer
 natural    = P.natural lexer
 
+parseModulePrefix :: Parser String
+parseModulePrefix = try $ do
+	prefix <- identifier
+	guard (isUpper (head prefix))
+	return prefix
+
 parseName :: Parser Name
-parseName =
-	Name
-		<$> pure []
-		<*> identifier
-		<*> pure 0
+parseName = do
+	Name <$> (try $ parseModulePrefix `endBy` dot) <*> identifier <*> pure 0
+  <|>
+  	do
+	prefix <- parseModulePrefix `sepBy1` dot
+	pure $ Name (init prefix) (last prefix) 0
 
 parseType :: Parser Type
 parseType = choice
@@ -70,17 +78,22 @@ parseVariable = do
 parseNodeDefinition :: Parser NodeDefinition
 parseNodeDefinition = do
 	reserved "node"
-	name <- parseName
+	name <- parseConstructor
 	args <- many parseType
 	return $ NodeDefinition name args
 
+parseAttribute :: Parser Attribute
+parseAttribute = choice
+	[ reserved "NoCPS" >> return NoCPS ]
+
 parseFunction :: Parser Function
 parseFunction = do
+	attributes <- many parseAttribute
 	retTypes <- many parseType
 	name <- parseName
 	args <- parens (commaSep parseVariable)
 	body <- parseBlock
-	return (Function name args retTypes body)
+	return (Function name attributes args retTypes body)
 
 parseConstructor :: Parser Name
 parseConstructor = try (do
@@ -272,6 +285,7 @@ parseTopLevel =
 
 parseModule :: Parser Module
 parseModule = do
+	P.whiteSpace lexer
 	topLevel <- many parseTopLevel
 	return Module
 		{ modForeigns = [ f | TopForeign f <- topLevel ]
