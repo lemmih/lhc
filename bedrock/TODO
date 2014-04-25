@@ -1,4 +1,8 @@
 * Sharing analysis in HPT.
 * Validation of bedrock AST.
-
-
+* Check weather we optimize away all the stack frames for functions
+  that do not use global registers, exceptions or the GC, nor call
+  any function that does.
+* Related to above. Find the functions that do not need to be CPS
+  transformed. It's better to not do the transformation than to
+  rely on optimizations to remove the stack frames.
