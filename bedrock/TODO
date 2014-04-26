@@ -3,6 +3,16 @@
 * Check weather we optimize away all the stack frames for functions
   that do not use global registers, exceptions or the GC, nor call
   any function that does.
+  Hm, optimising away the CPS transformation is not trivial. But would
+  it be worth it?
 * Related to above. Find the functions that do not need to be CPS
   transformed. It's better to not do the transformation than to
   rely on optimizations to remove the stack frames.
+* Mark stores/loads with aliasing groups.
+* Mark fetch expressions when loading immutable data.
+* Run NoCPS analysis after eval/apply have been eliminated.
+* Inline one-shot functions.
+* Inline trivial functions.
+* create allocs when fixing node size. Apply lowerAllocs before lowering
+  nodes such that we can correctly gcMarkNode all nodes.
+  

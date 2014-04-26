@@ -23,6 +23,11 @@ Profiling, debugging and program monitoring:
   External tools can then listen to the snapshots and generate a graph of
   memory usage over time.
 
+Using libuv
+  We want one event loop per core with N heaps per event loop. Finding
+  root elements for a given heap will be difficult.
+  We basically want StablePtr's. How efficiently can we support them?
+
 Shared nothing concurrency.
   Allocate a fixed number of isolated heaps per core.
   Round-robin allocation of new actors in each core/heap pair.
