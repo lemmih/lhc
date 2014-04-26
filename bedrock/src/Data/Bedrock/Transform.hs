@@ -24,6 +24,19 @@ pushFunction fn = modifyModule $ \m -> m{functions = functions m ++ [fn]}
 pushNode :: NodeDefinition -> Gen ()
 pushNode n = modifyModule $ \m -> m{ nodes = n : nodes m }
 
+lookupAttributes :: Name -> Gen [Attribute]
+lookupAttributes name = do
+    m <- gets envFunctions
+    case Map.lookup name m of
+        -- XXX: Throw an exception?
+        Nothing -> return []
+        Just fn -> return $ fnAttributes fn
+
+hasAttribute :: Name -> Attribute -> Gen Bool
+hasAttribute name attr = do
+    attrs <- lookupAttributes name
+    return $ attr `elem` attrs
+
 newUnique :: Gen Int
 newUnique = do
     u <- gets envUnique

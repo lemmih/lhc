@@ -30,7 +30,6 @@ cpsFunction fn = do
                 ,fnBody = body}
     pushFunction fn'
 
--- FIXME: Support tail calling functions with NoCPS attributes.
 cpsBlock :: Function -> Block -> Gen Block
 cpsBlock origin block =
     case block of
@@ -51,8 +50,11 @@ cpsBlock origin block =
             return $
                 Bind [node] (Fetch stdContinuation) $
                 InvokeHandler node exception
-        TailCall fn args ->
-            pure $ TailCall fn (args ++ [stdContinuation])
+        TailCall fn args -> do
+            noCPS <- hasAttribute fn NoCPS
+            if noCPS
+                then pure $ TailCall fn args
+                else pure $ TailCall fn (args ++ [stdContinuation])
         other -> return other
 
 exhFrameIdentifier :: String
@@ -62,7 +64,6 @@ isCatchFrame :: Name -> Bool
 isCatchFrame (Name [] ident _) = exhFrameIdentifier == ident
 isCatchFrame _ = False
 
--- FIXME: Support calling functions with NoCPS attributes.
 cpsExpresion :: Function -> [Variable]
              -> Expression -> Block -> Gen Block
 cpsExpresion origin binds simple rest =
@@ -84,9 +85,12 @@ cpsExpresion origin binds simple rest =
                         [ continuationFrame
                         , exSusp ]) $
                 TailCall fn (fnArgs ++ [exceptionFrame])
-        Application fn fnArgs ->
-            mkContinuation $ \continuationFrame ->
-                TailCall fn (fnArgs ++ [continuationFrame])
+        Application fn fnArgs -> do
+            noCPS <- hasAttribute fn NoCPS
+            if noCPS
+                then return $ Bind binds (Application fn fnArgs) rest
+                else mkContinuation $ \continuationFrame ->
+                        TailCall fn (fnArgs ++ [continuationFrame])
         Store (FunctionName fn blanks) args ->
             return $ Bind binds (Store (FunctionName fn (blanks+1)) args) rest
         other -> return $ Bind binds other rest
@@ -124,4 +128,7 @@ cpsAlternative origin (Alternative pattern expr) =
 
 stdContinuation :: Variable
 stdContinuation = Variable (Name [] "cont" 0) FramePtr
+
+
+
 
