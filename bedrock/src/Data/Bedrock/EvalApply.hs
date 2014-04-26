@@ -26,9 +26,8 @@ traverseBlock :: HPTResult -> Function -> Block -> Gen Block
 traverseBlock hpt origin expr =
     case expr of
         Bind binds simple rest ->
-            Bind binds
-                <$> traverseExpression hpt origin binds simple
-                <*> traverseBlock hpt origin rest
+            traverseExpression hpt origin binds simple =<<
+                traverseBlock hpt origin rest
         Case scrut defaultBranch alternatives ->
             Case scrut
                 <$> pure defaultBranch
@@ -36,18 +35,18 @@ traverseBlock hpt origin expr =
         other -> return other
 
 traverseExpression :: HPTResult -> Function -> [Variable]
-               -> Expression -> Gen Expression
-traverseExpression hpt origin binds simple =
+               -> Expression -> Block -> Gen Block
+traverseExpression hpt origin binds simple rest =
     case simple of
-        Eval var | [bind] <- binds      -> mkEval hpt origin bind var
-        Apply obj arg | [bind] <- binds -> mkApply hpt origin bind obj arg
+        Eval var | [bind] <- binds      -> mkEval hpt origin bind var rest
+        Apply obj arg | [bind] <- binds -> mkApply hpt origin bind obj arg rest
         Application fn args             ->
-            return $ Application fn args
-        _                               -> return simple
+            return $ Bind binds (Application fn args) rest
+        _                               -> return $ Bind binds simple rest
 
 
-mkEval :: HPTResult -> Function -> Variable -> Variable -> Gen Expression
-mkEval hpt origin bind var = do
+mkEval :: HPTResult -> Function -> Variable -> Variable -> Block -> Gen Block
+mkEval hpt origin bind var rest = do
     evalName <- tagName "eval" (fnName origin)
     arg <- tagVariable "ptr" var
 
@@ -57,7 +56,6 @@ mkEval hpt origin bind var = do
     preEvalObject <- newVariable "node" (StaticNode (maxArgs+1))
     evalRet <- newName "ret"
     let body =
-            Bind [preEvalObject] (Fetch arg) $
             Case preEvalObject Nothing (map mkAlt (Map.keys objects))
         mkAlt name@(FunctionName fn 0) =
             let args = hptFnArgs hpt Map.! fn in
@@ -76,14 +74,17 @@ mkEval hpt origin bind var = do
     pushFunction Function
         { fnName = evalName
         , fnAttributes = []
-        , fnArguments = [arg]
+        , fnArguments = [arg, preEvalObject]
         , fnResults = [StaticNode (sizeOfVariable hpt bind)]
         , fnBody = body }
-    return $ Application evalName [var]
+    return $
+        Bind [preEvalObject] (Fetch var) $
+        Bind [bind] (Application evalName [var, preEvalObject])
+        rest
 
 mkApply :: HPTResult -> Function -> Variable -> Variable -> Variable
-        -> Gen Expression
-mkApply hpt origin bind obj arg = do
+        -> Block -> Gen Block
+mkApply hpt origin bind obj arg rest = do
     applyName <- tagName "apply" (fnName origin)
     applyObj <- newVariable "node" (StaticNode (sizeOfVariable hpt obj))
     applyArg <- tagVariable "ptr" arg
@@ -108,7 +109,7 @@ mkApply hpt origin bind obj arg = do
         , fnArguments = [applyObj, applyArg]
         , fnResults = [StaticNode (sizeOfVariable hpt bind)]
         , fnBody = body }
-    return $ Application applyName [obj, arg]
+    return $ Bind [bind] (Application applyName [obj, arg]) rest
 
 
 traverseAlternative :: HPTResult -> Function -> Alternative -> Gen Alternative
