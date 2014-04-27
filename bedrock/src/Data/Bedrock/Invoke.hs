@@ -51,6 +51,13 @@ traverseExpression :: HPTResult -> Expression -> Expression
 traverseExpression hpt expr =
     case expr of
         Store node vars -> Store node (map (setVariableSize hpt) vars)
+        Fetch _attrs ptr ->
+            let HeapLocationSet locs =
+                    derefPtrs hpt (IntSet.singleton (variableIndex ptr))
+                shared = or [ hptSharedHeapLocations hpt Vector.! hp
+                             | hp <- IntSet.toList locs]
+                attrs = MemAttributes{ memConstant = not shared, memAliasGroup = Nothing}
+            in Fetch attrs ptr
         _ -> expr
 
 -- FIXME: merge with HPT
@@ -88,7 +95,7 @@ mkInvokeAlts hpt objects args = do
             nextFrame <- newVariable "nextFrame" (StaticNode (sizeOfObjects hpt nextFrameObjects))
             exhPtr <- newVariable "exhPtr" Node
             Alternative (NodePat (ConstructorName cons) [nextFramePtr, exhPtr]) .
-                Bind [nextFrame] (Fetch nextFramePtr) .
+                Bind [nextFrame] (Fetch anyMemory nextFramePtr) .
                 Case nextFrame Nothing
                     <$> mkInvokeAlts hpt nextFrameObjects args
 
@@ -115,7 +122,7 @@ mkInvokeHandlerAlts hpt objects arg = do
                     let nextFramePtr = partialArgs !! framePtrIndex
                     nextFrame <- newVariable "nextFrame" (StaticNode size)
                     Alternative (NodePat name partialArgs) .
-                        Bind [nextFrame] (Fetch nextFramePtr) .
+                        Bind [nextFrame] (Fetch anyMemory nextFramePtr) .
                         Case nextFrame Nothing
                             <$> mkInvokeHandlerAlts hpt nextFrameObjects arg
         mkAlt (ConstructorName cons, objArgs) | isCatchFrame cons = do

@@ -40,10 +40,7 @@ traverseExpression hpt origin binds simple rest =
     case simple of
         Eval var | [bind] <- binds      -> mkEval hpt origin bind var rest
         Apply obj arg | [bind] <- binds -> mkApply hpt origin bind obj arg rest
-        Application fn args             ->
-            return $ Bind binds (Application fn args) rest
         _                               -> return $ Bind binds simple rest
-
 
 mkEval :: HPTResult -> Function -> Variable -> Variable -> Block -> Gen Block
 mkEval hpt origin bind var rest = do
@@ -78,7 +75,7 @@ mkEval hpt origin bind var rest = do
         , fnResults = [StaticNode (sizeOfVariable hpt bind)]
         , fnBody = body }
     return $
-        Bind [preEvalObject] (Fetch var) $
+        Bind [preEvalObject] (Fetch anyMemory var) $
         Bind [bind] (Application evalName [var, preEvalObject])
         rest
 

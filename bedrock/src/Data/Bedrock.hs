@@ -82,6 +82,11 @@ data Literal
 	| LiteralString String
 	deriving (Show, Eq)
 
+data MemAttributes = MemAttributes
+	{ memConstant :: Bool
+	, memAliasGroup :: Maybe Int
+	} deriving (Show, Eq)
+
 data Expression
 	= Application Name [Variable]
 	| CCall String [Variable]
@@ -92,8 +97,8 @@ data Expression
 	| Write Variable Int Variable
 	| Address Variable Int
 
-	| Fetch Variable
-	| Load Variable Int
+	| Fetch MemAttributes Variable
+	| Load MemAttributes Variable Int
 	| Add Variable Variable
 
 	-- Global variables.

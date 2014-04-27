@@ -13,6 +13,7 @@ import qualified Data.Map as Map
 
 import           Data.Bedrock
 import           Data.Bedrock.Transform
+import           Data.Bedrock.Misc (constantMemory)
 
 
 cpsTransformation :: Gen ()
@@ -30,6 +31,7 @@ cpsFunction fn = do
                 ,fnBody = body}
     pushFunction fn'
 
+
 cpsBlock :: Function -> Block -> Gen Block
 cpsBlock origin block =
     case block of
@@ -39,7 +41,7 @@ cpsBlock origin block =
         Return args -> do
             node <- newVariable "contNode" Node
             return $
-                Bind [node] (Fetch stdContinuation) $
+                Bind [node] (Fetch constantMemory stdContinuation) $
                 Invoke node args
         Case scrut defaultBranch alternatives ->
             Case scrut
@@ -48,7 +50,7 @@ cpsBlock origin block =
         Raise exception -> do
             node <- newVariable "contNode" Node
             return $
-                Bind [node] (Fetch stdContinuation) $
+                Bind [node] (Fetch constantMemory stdContinuation) $
                 InvokeHandler node exception
         TailCall fn args -> do
             noCPS <- hasAttribute fn NoCPS

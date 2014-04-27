@@ -181,10 +181,10 @@ uniqSimple simple =
             Write <$> resolve ptr <*> pure idx <*> resolve var
         Address var idx ->
             Address <$> resolve var <*> pure idx
-        Fetch var ->
-            Fetch <$> resolve var
-        Load var idx ->
-            Load <$> resolve var <*> pure idx
+        Fetch constant var ->
+            Fetch constant <$> resolve var
+        Load constant var idx ->
+            Load constant <$> resolve var <*> pure idx
         Add a b ->
             Add <$> resolve a <*> resolve b
         Eval var ->

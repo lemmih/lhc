@@ -41,6 +41,7 @@ newtype Gen a = Gen { unGen :: ReaderT Env IO a }
 compile :: Module -> FilePath -> IO ()
 compile bedrock dst = do
     m <- LLVM.moduleCreateWithName "lhc"
+    LLVM.setDataLayout m "p:64:64:64"
     cx <- LLVM.getGlobalContext
     voidTy <- LLVM.voidTypeInContext cx
 
@@ -180,7 +181,7 @@ compileBlock block =
         Bind [bind] (Literal lit) rest -> do
             value <- resolveLiteral lit
             bindVariable bind value $ compileBlock rest
-        Bind [bind] (Load ptr nth) rest -> do
+        Bind [bind] (Load _constant ptr nth) rest -> do
             value <- compileLoad ptr nth
             bindVariable bind value $ compileBlock rest
 

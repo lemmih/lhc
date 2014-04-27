@@ -648,7 +648,7 @@ hptExpression origin binds simple =
                 ConstructorName name -> do
                     args <- getNodeArgumentRegisters name
                     forM_ (zip vars args) $ uncurry hptCopyVariables
-        Fetch ptrRef | [node] <- binds ->
+        Fetch _constant ptrRef | [node] <- binds ->
             eachIteration $
                 setNodeScope node =<< getHeapSetObjects =<< getPtrScope ptrRef
         TypeCast var | [bind] <- binds ->
@@ -777,8 +777,8 @@ analyseUsage m =
             Store _name vars       -> pushMany vars
             Write v1 _ v2          -> pushMany [v1,v2]
             Address var _          -> push var
-            Fetch var              -> push var
-            Load var _             -> push var
+            Fetch _constant var    -> push var
+            Load _constant var _   -> push var
             Add v1 v2              -> pushMany [v1,v2]
             ReadRegister{}         -> return ()
             WriteRegister _ var    -> push var

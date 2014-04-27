@@ -48,5 +48,11 @@ isNodeType StaticNode{} = True
 isNodeType _ = False
 
 
+anyMemory :: MemAttributes
+anyMemory = MemAttributes{ memConstant = False, memAliasGroup = Nothing }
+
+constantMemory :: MemAttributes
+constantMemory =
+    MemAttributes { memConstant = True, memAliasGroup = Nothing }
 
 

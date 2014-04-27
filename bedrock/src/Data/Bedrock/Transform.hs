@@ -157,9 +157,9 @@ freeVariablesSimple simple =
             Set.union (Set.fromList args)
         Write ptr _idx var ->
             Set.insert ptr . Set.insert var
-        Fetch ptr ->
+        Fetch _ ptr ->
             Set.insert ptr
-        Load ptr _idx ->
+        Load _ ptr _idx ->
             Set.insert ptr
         Add lhs rhs ->
             Set.insert lhs . Set.insert rhs

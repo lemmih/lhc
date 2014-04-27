@@ -167,7 +167,8 @@ parseExpression = choice
 	, do
 		reserved "@fetch"
 		ptr <- parseVariable
-		return $ Fetch ptr
+		let attrs = MemAttributes False Nothing
+		return $ Fetch attrs ptr
 	, do
 		reserved "@eval"
 		ptr <- parens parseVariable

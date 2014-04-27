@@ -72,6 +72,13 @@ ppAlternative (Alternative pattern expression) =
 	ppPattern pattern <+> text "→" Doc.<$$>
 	Doc.indent 2 (ppBlock expression)
 
+instance Pretty MemAttributes where
+	pretty MemAttributes{ memConstant = constant, memAliasGroup = g} =
+		if constant then ppSyntax "constant" else Doc.empty <+>
+		case g of
+			Nothing -> Doc.empty
+			Just group -> ppSyntax "alias" <> Doc.char ':' <> Doc.int group
+
 ppExpression :: Expression -> Doc
 ppExpression simple =
 	case simple of
@@ -85,10 +92,11 @@ ppExpression simple =
 			pretty ptr <> Doc.brackets (Doc.int idx) <+> pretty var
 		Address ptr idx ->
 			ppSyntax "&" <> pretty ptr <> Doc.brackets (Doc.int idx)
-		Fetch ptr ->
-			ppSyntax "@fetch" <+> pretty ptr
-		Load ptr nth ->
-			ppSyntax "@load" <+> pretty ptr <> Doc.brackets (Doc.int nth)
+		Fetch attr ptr ->
+			ppSyntax "@fetch" <+> pretty attr <+> pretty ptr
+		Load attr ptr nth ->
+			ppSyntax "@load" <+> pretty attr <+> pretty ptr <>
+			Doc.brackets (Doc.int nth)
 		Add lhs rhs ->
 			ppSyntax "@add" <+> pretty lhs <+> pretty rhs
 		Application fn args ->
