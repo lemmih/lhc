@@ -1,4 +1,4 @@
-* Sharing analysis in HPT.
+* Insert Indirection updates and Indirection checks.
 * Validation of bedrock AST.
 * Check weather we optimize away all the stack frames for functions
   that do not use global registers, exceptions or the GC, nor call
@@ -15,4 +15,3 @@
 * Inline trivial functions.
 * create allocs when fixing node size. Apply lowerAllocs before lowering
   nodes such that we can correctly gcMarkNode all nodes.
-  
