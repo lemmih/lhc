@@ -1,4 +1,5 @@
 * Insert Indirection updates and Indirection checks.
+* Reduce code bloat: Don't inline calls to InvokeHandler?
 * Validation of bedrock AST.
 * Check weather we optimize away all the stack frames for functions
   that do not use global registers, exceptions or the GC, nor call
@@ -8,10 +9,10 @@
 * Related to above. Find the functions that do not need to be CPS
   transformed. It's better to not do the transformation than to
   rely on optimizations to remove the stack frames.
+  Run NoCPS analysis after eval/apply have been eliminated.
 * Mark stores/loads with aliasing groups.
-* Mark fetch expressions when loading immutable data.
-* Run NoCPS analysis after eval/apply have been eliminated.
 * Inline one-shot functions.
 * Inline trivial functions.
 * create allocs when fixing node size. Apply lowerAllocs before lowering
   nodes such that we can correctly gcMarkNode all nodes.
+* Support variable length encoding of nodes.
