@@ -1,32 +1,22 @@
 cabal-version:       >= 1.6
 name:                lhc
-version:             0.11
+version:             0.12
 synopsis:            The Luxurious LHC Optimization System
 description:
-  LHC rewrite number 3.
+  LHC rewrite number 4.
 category:            Compiler
 license:             PublicDomain
 author:              David Himmelstrup, Austin Seipp
 maintainer:          https://github.com/Lemmih/lhc/issues
 homepage:            https://github.com/Lemmih/lhc
 build-type:          Custom
-cabal-version:	     >= 1.6
+cabal-version:	     >= 1.10
 extra-source-files:
-
 data-files:
 
 Source-repository head
   type:          git
   location:      https://github.com/Lemmih/lhc.git
-
-flag hpc
-  default:            False
-flag threaded
-  default:            False
-flag lhc-regress
-  default:            False
-flag lhc-pkg
-  default:            True
 
 Executable lhc
  main-is:            Main.hs
@@ -34,25 +24,20 @@ Executable lhc
  ghc-prof-options:   -auto-all
  build-depends:      base == 4.*,
                      containers,
-                     Cabal            >= 1.17.0,
                      filepath         >= 1.3.0.0,
-                     tagged           >= 0.4.5,
                      mtl              >= 2.1.2,
                      ansi-wl-pprint   >= 0.6.6,
 
-                     haskell-names    >= 0.1,
+                     haskell-names    >= 0.3,
                      hse-cpp          >= 0.1,
                      haskell-packages >= 0.2,
-                     haskell-src-exts >= 1.14.0
+                     haskell-src-exts >= 1.15.0,
+
+                     bedrock
 
 
 
- other-modules:      Paths_lhc
-
- ghc-options:        -fwarn-unused-imports -fwarn-unused-binds -fwarn-incomplete-patterns
- Extensions:         ScopedTypeVariables
- if flag(hpc)
-  ghc-options:       -fhpc -hisuf hpc_hi -osuf hpc_o
- if flag(threaded)
-  ghc-options:       -threaded
-
+ ghc-options:        -fwarn-unused-imports -fwarn-unused-binds
+                     -fwarn-incomplete-patterns
+ Default-language:   Haskell2010
+ Extensions:         
