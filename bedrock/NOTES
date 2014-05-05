@@ -1,8 +1,70 @@
-Inefficiencies in GHC:
-  Objects are placed on the heap instead of the stack.
-  Each green thread has its own stack.
-  No stepping in the GC.
-  GCing CAFs.
+Performance improvements over GHC:
+  Node layout:
+    * Tail pointer elimination. Tail pointers can always be compacted unless
+      the tail object is shared.
+      Likely to be a huge win.
+    * Object inlining. Objects not in the tail position can be compacted iff
+      their size is statically known. This basically means they cannot contain
+      pointers to other heap objects. Inlineable objects include Char, Int,
+      Integer, and so on. Objects not inlineable are Cons, Just, Branch, and
+      so on.
+      Likely to be a significant win.
+  Mutator:
+    * Aggressive unboxing. We have excellent GC support so we don't have to
+      worry about unpacking heap objects into registers (or the stack). GHC
+      is very limited in how it handles objects that may contain root pointers
+      but we have no such limitations and can let the optimizer run freely.
+      Small but robust win.
+    * Interprocedural alias analysis. As a side-effect of the HPT analysis,
+      we collect a lot of information about pointers which is of use to LLVM.
+      We collect a complete aliasing profile (which pointers may or may not
+      point to the same memory location), and we also identify which pointers
+      only point to immutable memory (We're in Haskell afterall, there ought
+      to be some immutability somewhere). LLVM loves this kind of information.
+      Probably a large win in a very few situtations (loops and such),
+      irrelevant in most others.
+    * Interprocedural register allocation. 
+      Likely to be a decent win.
+  Garbage collector:
+    * Eliminate two memory reads per live object. In GHC, info tables and block
+      headers are accessed when evacuating/scavenging objects. We pack the
+      needed information in the object tag.
+      This should be a decent win but maybe not huge since the info tables and
+      block headers often are in cache.
+    * Static information is statically encoded. Information about which CAFs
+      a certain object depends upon can be baked into the collector. No
+      need to scan the info table to find static objects.
+      This should be a very small win.
+    * Cache friendly object layout. By packing objects together, we avoid
+      reading objects smaller than a cache-line.
+      Very likely to be a win.
+    * Limited recursion in the evacuator. The evacuator statically knows when
+      it is safe to evacuate the children of an object. This leads to better
+      locality (see point above) and also means less work (fewer memory
+      writes) for the scavenger.
+    * Per-object stepping. GHC has a per-block target generation. This allows
+      it to delay the promotion of objects until they've aged a bit more.
+      We can have a per-object stepping counter which gives better control
+      and allows objects to live longer in their generation.
+      Might be a win, might not be a win.
+  Laziness:
+    * Update elimination. GHC pushes an update frame after each @eval. We do
+      whole-program analysis to avoid updates when they are not needed.
+      This should be a small but robust win.
+    * Locality preserving @eval. In GHC, @eval touches the info table of the
+      object to be evaluated. The cost of this is likely small since the table
+      is probably cached. But not polluting the cache is always a good thing.
+      Minor, unreliable win.
+    * Locality preserving @update. Same as above except @update touches the
+      block table. At least one block table is always touched. In some cases,
+      two block tables are touched.
+      Minor, unreliable win.
+  Threading:
+    * Linked list stack for green threads. Keeping a real stack for each thread
+      is too expensive and it is often not more efficient than a linked list.
+      This should be a win in some situations, a loss in others.
+    * Single threaded mutator. All concurrency is shared-nothing.
+  
 
 Interesting avenues to explore:
   Immix.
@@ -23,10 +85,46 @@ Profiling, debugging and program monitoring:
   External tools can then listen to the snapshots and generate a graph of
   memory usage over time.
 
+Stack frames and regions:
+  In the presence of IO, we do not know the life span of stack frames.
+  But in code that doesn't use IO (particularly in strict code), we
+  know the exact lifespan of each stack frame. Could we use regions
+  to avoid allocating the stack frames on the heap? We would require
+  that there are no pointers from the heap to any region.
+
+  In the absense of suspensions, the stack has the interesting property
+  that it does not need to be part of the heap. It contains heap pointers
+  but the heap will never point to it. This changes, of course, when we
+  suspend computation.
+
+  Can light-weight regions be implemented with llvm.stacksave and
+  llvm.stackrestore? The regions couldn't overlap, of course, but maybe
+  that is not necessary when we only use them for pushing frames to the
+  stack. How to deal with exceptions? Hm, we can restore the stack when
+  unwinding the stack.
+
+Optimizations possible in bedrock which are not possible in LLVM:
+  LLVM is doing a great job at optimizing our programs. We should focus
+  on implementing those optimizations which cannot be performed on
+  LLVM code.
+
+  1. Hoisting code out of suspended functions. LLVM doesn't know that
+     a node with the same name of a function represents the suspended
+     form of said function.
+     This optimization includes arity raising.
+  2. Removing dead stores. We know that the heap is never walked and
+     that objects are only accessed by their reference. If this reference
+     is dead, the store can be omitted. I wish this information could be
+     conveyed to LLVM but I don't see how.
+  3. Node inlining and specialization. 
+
 Using libuv
   We want one event loop per core with N heaps per event loop. Finding
   root elements for a given heap will be difficult.
-  We basically want StablePtr's. How efficiently can we support them?
+  We basically want StablePtr's. How efficiently can we support them? How
+  are they implemented in GHC right now?
+  How about 'IORef (Map StablePtr Any)'? How will it interact with the HPT
+  analysis? Use a judy array instead?
 
 Shared nothing concurrency.
   Allocate a fixed number of isolated heaps per core.
@@ -80,6 +178,15 @@ Garbage collection:
     NoGC, growing. Allocate as needed, never collect.
     Boehm.
 
+  Non-temporal stores:
+    For memcpy, using temporal stores cuts throughput by 1/3. This is for
+    linear memory which won't be read again until the cache has been flushed,
+    our GC environment is different. We copy a graph and we read each object
+    twice, once when evacuating, once when scavenging. Maybe it's only worth
+    it to use a non-temporal store when we have evacuated many more objects
+    than we have scavenged. That is, when the to-pointer is far from the
+    scavenge-pointer. In this case, by-passing the cache might be best.
+
 Whole program alias analysis:
   Alias analysis is import for allowing LLVM to optimize properly. In
   particular, LLVM cannot move invariant loads out of loops if indeed
@@ -96,12 +203,34 @@ Whole program alias analysis:
   verify. If no performance improvements are seen, figure out why.
 
 Interprocedural register allocation:
+  LLVM is going a great job at this. But how does it scale? For small programs,
+  LLVM does whole-program interprocedural register allocation. What will it do
+  for large programs? Maybe we need to help it along by grouping SCCs. Maybe
+  LLVM does this on its own.
 
 Things to benchmark:
   How much does it cost to limit the mutator with a fuel argument?
   How does immix compare to an ordinary copying collector?
   What percentage of of thunks are forced? A high percentage would
   mean eager evaluation is beneficial.
+  How much of the heap is wasted on pointers? A space optimal heap would
+  only have pointers to shared objects. Knowing how far we are from the
+  optimal would give us the limit of gains possible by merging nodes.
+
+  When garbage collecting a generation, how many pointers are there on
+  average to the next generation? GHC will read from these pointers but
+  avoid them. How significant is this?
+
+  Haskell, LLVM, and Alias Analysis
+    Blog post. Benchmark the impact of interprocedural alias analysis.
+  Haskell, LLVM, and Register Allocation
+    Blog post. Benchmark the impact of interprocedural register allocation.
+  Haskell, GC, and Compaction
+    Blog post. Benchmark the impact of compacting live objects.
+  Haskell, GC, and Non-Temporal Stores
+    Blog post. Benchmark the impack of non-temporal stores in the GC.
+  Haskell, C, and Callbacks
+    Blog post. Benchmark the cost of calling Haskell from C.
 
 Stepping in generational garbage collectors:
   Problem: Not all objects in a generation will be given the same amount of
@@ -175,5 +304,101 @@ Targeting LLVM for a functional language:
   Moving allocations from the heap onto the system stack is then an
   optimization like any other.
 
+Foreign Function Interface:
+  unsafe calls
+    Trivial, direct ccalls.
+  safe calls
+    Spawned in a work queue (libuv). Result passed back into Haskell space
+    via libnanomsg.
+  C -> Haskell
+    Haskell functions aren't called directly. Instead requests are passed
+    into Haskell space via libnanomsg.
+  wrapper: IO () -> IO (FunPtr (IO ()))
+  dynamic: FunPtr (IO ()) -> IO ()
+    safe call created dynamically. No option for unsafe calls?
 
+Libraries to make life easier:
+  libuv
+    Manages the event loop per execution core.
+  libjudy
+    Provides efficient StablePtr -> Closure mapping.
+    Efficient remembered set?
+  libnanomsg
+    Responsible for all communication between execution cores and between
+    C space and Haskell space (eg. calling Haskell from C).
+  tomfastmath
+    Efficient arbitrary precision integer implementation.
+  lifffi
+    Can generate function pointers on the fly. This is needed for, say, foreign
+    wrappers.
 
+GRIN optimizations:
+  Copy propagation:
+    This is done by LLVM.
+  Generalised unboxing:
+    This is done by whole-program dead variable elimination. LLVM might be
+    able to do this in many cases but we better make sure it gets done
+    correctly.
+  Evaluated case elimination:
+    Eliminate senseless code such as:
+    case scrut of
+       P1 -> unit scrut
+       P2 -> unit scrut
+    LLVM does this.
+  Trivial case elimination:
+    case scrut of
+      P1 -> ...
+    LLVM deals with this.
+  Sparse case optimisation:
+    Remove unused case branches. LLVM cannot do this. It relies on the HPT
+    analysis.
+  Case copy propagation:
+    v <- case scrut of
+      P1 -> node (Int x)
+      P2 -> node (Int y)
+    n <- case scrut of
+      P1 -> x
+      P2 -> y
+    v = node (Int n)
+    Done by LLVM? 
+  Update elimination:
+    Not done by LLVM. Requires HPT analysis results.
+  Late inlining:
+    Done by LLVM.
+  Case hoisting:
+    Done by LLVM.
+  Constant propagation:
+    Done by LLVM.
+  Arity raising.
+    Done partly by LLVM. Also has to be done in Bedrock.
+  Common sub-expression elimination:
+    Done by LLVM.
+  Dead code elimination:
+    Partly done by LLVM. Whole-program dce done in bedrock.
+  Dead parameter elimination:
+    Same as above.
+
+Graph compression:
+  Remove tail pointers. Always a win.
+  Eliminate pointers to static objects (Nil, Empty, etc). Combinatorial
+  explosion.
+  Inlining nodes. Gets in the way of tail pointer elimination.
+  Unpacking nodes. Destroys sharing.
+  
+  If we annotated the graph with sharing information, destructive optimizations
+  would become safe. When moving an object, we replace it with an Indirection.
+  When we find a pointer to an Indirection, we set the shared bit for the
+  indirection target and replace the Indirection with IndirectionShared. When
+  we encounter an IndirectionShared, we do nothing (like we did with an
+  Indirection before). This will cost an extra 2 loads and stores for each
+  shared object. This information will quickly be out of date. And unshared
+  objects can become shared in the future. Hm, doesn't seem worth it.
+
+  Node inlining requires speculative fetching during evacuation. Hm, if we
+  tagged pointers with node types then this fetch could be avoived. But we
+  also want to tag pointers with the generation they're in. This generation
+  tag is read when updating and in the GC loop so it's probably more important.
+  Hm, we don't need to know which node we're pointing to. We just need to know
+  whether it can be inlined. A single bit is required. On 32bit machines there
+  aren't enough bits. But on 64bit machines, we can do it. One bit for
+  inlineable, two bits for generation.
