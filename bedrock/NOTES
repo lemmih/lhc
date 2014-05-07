@@ -402,3 +402,147 @@ Graph compression:
   whether it can be inlined. A single bit is required. On 32bit machines there
   aren't enough bits. But on 64bit machines, we can do it. One bit for
   inlineable, two bits for generation.
+
+  Since we have to update with redirections, nodes cannot be smaller than two
+  words. This means we cannot inline all children. For example,
+  (Cons (Char _) Nil) cannot be packed without a pointer to the Char. Static
+  nodes such as Nil or Nothing are exempt, though. For those objects, we do not
+  care about duplication.
+
+
+GHC GC Notes:
+  Evacuate: (p is the address of a root pointer)
+    1. q = *p;
+    2. Check if p is HEAP_ALLOCED
+      ezyang is working on making this cheaper.
+    3. Read block descr for q
+    4. Read info table for q
+    5. Find destination gen
+    6. to = gen->free
+    7. gen->free += size
+    8. if gen->free > gen->limit todo_block_full
+    9. copy from -> to
+    10. update q with indirection
+    11. *p = to
+
+  Can we avoid the stack? How many registers do we need? Reading from the cache
+  is cheap, writing is always expensive. Put destination pointers in cache,
+  limits in mem?
+
+Pointer and node tagging:
+  Heap pointers are tagged with inlineable:1 and gen:2. On 32bit systems,
+  inlineable is skipped as assumed to be always false.
+  Hm, for updates, have pointers tagged with gen_no shouldn't be a big win.
+  Since we're overwriting the tag, reading the tag should be nearly free.
+  Tagging gen_no should make the GC slightly faster since it doesn't have to
+  touch nodes from other generations than it is currently GCing. Maybe this is
+  not very significant.
+
+  Nodes are of course tagged with their ID number. They're tagged with
+  a stepping counter, 3 or 4 bits should be enough, maybe 2. They're tagged with
+  a mark bit, only used by the mark/sweep collector. And importantly, they're
+  tagged with a bitmap of which pointers are inlined.
+  18 bits for the ID number. Three bits for the stepper. One for the mark. This
+  leaves 32-22=10 bits for the bitmap on 32bit machines. 64-22=42 bits on 64bit
+  machines. This should definitely cover more than 99.9% of objects.
+
+GC strategies and memory overhead:
+  Four generations, last generation being immix.
+
+  Single walk-through strategy:
+    For each of the semi-space generations, set aside memory for copying. This
+    doubles the worst-case memory bound.
+    At the beginning of each GC run, we determine how many generations we need
+    to collect. Collecting an older generation also collects the younger
+    generations.
+    Imagine we collect generation 0 and at the end of the collection, generation
+    1 has exceeded its limit. This does not immediately trigger a new
+    collection. Instead, generation 1 is marked for collection at the next run
+    and generation 0 is shrunk if necessary to keep the worst-case memory
+    bound within its limit. At the next GC run, both generation 1 and 0 are
+    collected together.
+    This approach can collect several generations in a single pass-through but
+    requires a lot of memory.
+    Worst case memory bound: size of all generations * 2
+
+  Gen-by-gen strategy:
+    In this strategy we free the from-space of each generation before
+    collecting the next. This requires more passes over the heap but reduces
+    the worst case memory bound.
+    We take the larget generation and set aside enough memory to collect it.
+    Now imagine that we collect generation 0 and at the end of the collection,
+    generation 1 has exceeded its limit. We free the from-space for generation 0
+    and walk the to-space to find additional roots (all the roots we used for
+    collecting generation 0 still counts as roots). If, at the end of this
+    collection, genration 2 has exceeded its limit, we do the same as we did
+    before: Free the from-space of generation 1 and walk generation 0+1 to
+    find additional roots.
+    Worst case memory bound: size of the largest generation * 2
+
+  META NOTE: Rename 'factor' to 'ratio'. It describes the ratio of live objects
+             to allocation space.
+  Per generation expansion factor:
+    The size of each generation is determined as the size of the live objects
+    multiplied by some factor+1.
+    If, for the sake of simplicity, we're using the single walk-through
+    strategy, a factor of 1 would mean size=live*(1+1) and memory_bound=size*2,
+    therefore memory_bound=live*4. In the worst case, we'll use 4 times the
+    size of our live objects. However, the steady-state case would be just
+    steady_state=live*(factor+1)+live=live*(factor+1+1)=live*3. In the common
+    case, we only use 3x the size of the live objects.
+
+    But the factors don't have to be the same for each generation. We might
+    want to make allocations cheaper in generation 0 at the cost of increased
+    memory usage. And we might want to make generation 2 more space efficient
+    at the cost of a higher rate of GCing.
+    Generation 0, 1 and 2 might have factors of, say, 2, 1 and 0.5,
+    respectively.
+
+    The gen-by-gen strategy works best if the generations are roughly evenly
+    sized. The relevant parameters here are the size factor and the stepping
+    count.
+
+  When we get close to the memory limit:
+    When we exceed the memory limit, we don't have enough space to expand
+    the generations by as much as they would like. When this happens, we scale
+    back the factors uniformly. If we use the factors 1,1,1 then we might
+    scale them to 0.5,0,5,0,5. If we use the factors 2,1,0.5 then we might
+    scale them to 1,0.5,0.25.
+
+    This has the effect of triggering GCs more often. The percentage of time
+    spent in GC goes up. Object are promoted quicker to the immix generation.
+    Once they're in the immix generation, space usage goes down and the
+    semi-space collectors may be free to expand again.
+
+  Memory overhead:
+    The overhead for immix is 25% for marking and X% for compaction. 12% may
+    be more than enough to set aside for compaction. That gives a total of 37%
+    overhead for objects in immix (assuming no loss due to fragmentation). We
+    don't actually pay for this overhead in the common case. But we need to
+    calculate the worst-case memory usage when adjusting to the maximum heap
+    size.
+
+    Overhead for a factor of 0 is 100%.
+    Overhead for a factor of 0.5 is 150%.
+    Overhead for a factor of 1 is 200%.
+    Overhead for a factor of 2 is 300%.
+
+    Large objects are not moved and therefore have zero overhead (except for
+    fragmentation loss when not a multiple of pagesize).
+
+Block allocator and the GC:
+  Global list of free blocks.
+  Large objects are allocated separately and never moved.
+  An arena is a list of used blocks and used large objects.
+  No coalescing. Block size relative to the size of the heap. Small blocks
+  are resized (Linux only) or freed. Large blocks are broken into smaller
+  blocks.
+  Allocating a new continuous slice of memory from an arena either
+  grabs a block from the global list or allocates a new block with mmap.
+  An arena is freed by moving the used blocks to the global block list.
+
+
+  data Arena = Arena LinkedListOfBlocks LinkedListOfLargeObjects
+  newSlice :: Arena -> IO (Ptr, Size)
+  free :: Arena -> IO ()
+  allocateLarge :: Arena -> Size -> IO Ptr
