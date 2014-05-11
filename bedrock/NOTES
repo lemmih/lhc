@@ -328,9 +328,11 @@ Libraries to make life easier:
     C space and Haskell space (eg. calling Haskell from C).
   tomfastmath
     Efficient arbitrary precision integer implementation.
-  lifffi
+  libffi
     Can generate function pointers on the fly. This is needed for, say, foreign
     wrappers.
+  libdivide
+    Would this be worth it or is it just silly.
 
 GRIN optimizations:
   Copy propagation:
@@ -446,6 +448,8 @@ Pointer and node tagging:
   leaves 32-22=10 bits for the bitmap on 32bit machines. 64-22=42 bits on 64bit
   machines. This should definitely cover more than 99.9% of objects.
 
+  Do we need to tag static objects? How about tagging pinned objects?
+
 GC strategies and memory overhead:
   Four generations, last generation being immix.
 
@@ -522,10 +526,10 @@ GC strategies and memory overhead:
     calculate the worst-case memory usage when adjusting to the maximum heap
     size.
 
-    Overhead for a factor of 0 is 100%.
-    Overhead for a factor of 0.5 is 150%.
-    Overhead for a factor of 1 is 200%.
-    Overhead for a factor of 2 is 300%.
+    Overhead for a factor of 0 is 100%, worse-case 100%.
+    Overhead for a factor of 0.5 is 150%, worst-case 200%
+    Overhead for a factor of 1 is 200%, worst-case 300%.
+    Overhead for a factor of 2 is 300%, worst-case 500%.
 
     Large objects are not moved and therefore have zero overhead (except for
     fragmentation loss when not a multiple of pagesize).
