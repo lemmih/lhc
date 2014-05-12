@@ -331,7 +331,7 @@ resolveNodeName nodeName = do
     wordTy <- asks envWordTy
     m <- asks envNodeMapping
     case Map.lookup nodeName m of
-        Nothing  -> error "LLVM.resolveNodeName"
+        Nothing  -> error $ "LLVM.resolveNodeName: " ++ show nodeName
         Just idx -> return $ LLVM.constInt wordTy (fromIntegral idx) False
 
 resolveFunction :: Name -> Gen Value

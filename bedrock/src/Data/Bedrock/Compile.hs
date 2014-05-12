@@ -89,3 +89,23 @@ compileFromFileWithOpts keepIntermediateFiles verbose path = do
             LLVM.compile result (replaceExtension path "bc")
   where
     base = takeBaseName path
+
+compileWithOpts :: KeepIntermediateFiles -> Verbose
+                -> FilePath -> Module -> IO ()
+compileWithOpts keepIntermediateFiles verbose path m = do
+    result <- runPipeline keepIntermediateFiles verbose base m
+        [ "rename"          :> unique
+        , PerformHPT
+        , "no-laziness"     :?> runGen . lowerEvalApply
+        , "no-exceptions"   :> unique . runGen cpsTransformation
+        , PerformHPT
+        , "no-invoke"       :?> runGen . lowerInvoke
+        , "no-unknown-size" :?> runGen . lowerNodeSize
+        , "no-nodes"        :> unique . registerIntroduction
+        , "no-allocs"       :> unique . runGen lowerAlloc
+        , "no-gc"           :> unique . lowerGC fixedGC
+        , "no-globals"      :> unique . lowerGlobalRegisters
+        ]
+    LLVM.compile result (replaceExtension path "bc")
+  where
+    base = takeBaseName path

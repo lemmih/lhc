@@ -25,7 +25,7 @@ instance Pretty Type where
 	pretty Node           = Doc.char '%'
 	pretty (StaticNode n) = Doc.char '%' <> Doc.int n <> Doc.char '%'
 	pretty (Primitive IWord) = Doc.char '#'
-	pretty (Primitive ty) = pretty ty
+	pretty (Primitive ty) = pretty ty <> char '|'
 	pretty FramePtr       = Doc.red (Doc.char '*')
 
 instance Pretty CType where
@@ -52,7 +52,7 @@ ppLiteral literal =
 
 ppNode :: NodeName -> [Doc] -> Doc
 ppNode (ConstructorName constructor) args =
-	Doc.hsep (Doc.magenta (pretty constructor) : args)
+	Doc.hsep (Doc.blue (pretty constructor) : args)
 ppNode (FunctionName fn blanks) args =
 	Doc.hsep (Doc.magenta (pretty fn) : args ++ replicate blanks (Doc.char '_'))
 --ppNode (CatchFrame fn blanks) args =
@@ -182,10 +182,11 @@ ppTypes lst = Doc.hsep $ map pretty lst
 
 instance Pretty Attribute where
 	pretty NoCPS = text "NoCPS"
+	pretty Internal = text "Internal"
 
 ppFunction :: Function -> Doc
 ppFunction fn =
-	pretty (fnAttributes fn) Doc.<$$>
+	ppList (map pretty (fnAttributes fn)) Doc.<$$>
 	ppTypes (fnResults fn) <+>
 	ppFnName (fnName fn) <+> Doc.hsep (map pretty (fnArguments fn)) <+>
 	Doc.char '=' Doc.<$$>
@@ -194,8 +195,15 @@ ppFunction fn =
 ppEntryPoint :: Name -> Doc
 ppEntryPoint entry = text "entrypoint:" <+> pretty entry
 
+instance Pretty Foreign where
+	pretty f =
+		ppSyntax "foreign" <+> pretty (foreignReturn f) <+>
+		text (foreignName f) <>
+		Doc.parens (ppList (map pretty $ foreignArguments f))
+
 ppModule :: Module -> Doc
 ppModule m =
+	Doc.vsep (map pretty (modForeigns m)) Doc.<$$>
 	Doc.vsep (map pretty (nodes m)) Doc.<$$>
 	ppEntryPoint (entryPoint m) Doc.<$$>
 	Doc.vsep (map ppFunction (functions m))

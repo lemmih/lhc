@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE Haskell2010 #-}
 module Data.Bedrock.EvalApply ( lowerEvalApply ) where
 
 import           Control.Applicative    (pure, (<$>), (<*>))
@@ -49,7 +49,7 @@ mkEval hpt origin bind var rest = do
 
     let HeapLocationSet ptrs = hptPtrScope hpt Vector.! variableIndex var
         objects = mergeObjectList $ map (hptHeap hpt Vector.!) (IntSet.toList ptrs)
-        maxArgs = maximum (map Vector.length (Map.elems objects))
+        maxArgs = foldr max 0 (map Vector.length (Map.elems objects))
     preEvalObject <- newVariable "node" (StaticNode (maxArgs+1))
     evalRet <- newName "ret"
     let body =

@@ -264,10 +264,8 @@ countStores = getSum . execWriter . mapM_ countFn . functions
             Store{} -> tell (Sum 1)
             _       -> return ()
 
-
-
 sizeOfVariable :: HPTResult -> Variable -> Int
-sizeOfVariable hpt var =
+sizeOfVariable hpt var = 
     case variableType var of
         NodePtr      -> 1
         FramePtr     -> 1

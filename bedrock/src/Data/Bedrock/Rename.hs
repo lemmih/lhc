@@ -60,7 +60,8 @@ resolveName :: Name -> Uniq Name
 resolveName name = do
     m <- ask
     case Map.lookup name m of
-        Nothing  -> error $ "Unresolved identifier: " ++ show (name, Map.keys m)
+        Nothing  -> -- return $ Name [] "unresolved" 0
+            error $ "Unresolved identifier: " ++ show (name, Map.keys m)
         Just new -> return new
 
 resolveNodeName :: NodeName -> Uniq NodeName

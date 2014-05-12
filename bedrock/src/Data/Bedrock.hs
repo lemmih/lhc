@@ -32,6 +32,8 @@ data CType
 	| IWord
 	| CPointer CType
 	| CVoid
+	-- CFloat
+	-- CDouble
 	deriving (Show, Eq, Ord)
 
 data Foreign = Foreign
@@ -60,6 +62,7 @@ data NodeDefinition = NodeDefinition Name [Type]
 
 data Attribute
 	= NoCPS
+	| Internal
 	deriving (Show,Eq)
 
 data Function = Function

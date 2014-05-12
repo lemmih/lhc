@@ -95,6 +95,8 @@ cpsExpresion origin binds simple rest =
                         TailCall fn (fnArgs ++ [continuationFrame])
         Store (FunctionName fn blanks) args ->
             return $ Bind binds (Store (FunctionName fn (blanks+1)) args) rest
+        MkNode (FunctionName fn blanks) args ->
+            return $ Bind binds (MkNode (FunctionName fn (blanks+1)) args) rest
         other -> return $ Bind binds other rest
   where    
     mkContinuation use = do
