@@ -1,15 +1,16 @@
 module Language.Haskell.TypeCheck.Infer where
 
-import Data.List
-import Control.Monad
-import Control.Monad.Trans
-import Language.Haskell.Exts.Annotated.Syntax
-import Language.Haskell.Exts.SrcLoc
-import Control.Applicative
+import           Control.Applicative
+import           Control.Monad
+import           Control.Monad.Trans
+import           Data.Graph
+import           Data.List
+import           Language.Haskell.Exts.Annotated.Syntax
+import           Language.Haskell.Exts.SrcLoc
 
-import Language.Haskell.Scope
-import Language.Haskell.TypeCheck.Types
-import Language.Haskell.TypeCheck.Monad
+import           Language.Haskell.Scope
+import           Language.Haskell.TypeCheck.Monad
+import           Language.Haskell.TypeCheck.Types
 
 
 tiGuardedAlts :: GuardedAlts Scoped -> TI TcType
@@ -51,7 +52,14 @@ tiExp expr =
             aT <- tiExp a
             unify (TcFun aT ty) fnT
             return ty
-        _ -> error "tiExp"
+        Paren _ e -> tiExp e
+        -- \a b c -> d
+        -- :: a -> b -> c -> d
+        Lambda _ pats e -> do
+            eTy <- tiExp e
+            patTys <- mapM tiPat pats
+            return $ foldr TcFun eTy patTys
+        _ -> error $ "tiExp: " ++ show expr
 
 tiPat :: Pat Scoped -> TI TcType
 tiPat pat =
@@ -59,7 +67,7 @@ tiPat pat =
         PVar _ name -> do
             tv <- TcMetaVar <$> newTcVar
             let Scoped (Variable src) _ = ann name
-            setAssumption src (Scheme [] $ [] :=> tv)
+            setAssumption src tv
             return tv
         PApp _ con pats -> do
             ty <- TcMetaVar <$> newTcVar
@@ -67,7 +75,7 @@ tiPat pat =
             conSig <- findGlobal gname
             _preds :=> conTy <- freshInst conSig
             patTys <- mapM tiPat pats
-            unify ty (foldl TcApp conTy patTys)
+            unify conTy (foldr TcFun ty patTys)
             return ty
         PWildCard _ -> do
             ty <- TcMetaVar <$> newTcVar
@@ -104,7 +112,7 @@ tiDecl decl ty =
             mapM_ (unify ty) ts
         _ -> error "tiDecl"
 
-tiExpl :: Decl Scoped -> Scheme -> TI ()
+tiExpl :: Decl Scoped -> TcType -> TI ()
 tiExpl decl declType = do
     _preds :=> ty <- freshInst declType
     tiDecl decl ty
@@ -121,7 +129,7 @@ tiImpls :: [Decl Scoped] -> TI ()
 tiImpls impls = do
     forM_ impls $ \impl -> do
         ty <- TcMetaVar <$> newTcVar
-        setAssumption (declIdent impl) (Scheme [] $ [] :=> ty)
+        setAssumption (declIdent impl) ty
         tiDecl impl ty
         rTy <- zonk ty
         liftIO $ print rTy
@@ -144,6 +152,7 @@ tiConDecl conDecl =
         ConDecl _ con bangTys ->
             let Scoped (Global gname) _ = ann con
             in (gname, map getTcType bangTys)
+
         _ -> error "tiConDecl"
   where
     getTcType (BangedTy _ ty) = typeToTcType ty
@@ -154,21 +163,8 @@ tiQualConDecl :: QualConDecl Scoped -> (GlobalName, [TcType])
 tiQualConDecl (QualConDecl _ _ _ con) =
     tiConDecl con
 
-tiTypeDecl :: Decl Scoped -> TI ()
-tiTypeDecl decl =
-    case decl of
-        DataDecl _ _ _ dhead cons _ -> do
-            let (tcvars, dataTy) = declHeadType dhead
-            forM_ cons $ \qualCon -> do
-                let (con, fieldTys) = tiQualConDecl qualCon
-                    ty = foldr TcFun dataTy fieldTys
-                setGlobal con (Scheme tcvars $ [] :=> ty)
-            --setGlobal Nothing (forall a. Maybe a)
-            --setGlobal Just (forall a. a -> Maybe a)
-        _ -> error "tiTypeDecl"
-
 tiClassDecl :: Decl Scoped -> TI ()
-tiClassDecl decl = 
+tiClassDecl decl =
     case decl of
         ClassDecl _ _ctx (DHead _ className [tyBind]) _deps (Just decls) ->
             sequence_
@@ -184,27 +180,105 @@ tiClassDecl decl =
             Scoped (Variable src) _ = ann name
             tcVar = tcVarFromTyVarBind tyBind
             tcType = typeToTcType ty
-        let scheme = Scheme [tcVar] ([IsIn gname (TcVar tcVar)] :=> tcType)
+        let scheme = TcForall [tcVar] ([IsIn gname (TcVar tcVar)] :=> tcType)
         setAssumption src scheme
 
 
+tiPrepareDecl :: Decl Scoped -> TI ()
+tiPrepareDecl decl =
+    case decl of
+        DataDecl _ _ _ dhead cons _ -> do
+            let (tcvars, dataTy) = declHeadType dhead
+            forM_ cons $ \qualCon -> do
+                let (con, fieldTys) = tiQualConDecl qualCon
+                    ty = foldr TcFun dataTy fieldTys
+                setGlobal con (TcForall tcvars $ [] :=> ty)
+        FunBind{} -> return ()
+        TypeDecl{} -> return ()
+        _ -> error $ "tiPrepareDecl: " ++ show decl
 
--- Split decls into class decls, data decls, expl decl and impl decl
+tiDecls :: [SrcLoc] -> [(Decl Scoped, SrcLoc)] -> TI ()
+tiDecls explicitlyTyped decls = do
+    liftIO $ print $ map snd decls
+    forM_ decls $ \(decl, binder) -> do
+        ty <- TcMetaVar <$> newTcVar
+        setAssumption binder ty
+        tiDecl decl ty
+        rTy <- zonk ty
+        liftIO $ print rTy
+
+    --error $ "tiDecls: " ++ show decls
+
+-- First go through the declarations and add explicit type signatures to
+-- the environment. Then type check the implicit declarations in their
+-- strongly connected groups. Lastly, verify the signature of explicitly
+-- typed declarations (this includes instance methods).
 tiBindGroup :: [Decl Scoped] -> TI ()
 tiBindGroup decls = do
-    mapM_ tiClassDecl classDecls
-    mapM_ tiTypeDecl typeDecls
-    tiImpls implDecls
-    -- mapM_ tiExpl explDecls
+    mapM_ tiPrepareDecl decls
+    forM_ scc $ tiDecls explicitlyTyped . flattenSCC
   where
-    (typeDecls, decls') = partition isTypeDecl decls
-    (classDecls, decls'') = partition isClassDecl decls'
-    implDecls = decls''
-    isTypeDecl DataDecl{} = True
-    isTypeDecl TypeDecl{} = True
-    isTypeDecl _ = False
-    isClassDecl ClassDecl{} = True
-    isClassDecl _ = False
+    explicitlyTyped = []
+    graph =
+        [ ((decl, binder), binder, declFreeVariables decl )
+        | decl <- decls
+        , binder <- declBinders decl ]
+    scc = stronglyConnComp graph
+
+-- FIXME: Rename this function. We're not finding free variables, we finding
+--        all references. 
+declFreeVariables :: Decl Scoped -> [SrcLoc]
+declFreeVariables decl =
+    case decl of
+        FunBind _ matches -> concatMap freeMatch matches
+        _ -> error $ "declFreeVariables: " ++ show decl
+  where
+    freeMatch match =
+        case match of
+            Match _ _ _pats rhs _binds -> freeRhs rhs
+    freeRhs rhs =
+        case rhs of
+            UnGuardedRhs _ expr -> freeExp expr
+    freeExp expr =
+        case expr of
+            Var _ qname -> [qnameIdentifier qname]
+            Con{} -> []
+            Case _ scrut alts -> freeExp scrut ++ concatMap freeAlt alts
+            App _ a b -> freeExp a ++ freeExp b
+            Paren _ e -> freeExp e
+            Lambda _ _pats e -> freeExp e
+            _ -> error $ "freeExp: " ++ show expr
+    freeAlt (Alt _ _pat guarded _binds) =
+        case guarded of
+            UnGuardedAlt _ expr -> freeExp expr
+
+qnameIdentifier :: QName Scoped -> SrcLoc
+qnameIdentifier qname =
+    case qname of
+        Qual _ _ name -> nameIdentifier name
+        UnQual _ name -> nameIdentifier name
+
+nameIdentifier :: Name Scoped -> SrcLoc
+nameIdentifier name =
+    case info of
+        Variable src -> getPointLoc src
+        _ -> error "nameIdentifier"
+  where
+    Scoped info _ = ann name
+
+declBinders :: Decl Scoped -> [SrcLoc]
+declBinders decl =
+    case decl of
+        DataDecl{} -> []
+        ForImp{}   -> []
+        FunBind _ matches ->
+            case head matches of
+                Match _ name _ _ _ ->
+                    let Scoped _ loc = ann name
+                    in [getPointLoc loc]
+        TypeDecl{} -> []
+        _ -> error $ "declBinders: " ++ show decl
+
 tiModule :: Module Scoped -> TI ()
 tiModule m =
     case m of

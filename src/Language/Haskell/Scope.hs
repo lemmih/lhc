@@ -409,6 +409,14 @@ resolveBangType bangTy =
             UnpackedTy (Scoped None span)
                 <$> resolveType ty
 
+resolveFieldDecl :: Resolve FieldDecl
+resolveFieldDecl fieldDecl =
+    case fieldDecl of
+        FieldDecl src names bangTy ->
+            FieldDecl (Scoped None src)
+                <$> mapM defineVariable names
+                <*> resolveBangType bangTy
+
 resolveConDecl :: Resolve ConDecl
 resolveConDecl conDecl =
     case conDecl of
@@ -416,6 +424,10 @@ resolveConDecl conDecl =
             ConDecl (Scoped None span)
                 <$> defineConstructor name
                 <*> mapM resolveBangType bangTys
+        RecDecl src name fieldDecls ->
+            RecDecl (Scoped None src)
+                <$> defineConstructor name
+                <*> mapM resolveFieldDecl fieldDecls
 
 resolveQualConDecl :: Resolve QualConDecl
 resolveQualConDecl (QualConDecl span mbTyVarBinds ctx conDecl) =

@@ -16,7 +16,7 @@ instance Eq TcMetaVar where
     TcMetaRef _ r1 == TcMetaRef _ r2 = r1==r2
 
 data TcType
-    = TcForall
+    = TcForall [TcVar] (Qual TcType)
     | TcFun TcType TcType
     | TcApp TcType TcType
     -- Uninstantiated tyvar
@@ -34,8 +34,8 @@ data Pred = IsIn GlobalName TcType
 -- Uninstantiated type signature.
 -- eg: forall a. Maybe a -- type of Nothing
 -- eg: Int -- type of 10
-data Scheme = Scheme [TcVar] (Qual TcType)
-    deriving ( Show )
+--data Scheme = Scheme [TcVar] (Qual TcType)
+--    deriving ( Show )
 
 data Typed = Typed TcType Scoped
 
