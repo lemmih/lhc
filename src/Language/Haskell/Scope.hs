@@ -1,5 +1,32 @@
+{-
+Goals:
+  Intuitive interface.
+  Good error messages, or at least the foundation for good error messages.
+  Origin analysis of recursive modules.
+  Fast.
+  Support rebindable syntax.
+  Support scoped type variables? Hm, maybe.
+
+Bugs:
+  Instance methods aren't resolved properly.
+
+Notes:
+  Rebindable syntax? We do not do any desugaring. Instead we just resolve
+  the relevant functions and add them to the module interface. When desugaring
+  with RebindableSyntax enabled, those functions can be used instead of the
+  default Prelude ones.
+
+-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Language.Haskell.Scope where
+module Language.Haskell.Scope
+    ( Origin(..)
+    , NameInfo(..)
+    , QualifiedName(..)
+    , Interface(..)
+    , Source(..)
+    , ScopeError(..)
+    , resolve
+    ) where
 
 import           Control.Applicative
 import           Control.Monad.Identity
@@ -8,44 +35,13 @@ import           Control.Monad.Writer
 import           Data.Map                               (Map)
 import qualified Data.Map                               as Map
 import           Data.Maybe
-import           Language.Haskell.Exts.Annotated        (ParseResult (..),
-                                                         parseFile)
 import           Language.Haskell.Exts.Annotated.Syntax
 import           Language.Haskell.Exts.SrcLoc
 import           Prelude                                hiding (span)
 
-data Scoped = Scoped NameInfo SrcSpanInfo
-    deriving ( Show )
--- TypeVars are uniquely identified by their SrcLoc and their name.
--- Variables are uniquely identified by their SrcLoc
--- Globals are uniquely identified by their GlobalName and namespace
-data NameInfo
-    = TypeVar SrcLoc
-    | Global GlobalName
-    | Variable SrcLoc
-    | None
-    | ScopeError ScopeError
-    deriving ( Show )
-
-data ScopeError
-    = ENotInScope SrcSpanInfo
-    | ETyVarNotInScope String SrcSpanInfo
-    | EGlobalNotInScope GlobalName SrcSpanInfo
-    | EAmbiguous
-    | ETypeAsClass
-    | ENotExported
-    | EModNotFound
-    | EInternal
-    deriving ( Show )
-
-testResolve :: IO ()
-testResolve = do
-    ParseOk m <- parseFile "src/Test.hs"
-    let (errs, _m') = resolve m
-    mapM_ print errs
 
 -- Resolve all names in a module
-resolve :: Module SrcSpanInfo -> ([ScopeError], Module Scoped)
+resolve :: Module SrcSpanInfo -> ([ScopeError], Module Origin)
 resolve m = runRename $ resolveModule m
 
 
@@ -54,23 +50,52 @@ resolve m = runRename $ resolveModule m
 -----------------------------------------------------------
 -- Types and Monad
 
-data GlobalName = GlobalName
+data Origin = Origin NameInfo SrcSpanInfo
+    deriving ( Show )
+
+data NameInfo
+    = Resolved GlobalName
+    | None
+    | ScopeError ScopeError
+    deriving ( Show )
+
+data GlobalName = GlobalName SrcSpanInfo QualifiedName
+    deriving ( Show )
+
+-- Module interface, list of names in the two namespaces.
+data Interface = Interface [GlobalName] [GlobalName]
+
+-- Used for error reporting.
+data Source
+    = ImplicitSource -- Imported implicitly, usually from Prelude.
+    | LocalSource -- Not imported, defined locally.
+    | ModuleSource (ModuleName SrcSpanInfo)
+data ScopedName = ScopedName Source GlobalName
+
+data ScopeError
+    = ENotInScope QualifiedName SrcSpanInfo
+    -- | ETypeNotInScope QualifiedName SrcSpanInfo
+    -- | EConstructorNotInScope QualifiedName SrcSpanInfo
+    -- | ETypeVariableNotInScope QualifiedName SrcSpanInfo
+    | EAmbiguous
+    | ETypeAsClass
+    | ENotExported
+    | EModNotFound
+    | EInternal
+    deriving ( Show )
+data QualifiedName = QualifiedName
     { gnameModule     :: String
     , gnameIdentifier :: String }
     deriving ( Eq, Ord, Show )
 data Namespace
     = NsTypes
-    | NsConstructors
-    | NsVariables
-    | NsTypeVariables
+    | NsValues
     deriving ( Show )
 data Scope = Scope
     { scopeTvRoot       :: Maybe SrcLoc
     , scopeModuleName   :: String
-    , scopeTypes        :: Map GlobalName GlobalName
-    , scopeConstructors :: Map GlobalName GlobalName
-    , scopeTyVars       :: Map String SrcLoc
-    , scopeVariables    :: Map GlobalName SrcLoc
+    , scopeTypes        :: Map QualifiedName [ScopedName]
+    , scopeValues       :: Map QualifiedName [ScopedName]
     , scopeErrors       :: [ScopeError]
     }
 instance Monoid Scope where
@@ -78,25 +103,24 @@ instance Monoid Scope where
         { scopeTvRoot       = Nothing
         , scopeModuleName   = "Main"
         , scopeTypes        = Map.empty
-        , scopeConstructors = Map.empty
-        , scopeTyVars       = Map.empty
-        , scopeVariables    = Map.empty
+        , scopeValues       = Map.empty
         , scopeErrors       = [] }
     -- FIXME: Catch ambiguous definitions.
     mappend a b = Scope
         { scopeTvRoot = scopeTvRoot a
         , scopeModuleName = scopeModuleName a
         , scopeTypes = scopeTypes a `Map.union` scopeTypes b
-        , scopeConstructors = scopeConstructors a `Map.union` scopeConstructors b
-        , scopeTyVars = scopeTyVars a `Map.union` scopeTyVars b
-        , scopeVariables = scopeVariables a `Map.union` scopeVariables b
+        , scopeValues = scopeValues a `Map.union` scopeValues b
         , scopeErrors = scopeErrors a ++ scopeErrors b }
 newtype Rename a = Rename { unRename :: ReaderT Scope (Writer Scope) a }
     deriving
         ( Monad, MonadReader Scope, MonadWriter Scope
         , Functor, Applicative )
 
-type Resolve a = a SrcSpanInfo -> Rename (a Scoped)
+data ResolveContext = ResolveToplevel | ResolveClass | ResolveInstance
+    deriving ( Show, Eq )
+
+type Resolve a = a SrcSpanInfo -> Rename (a Origin)
 
 -----------------------------------------------------------
 -- Utilities
@@ -114,10 +138,11 @@ withTvRoot root = local $ \env -> env{ scopeTvRoot = Just root }
 
 -- Run action without letting the tyVars escsape the scope.
 limitTyVarScope :: Rename a -> Rename a
-limitTyVarScope action = Rename $ ReaderT $ \scope ->
-    let inScope = scope{ scopeTyVars = scopeTyVars scope `Map.union` scopeTyVars nestedScope}
-        (a, nestedScope) = runWriter $ runReaderT (unRename action) inScope
-    in WriterT $ Identity (a, nestedScope{ scopeTyVars = Map.empty })
+limitTyVarScope = limitScope
+--limitTyVarScope action = Rename $ ReaderT $ \scope ->
+--    let inScope = scope{ scopeTyVars = scopeTyVars scope `Map.union` scopeTyVars nestedScope}
+--        (a, nestedScope) = runWriter $ runReaderT (unRename action) inScope
+--    in WriterT $ Identity (a, nestedScope{ scopeTyVars = Map.empty })
 
 limitScope :: Rename a -> Rename a
 limitScope action = Rename $ ReaderT $ \scope ->
@@ -125,76 +150,74 @@ limitScope action = Rename $ ReaderT $ \scope ->
         (a, nestedScope) = runWriter $ runReaderT (unRename action) inScope
     in WriterT $ Identity (a, mempty{ scopeErrors = scopeErrors nestedScope})
 
-qnameToGlobalName :: QName l -> GlobalName
-qnameToGlobalName qname =
-    case qname of
-        Qual _ (ModuleName _ m) name -> GlobalName m (getNameIdentifier name)
-        UnQual _ name -> GlobalName "" (getNameIdentifier name)
-        Special{} -> error "qnameToGlobalName"
-
 getNameIdentifier :: Name l -> String
 getNameIdentifier (Ident _ ident) = ident
 getNameIdentifier (Symbol _ symbol) = symbol
 
+matchName :: Match l -> Name l
+matchName (Match _span name _pats _rhs _binds) = name
+matchName (InfixMatch _span _left name _right _rhs _binds) = name
+
+
+-----------------------------------------------------------
+-- Name binding and resolution
+
+-- FIXME: Use ETypeNotInScope, EConstructorNotInScope, etc.
 resolveName :: Namespace -> Resolve Name
-resolveName ns name =
-    case name of
-        Ident span ident ->
-            Ident
-                <$> getScoped span ident
-                <*> pure ident
-        Symbol span symbol -> do
-            Symbol
-                <$> getScoped span symbol
-                <*> pure symbol
+resolveName = resolveName' ""
+
+resolveName' :: String -> Namespace -> Resolve Name
+resolveName' qualification ns name =
+    con <$> getScoped src <*> pure nameString
   where
-    worker field nsType span gname = do
+    (con, src, nameString) =
+        case name of
+            Ident a b  -> (Ident, a, b)
+            Symbol a b -> (Symbol, a, b)
+    qname = QualifiedName qualification nameString
+    worker field = do
         m <- asks field
-        let ret = case Map.lookup gname m of
-                Nothing -> Left (ENotInScope span)
+        let ret = case Map.lookup qname m of
+                Nothing -> Left (ENotInScope qname src)
                 Just var -> Right var
-            nameInfo = either ScopeError nsType ret
-        tell mempty{ scopeErrors = maybeToList (either (Just) (const Nothing) ret) }
-        return $ Scoped nameInfo span
-    mkGlobal = GlobalName ""
+            nameInfo =
+                case ret of
+                    Left err -> ScopeError err
+                    Right [ScopedName _ gname] -> Resolved gname
+        tell mempty{ scopeErrors =
+                        maybeToList (either (Just) (const Nothing) ret) }
+        return $ Origin nameInfo src
     getScoped span =
         case ns of
-            NsVariables     -> worker scopeVariables Variable span . mkGlobal
-            NsConstructors  -> worker scopeConstructors Global span . mkGlobal
-            NsTypes         -> worker scopeTypes Global span . mkGlobal
-            NsTypeVariables -> worker scopeTyVars TypeVar span
+            NsValues -> worker scopeValues
+            NsTypes  -> worker scopeTypes
 
-defineType :: Resolve Name
-defineType name = do
+resolveQName :: Namespace -> Resolve QName
+resolveQName ns qname =
+    case qname of
+        Qual src (ModuleName l m) name ->
+            Qual (Origin None src)
+                <$> pure (ModuleName (Origin None l) m)
+                <*> resolveName' m ns name
+        UnQual src name ->
+            UnQual (Origin None src)
+                <$> resolveName ns name
+        Special src specialCon ->
+            Special (Origin None src)
+                <$> resolveSpecialCon specialCon
+
+defineName :: Namespace -> Resolve Name
+defineName ns name = do
     thisModule <- asks scopeModuleName
-    let gname = GlobalName "" (getNameIdentifier name)
-        resolved = GlobalName thisModule (getNameIdentifier name)
-    tell mempty{ scopeTypes = Map.singleton gname resolved}
-    resolveName NsTypes name
-
-defineConstructor :: Resolve Name
-defineConstructor name = do
-    thisModule <- asks scopeModuleName
-    let gname = GlobalName "" (getNameIdentifier name)
-        resolved = GlobalName thisModule (getNameIdentifier name)
-    tell mempty{ scopeConstructors = Map.singleton gname resolved }
-    resolveName NsConstructors name
-
--- FIXME: merge defineVariable, defineConstructor, defineType, defineTyVar
--- using the same pattern as resolveName.
-defineVariable :: Resolve Name
-defineVariable name = do
-    let point = getPointLoc (ann name)
-        gname = GlobalName "" (getNameIdentifier name)
-    tell mempty{ scopeVariables = Map.singleton gname point}
-    resolveName NsVariables name
-
-defineTyVar :: Resolve Name
-defineTyVar name = do
-    let span = ann name
+    let src = ann name
         ident = getNameIdentifier name
-    tell mempty{ scopeTyVars = Map.singleton ident (getPointLoc span) }
-    resolveName NsTypeVariables name
+        qname = QualifiedName "" ident
+        gname = GlobalName src (QualifiedName thisModule ident)
+        resolved = ScopedName LocalSource gname
+    case ns of
+        NsValues -> tell mempty{ scopeValues = Map.singleton qname [resolved]}
+        NsTypes  -> tell mempty{ scopeTypes = Map.singleton qname [resolved]}
+    resolveName ns name
 
 -- resolveMaybe :: Resolve a -> Resolve (Maybe a)
 resolveMaybe :: (a -> Rename b) -> Maybe a -> Rename (Maybe b)
@@ -203,50 +226,34 @@ resolveMaybe fn mbValue =
         Nothing    -> return Nothing
         Just value -> Just <$> fn value
 
-freeVariables :: Type SrcSpanInfo -> [String]
-freeVariables = worker []
-  where
-    worker ignore (TyForall _ Nothing _ ty) = worker ignore ty
-    worker ignore (TyForall _ (Just binds) _ ty) =
-        worker (map getTyVar binds ++ ignore) ty
-    worker ignore (TyFun _ a b) = worker ignore a ++ worker ignore b
-    worker ignore (TyApp _ a b) = worker ignore a ++ worker ignore b
-    worker ignore (TyVar _ var)
-        | getNameIdentifier var `elem` ignore = []
-        | otherwise = [getNameIdentifier var]
-    worker _ TyCon{} = []
-    worker _ ty = error $ "freeVariables: " ++ show ty
-    getTyVar (KindedVar _ name _) = getNameIdentifier name
-    getTyVar (UnkindedVar _ name) = getNameIdentifier name
-
------------------------------------------------------------
--- Name resolution
+-------------------------------------------------------------
+---- Name resolution
 
 resolveSafety :: Resolve Safety
 resolveSafety safety =
     case safety of
         PlayRisky src  ->
-            pure $ PlayRisky (Scoped None src)
+            pure $ PlayRisky (Origin None src)
         PlaySafe src b ->
-            pure $ PlaySafe (Scoped None src) b
+            pure $ PlaySafe (Origin None src) b
         PlayInterruptible src ->
-            pure $ PlayInterruptible (Scoped None src)
+            pure $ PlayInterruptible (Origin None src)
 
 resolveCallConv :: Resolve CallConv
 resolveCallConv conv = pure $
     case conv of
-        StdCall src   -> StdCall (Scoped None src)
-        CCall src     -> CCall (Scoped None src)
-        CPlusPlus src -> CPlusPlus (Scoped None src)
-        DotNet src    -> DotNet (Scoped None src)
-        Jvm src       -> Jvm (Scoped None src)
-        Js src        -> Js (Scoped None src)
-        CApi src      -> CApi (Scoped None src)
+        StdCall src   -> StdCall (Origin None src)
+        CCall src     -> CCall (Origin None src)
+        CPlusPlus src -> CPlusPlus (Origin None src)
+        DotNet src    -> DotNet (Origin None src)
+        Jvm src       -> Jvm (Origin None src)
+        Js src        -> Js (Origin None src)
+        CApi src      -> CApi (Origin None src)
 
 resolveKind :: Resolve Kind
 resolveKind kind =
     case kind of
-        KindStar span -> pure $ KindStar (Scoped None span)
+        KindStar span -> pure $ KindStar (Origin None span)
         _ -> error "resolveKind"
 
 resolveTyVarBind :: Resolve TyVarBind
@@ -254,21 +261,21 @@ resolveTyVarBind tyVarBind =
     case tyVarBind of
         KindedVar span name kind ->
             KindedVar
-                <$> pure (Scoped None span)
-                <*> defineTyVar name
+                <$> pure (Origin None span)
+                <*> defineName NsTypes name
                 <*> resolveKind kind
         UnkindedVar span name    ->
             UnkindedVar
-                <$> pure (Scoped None span)
-                <*> defineTyVar name
+                <$> pure (Origin None span)
+                <*> defineName NsTypes name
 
 resolveDeclHead :: Resolve DeclHead
 resolveDeclHead dhead =
     case dhead of
         DHead span name tyVarBinds ->
             DHead
-                <$> pure (Scoped None span)
-                <*> defineType name
+                <$> pure (Origin None span)
+                <*> defineName NsTypes name
                 <*> mapM resolveTyVarBind tyVarBinds
         DHInfix{} -> error "resolveDeclHead"
         DHParen _ next -> resolveDeclHead next
@@ -281,157 +288,98 @@ resolveContext ctx =
 resolveDataOrNew :: Resolve DataOrNew
 resolveDataOrNew dataOrNew =
     case dataOrNew of
-        DataType span -> pure $ DataType (Scoped None span)
-        NewType span  -> pure $ NewType (Scoped None span)
+        DataType span -> pure $ DataType (Origin None span)
+        NewType span  -> pure $ NewType (Origin None span)
 
 resolveInstHead :: Resolve InstHead
 resolveInstHead instHead =
     case instHead of
         IHead src className tys ->
-            IHead (Scoped None src)
+            IHead (Origin None src)
                 <$> resolveQName NsTypes className
                 <*> mapM resolveType tys
         IHInfix{} -> error "resolveInstHead"
-        IHParen span sub ->
-            IHParen (Scoped None span)
+        IHParen src sub ->
+            IHParen (Origin None src)
                 <$> resolveInstHead sub
 
 resolveDeriving :: Resolve Deriving
 resolveDeriving (Deriving span instHeads) =
     Deriving
-        <$> pure (Scoped None span)
+        <$> pure (Origin None span)
         <*> mapM resolveInstHead instHeads
 
 resolveSpecialCon :: Resolve SpecialCon
 resolveSpecialCon specialCon = pure $
     case specialCon of
-        UnitCon src             -> UnitCon $ Scoped None src
-        ListCon src             -> ListCon $ Scoped None src
-        FunCon src              -> FunCon $ Scoped None src
-        TupleCon src boxed size -> TupleCon (Scoped None src) boxed size
-        Cons src                -> Cons $ Scoped None src
-        UnboxedSingleCon src    -> UnboxedSingleCon $ Scoped None src
-
-resolveQName :: Namespace -> Resolve QName
-resolveQName ns qname =
-    case qname of
-        Qual span (ModuleName l m) name ->
-            Qual
-                <$> getScoped span (GlobalName m (getNameIdentifier name))
-                <*> pure (ModuleName (Scoped None l) m)
-                <*> resolveName ns name
-        UnQual span name ->
-            UnQual
-                <$> getScoped span (GlobalName "" (getNameIdentifier name))
-                <*> resolveName ns name
-        Special src specialCon ->
-            Special (Scoped None src)
-                <$> resolveSpecialCon specialCon
-  where
-    worker field nsType span gname = do
-        m <- asks field
-        let ret = case Map.lookup gname m of
-                Nothing -> Left (EGlobalNotInScope gname span)
-                Just var -> Right var
-            nameInfo = either ScopeError nsType ret
-        tell mempty{ scopeErrors = maybeToList (either (Just) (const Nothing) ret) }
-        return $ Scoped nameInfo span
-    getScoped =
-        case ns of
-            NsVariables    -> worker scopeVariables Variable
-            NsConstructors -> worker scopeConstructors Global
-            NsTypes        -> worker scopeTypes Global
-
--- FIXME: Yikes, merge this with resolveName
-resolveTyVar :: Resolve Name
-resolveTyVar tyVar =
-    case tyVar of
-        Ident span ident ->
-            Ident
-                <$> getScoped span ident
-                <*> pure ident
-        Symbol span symbol ->
-            Symbol
-                <$> getScoped span symbol
-                <*> pure symbol
-  where
-    getScoped span key = do
-        m <- asks scopeTyVars
-        mbRoot <- getTvRoot
-        let mbError = case Map.lookup key m of
-                Nothing -> case mbRoot of
-                    Nothing -> Just (ETyVarNotInScope key span)
-                    Just{} -> Nothing{}
-                Just{} -> Nothing
-        tell mempty{ scopeErrors = maybeToList mbError }
-        pure $ Scoped (
-            case Map.lookup key m of
-                Nothing -> case mbRoot of
-                    Nothing -> ScopeError (ETyVarNotInScope key span)
-                    Just point -> TypeVar point
-                Just point -> TypeVar point) span
+        UnitCon src             -> UnitCon $ Origin None src
+        ListCon src             -> ListCon $ Origin None src
+        FunCon src              -> FunCon $ Origin None src
+        TupleCon src boxed size -> TupleCon (Origin None src) boxed size
+        Cons src                -> Cons $ Origin None src
+        UnboxedSingleCon src    -> UnboxedSingleCon $ Origin None src
 
 resolveType :: Resolve Type
 resolveType ty =
     case ty of
-        TyCon span qname ->
-            TyCon (Scoped None span)
+        TyCon src qname ->
+            TyCon (Origin None src)
                 <$> resolveQName NsTypes qname
-        TyVar span tyVar ->
-            TyVar (Scoped None span)
-                <$> resolveTyVar tyVar
-        TyFun span a b ->
-            TyFun (Scoped None span)
+        TyVar src tyVar ->
+            TyVar (Origin None src)
+                <$> resolveName NsTypes tyVar
+        TyFun src a b ->
+            TyFun (Origin None src)
                 <$> resolveType a
                 <*> resolveType b
-        TyApp span a b ->
-            TyApp (Scoped None span)
+        TyApp src a b ->
+            TyApp (Origin None src)
                 <$> resolveType a
                 <*> resolveType b
         TyParen src sub ->
-            TyParen (Scoped None src)
+            TyParen (Origin None src)
                 <$> resolveType sub
         TyTuple src boxed tys ->
-            TyTuple (Scoped None src) boxed
+            TyTuple (Origin None src) boxed
                 <$> mapM resolveType tys
         _ -> error $ "resolveType: " ++ show ty
 
 resolveBangType :: Resolve BangType
 resolveBangType bangTy =
     case bangTy of
-        BangedTy span ty ->
-            BangedTy (Scoped None span)
+        BangedTy src ty ->
+            BangedTy (Origin None src)
                 <$> resolveType ty
-        UnBangedTy span ty ->
-            UnBangedTy (Scoped None span)
+        UnBangedTy src ty ->
+            UnBangedTy (Origin None src)
                 <$> resolveType ty
-        UnpackedTy span ty ->
-            UnpackedTy (Scoped None span)
+        UnpackedTy src ty ->
+            UnpackedTy (Origin None src)
                 <$> resolveType ty
 
 resolveFieldDecl :: Resolve FieldDecl
 resolveFieldDecl fieldDecl =
     case fieldDecl of
         FieldDecl src names bangTy ->
-            FieldDecl (Scoped None src)
-                <$> mapM defineVariable names
+            FieldDecl (Origin None src)
+                <$> mapM (defineName NsValues) names
                 <*> resolveBangType bangTy
 
 resolveConDecl :: Resolve ConDecl
 resolveConDecl conDecl =
     case conDecl of
         ConDecl span name bangTys ->
-            ConDecl (Scoped None span)
-                <$> defineConstructor name
+            ConDecl (Origin None span)
+                <$> defineName NsValues name
                 <*> mapM resolveBangType bangTys
         RecDecl src name fieldDecls ->
-            RecDecl (Scoped None src)
-                <$> defineConstructor name
+            RecDecl (Origin None src)
+                <$> defineName NsValues name
                 <*> mapM resolveFieldDecl fieldDecls
 
 resolveQualConDecl :: Resolve QualConDecl
-resolveQualConDecl (QualConDecl span mbTyVarBinds ctx conDecl) =
-    QualConDecl (Scoped None span)
+resolveQualConDecl (QualConDecl src mbTyVarBinds ctx conDecl) =
+    QualConDecl (Origin None src)
         <$> resolveMaybe (mapM resolveTyVarBind) mbTyVarBinds
         <*> resolveMaybe resolveContext ctx
         <*> resolveConDecl conDecl
@@ -439,34 +387,34 @@ resolveQualConDecl (QualConDecl span mbTyVarBinds ctx conDecl) =
 resolvePat :: Resolve Pat
 resolvePat pat =
     case pat of
-        PVar span name ->
-            PVar (Scoped None span)
-                <$> defineVariable name
-        PApp span con pats ->
-            PApp (Scoped None span)
-                <$> resolveQName NsConstructors con
+        PVar src name ->
+            PVar (Origin None src)
+                <$> defineName NsValues name
+        PApp src con pats ->
+            PApp (Origin None src)
+                <$> resolveQName NsValues con
                 <*> mapM resolvePat pats
-        PWildCard span ->
-            pure $ PWildCard (Scoped None span)
-        PParen span sub ->
-            PParen (Scoped None span)
+        PWildCard src ->
+            pure $ PWildCard (Origin None src)
+        PParen src sub ->
+            PParen (Origin None src)
                 <$> resolvePat sub
         PTuple src boxed pats ->
-            PTuple (Scoped None src) boxed
+            PTuple (Origin None src) boxed
                 <$> mapM resolvePat pats
         _ -> error $ "resolvePat: " ++ show pat
 
 resolveGuardedAlts :: Resolve GuardedAlts
 resolveGuardedAlts galts =
     case galts of
-        UnGuardedAlt span expr ->
-            UnGuardedAlt (Scoped None span)
+        UnGuardedAlt src expr ->
+            UnGuardedAlt (Origin None src)
                 <$> resolveExp expr
         _ -> error "resolveGuardedAlts"
 
 resolveAlt :: Resolve Alt
-resolveAlt (Alt span pat guarded mbBinds) = limitScope $
-    Alt (Scoped None span)
+resolveAlt (Alt src pat guarded mbBinds) = limitScope $
+    Alt (Origin None src)
         <$> resolvePat pat
         <*> resolveGuardedAlts guarded
         <*> resolveMaybe undefined mbBinds
@@ -475,11 +423,11 @@ resolveQOp :: Resolve QOp
 resolveQOp qop =
     case qop of
         QVarOp src qname ->
-            QVarOp (Scoped None src)
-                <$> resolveQName NsVariables qname
+            QVarOp (Origin None src)
+                <$> resolveQName NsValues qname
         QConOp src qname ->
-            QConOp (Scoped None src)
-                <$> resolveQName NsConstructors qname
+            QConOp (Origin None src)
+                <$> resolveQName NsValues qname
 
 resolveLiteral :: Resolve Literal
 resolveLiteral lit = pure $
@@ -496,74 +444,69 @@ resolveLiteral lit = pure $
         PrimString src s orig -> worker PrimString src s orig
   where
     worker con src =
-        con (Scoped None src)
+        con (Origin None src)
 
 resolveExp :: Resolve Exp
 resolveExp expr =
     case expr of
-        Case span scrut alts ->
-            Case (Scoped None span)
+        Case src scrut alts ->
+            Case (Origin None src)
                 <$> resolveExp scrut
                 <*> mapM resolveAlt alts
-        Con span qname ->
-            Con (Scoped None span)
-                <$> resolveQName NsConstructors qname
-        Var span qname ->
-            Var (Scoped None span)
-                <$> resolveQName NsVariables qname
+        Con src qname ->
+            Con (Origin None src)
+                <$> resolveQName NsValues qname
+        Var src qname ->
+            Var (Origin None src)
+                <$> resolveQName NsValues qname
         App src a b ->
-            App (Scoped None src)
+            App (Origin None src)
                 <$> resolveExp a
                 <*> resolveExp b
         InfixApp src a qop b ->
-            InfixApp (Scoped None src)
+            InfixApp (Origin None src)
                 <$> resolveExp a
                 <*> resolveQOp qop
                 <*> resolveExp b
         Paren src sub ->
-            Paren (Scoped None src)
+            Paren (Origin None src)
                 <$> resolveExp sub
         Lambda src pats sub -> limitScope $
-            Lambda (Scoped None src)
+            Lambda (Origin None src)
                 <$> mapM resolvePat pats
                 <*> resolveExp sub
         Lit src lit ->
-            Lit (Scoped None src)
+            Lit (Origin None src)
                 <$> resolveLiteral lit
         Tuple src boxed exps ->
-            Tuple (Scoped None src) boxed
+            Tuple (Origin None src) boxed
                 <$> mapM resolveExp exps
         _ -> error $ "resolveExp: " ++ show expr
 
 resolveRhs :: Resolve Rhs
 resolveRhs rhs =
     case rhs of
-        UnGuardedRhs span expr ->
-            UnGuardedRhs (Scoped None span)
+        UnGuardedRhs src expr ->
+            UnGuardedRhs (Origin None src)
                 <$> resolveExp expr
         _ -> error "resolveRhs"
 
 resolveMatch :: Resolve Match
 resolveMatch match =
     case match of
-        Match span name pats rhs mbBinds -> limitScope $
-            Match (Scoped None span)
-                <$> resolveName NsVariables name
+        Match src name pats rhs mbBinds -> limitScope $
+            Match (Origin None src)
+                <$> resolveName NsValues name
                 <*> mapM resolvePat pats
                 <*> resolveRhs rhs
                 <*> resolveMaybe undefined mbBinds
         _ -> error "resolveMatch"
 
--- FIXME: Move this
-matchName :: Match l -> Name l
-matchName (Match _span name _pats _rhs _binds) = name
-matchName (InfixMatch _span _left name _right _rhs _binds) = name
-
 resolveClassDecl :: Resolve ClassDecl
 resolveClassDecl decl =
     case decl of
         ClsDecl src sub ->
-          ClsDecl (Scoped None src)
+          ClsDecl (Origin None src)
             <$> resolveDecl ResolveClass sub
         _ -> error "resolveClassDecl"
 
@@ -576,26 +519,22 @@ resolveInstDecl :: Resolve InstDecl
 resolveInstDecl inst =
     case inst of
         InsDecl src decl ->
-            InsDecl (Scoped None src)
+            InsDecl (Origin None src)
                 <$> resolveDecl ResolveInstance decl
         _ -> error "resolveInstDecl"
 
 resolveActivation :: Resolve Activation
 resolveActivation activation = pure $
     case activation of
-        ActiveFrom src n -> ActiveFrom (Scoped None src) n
-        ActiveUntil src n -> ActiveUntil (Scoped None src) n
-
--- FIXME: Move this
-data ResolveContext = ResolveToplevel | ResolveClass | ResolveInstance
-    deriving ( Show, Eq )
+        ActiveFrom src n -> ActiveFrom (Origin None src) n
+        ActiveUntil src n -> ActiveUntil (Origin None src) n
 
 resolveDecl :: ResolveContext -> Resolve Decl
 resolveDecl rContext decl =
     case decl of
         DataDecl src isNewtype ctx dhead cons derive ->
             limitTyVarScope $
-            DataDecl (Scoped None src)
+            DataDecl (Origin None src)
                 <$> resolveDataOrNew isNewtype
                 <*> resolveMaybe resolveContext ctx
                 <*> resolveDeclHead dhead
@@ -607,13 +546,13 @@ resolveDecl rContext decl =
             -- top-level functions. For class declarations,
             -- we use their type signature.
             when (rContext == ResolveToplevel) $
-                void $ defineVariable (matchName $ head matches)
-            FunBind (Scoped None src)
+                void $ defineName NsValues (matchName $ head matches)
+            FunBind (Origin None src)
                 <$> mapM resolveMatch matches
 
         -- FIXME: PatBind in classes and instances
         PatBind src pat ty rhs binds ->
-            PatBind (Scoped None src)
+            PatBind (Origin None src)
                 <$> resolvePat pat
                 <*> resolveMaybe resolveType ty
                 <*> resolveRhs rhs
@@ -625,23 +564,23 @@ resolveDecl rContext decl =
         -- to the point of the signature.
         TypeSig src names ty | rContext == ResolveToplevel -> do
             withTvRoot (getPointLoc src) $
-                TypeSig (Scoped None src)
-                    <$> mapM (resolveName NsVariables) names
+                TypeSig (Origin None src)
+                    <$> mapM (resolveName NsValues) names
                     <*> resolveType ty
         TypeSig src names ty | rContext == ResolveClass -> do
             withTvRoot (getPointLoc src) $
-                TypeSig (Scoped None src)
-                    <$> mapM defineVariable names
+                TypeSig (Origin None src)
+                    <$> mapM (defineName NsValues) names
                     <*> resolveType ty
         ClassDecl src ctx dhead deps decls ->
-            ClassDecl (Scoped None src)
+            ClassDecl (Origin None src)
                 <$> resolveMaybe resolveContext ctx
                 <*> resolveDeclHead dhead
                 <*> mapM resolveFunDep deps
                 <*> resolveMaybe (mapM resolveClassDecl) decls
 
         InstDecl src ctx instHead decls ->
-            InstDecl (Scoped None src)
+            InstDecl (Origin None src)
                 <$> resolveMaybe resolveContext ctx
                 <*> resolveInstHead instHead
                 <*> resolveMaybe (mapM resolveInstDecl) decls
@@ -649,52 +588,66 @@ resolveDecl rContext decl =
         ForImp src conv safety ident name ty ->
             -- Bind free type variables to the foreign import.
             withTvRoot (getPointLoc src) $
-                ForImp (Scoped None src)
+                ForImp (Origin None src)
                     <$> resolveCallConv conv
                     <*> resolveMaybe resolveSafety safety
                     <*> pure ident
-                    <*> defineVariable name
+                    <*> defineName NsValues name
                     <*> resolveType ty
 
         InlineSig src noInline mbActivation qname ->
-            InlineSig (Scoped None src) noInline
+            InlineSig (Origin None src) noInline
                 <$> resolveMaybe resolveActivation mbActivation
-                <*> resolveQName NsVariables qname
+                <*> resolveQName NsValues qname
 
         TypeDecl src dhead ty ->
-            TypeDecl (Scoped None src)
+            TypeDecl (Origin None src)
                 <$> resolveDeclHead dhead
                 <*> resolveType ty
 
         _ -> error $ "resolveDecl: " ++ show decl
 
 resolveModuleName :: Resolve ModuleName
-resolveModuleName (ModuleName span name) = do
+resolveModuleName (ModuleName src name) = do
     tell mempty{ scopeModuleName = name }
-    pure $ ModuleName (Scoped None span) name
+    pure $ ModuleName (Origin None src) name
+
+resolveExportSpec :: Resolve ExportSpec
+resolveExportSpec spec =
+    case spec of
+        EAbs src qname ->
+            EAbs (Origin None src) <$> resolveQName NsTypes qname
+        _ -> error $ "resolveExportSpec: " ++ show spec
+
+resolveExportSpecList :: Resolve ExportSpecList
+resolveExportSpecList list =
+    case list of
+        ExportSpecList src exports ->
+            ExportSpecList (Origin None src)
+                <$> mapM resolveExportSpec exports
 
 resolveModuleHead :: Resolve ModuleHead
-resolveModuleHead (ModuleHead span name mbWarn mbExport) =
-    ModuleHead (Scoped None span)
+resolveModuleHead (ModuleHead src name mbWarn mbExport) =
+    ModuleHead (Origin None src)
         <$> resolveModuleName name
         <*> resolveMaybe undefined mbWarn
-        <*> resolveMaybe undefined mbExport
+        <*> resolveMaybe resolveExportSpecList mbExport
 
 resolveModulePragma :: Resolve ModulePragma
 resolveModulePragma pragma =
     case pragma of
         LanguagePragma src names ->
-            pure $ LanguagePragma (Scoped None src) (map scope names)
+            pure $ LanguagePragma (Origin None src) (map scope names)
         _ -> error "resolveModulePragma"
   where
-    scope (Ident src ident) = Ident (Scoped None src) ident
-    scope (Symbol src symbol) = Symbol (Scoped None src) symbol
+    scope (Ident src ident) = Ident (Origin None src) ident
+    scope (Symbol src symbol) = Symbol (Origin None src) symbol
 
 resolveModule :: Resolve Module
 resolveModule m =
     case m of
-        Module span mhead pragma imports decls ->
-            Module (Scoped None span)
+        Module src mhead pragma imports decls ->
+            Module (Origin None src)
                 <$> resolveMaybe resolveModuleHead mhead
                 <*> mapM resolveModulePragma pragma
                 <*> mapM undefined imports
