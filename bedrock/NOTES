@@ -47,6 +47,9 @@ Performance improvements over GHC:
       We can have a per-object stepping counter which gives better control
       and allows objects to live longer in their generation.
       Might be a win, might not be a win.
+    * Eliminate fixed size nurseries. Nurseries are expensive when lots of long
+      lived data is allocated. By only using resizable generations, we limit
+      GC time to a fixed fraction of program time.
   Laziness:
     * Update elimination. GHC pushes an update frame after each @eval. We do
       whole-program analysis to avoid updates when they are not needed.
