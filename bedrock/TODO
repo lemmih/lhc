@@ -1,3 +1,8 @@
+Code clean-up:
+
+Features:
+
+Misc:
 * Insert Indirection updates and Indirection checks.
 * Reduce code bloat: Don't inline calls to InvokeHandler?
 * Validation of bedrock AST.
