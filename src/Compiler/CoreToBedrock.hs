@@ -19,14 +19,14 @@ import qualified Data.Map                        as Map
 
 import Data.Bedrock.Compile
 
-test :: IO ()
-test = do
-    HS.ParseOk m <- HS.parseFile "BedrockIO.hs"
-    let (errs, m') = resolve m
-    mapM_ print errs
-    let core = Haskell.convert m'
-    let bedrock = convert core
-    print (ppModule bedrock)
+--test :: IO ()
+--test = do
+--    HS.ParseOk m <- HS.parseFile "BedrockIO.hs"
+--    let (errs, m') = resolve m
+--    mapM_ print errs
+--    let core = Haskell.convert m'
+--    let bedrock = convert core
+--    print (ppModule bedrock)
     --compileWithOpts True True "FromHaskell.rock" bedrock
 
 convert :: Core.Module -> Bedrock.Module

@@ -2,13 +2,15 @@ module Language.Haskell.TypeCheck.Types where
 
 import Data.IORef
 import Language.Haskell.Exts.SrcLoc
+import qualified Text.PrettyPrint.ANSI.Leijen as Doc
 
-import Language.Haskell.Scope ( Scoped, GlobalName )
+import Language.Haskell.Scope ( GlobalName(..), QualifiedName(..) )
 
 -- Type variables are uniquely identified by their name and binding point.
 -- The binding point is not enough since ty vars can be bound at an implicit
 -- forall.
-type TcVar = (String, SrcLoc)
+data TcVar = TcVar String SrcSpanInfo
+    deriving ( Show, Eq )
 data TcMetaVar = TcMetaRef String (IORef (Maybe TcType))
 instance Show TcMetaVar where
     show (TcMetaRef name _) = name
@@ -20,11 +22,45 @@ data TcType
     | TcFun TcType TcType
     | TcApp TcType TcType
     -- Uninstantiated tyvar
-    | TcVar TcVar
+    | TcRef TcVar
     | TcCon GlobalName
     -- Instantiated tyvar
     | TcMetaVar TcMetaVar
     deriving ( Show )
+
+instance Doc.Pretty TcType where
+    pretty ty =
+        case ty of
+            TcForall [] ([] :=> t) ->
+                Doc.pretty t
+            TcForall vars qual ->
+                Doc.text "∀" Doc.<+> Doc.hsep (map Doc.pretty vars) Doc.<>
+                Doc.dot Doc.<+> Doc.pretty qual
+            TcFun a b ->
+                Doc.parens (Doc.pretty a) Doc.<+>
+                Doc.text "→ " Doc.<+> Doc.pretty b
+            TcApp a b ->
+                Doc.pretty a Doc.<+> Doc.pretty b
+            TcCon (GlobalName _ (QualifiedName m ident)) ->
+                Doc.text (m ++ "." ++ ident)
+            TcRef var -> Doc.pretty var
+            TcMetaVar meta ->
+                Doc.pretty meta
+
+instance Doc.Pretty TcVar where
+    pretty (TcVar ident _src) = Doc.text ident
+
+instance Doc.Pretty TcMetaVar where
+    pretty (TcMetaRef ident _) = Doc.blue (Doc.text ident)
+
+instance Doc.Pretty t => Doc.Pretty (Qual t) where
+    pretty ([] :=> t) = Doc.pretty t
+    pretty (quals :=> t) =
+        Doc.parens (Doc.hsep $ Doc.punctuate Doc.comma $ map Doc.pretty quals) Doc.<+>
+        Doc.text "⇒" Doc.<+> Doc.pretty t
+
+instance Doc.Pretty Pred where
+    pretty (IsIn _gname _t) = error "Pretty pred"
 
 data Qual t = [Pred] :=> t
     deriving ( Show )
@@ -37,6 +73,6 @@ data Pred = IsIn GlobalName TcType
 --data Scheme = Scheme [TcVar] (Qual TcType)
 --    deriving ( Show )
 
-data Typed = Typed TcType Scoped
+--data Typed = Typed TcType Origin
 
 

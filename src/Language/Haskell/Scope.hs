@@ -21,11 +21,15 @@ Notes:
 module Language.Haskell.Scope
     ( Origin(..)
     , NameInfo(..)
+    , GlobalName(..)
     , QualifiedName(..)
     , Interface(..)
     , Source(..)
     , ScopeError(..)
     , resolve
+
+    -- XXX: Dont export.
+    , getNameIdentifier
     ) where
 
 import           Control.Applicative
@@ -37,8 +41,6 @@ import qualified Data.Map                               as Map
 import           Data.Maybe
 import           Language.Haskell.Exts.Annotated.Syntax
 import           Language.Haskell.Exts.SrcLoc
-import           Prelude                                hiding (span)
-
 
 -- Resolve all names in a module
 resolve :: Module SrcSpanInfo -> ([ScopeError], Module Origin)
@@ -60,7 +62,7 @@ data NameInfo
     deriving ( Show )
 
 data GlobalName = GlobalName SrcSpanInfo QualifiedName
-    deriving ( Show )
+    deriving ( Show, Eq, Ord )
 
 -- Module interface, list of names in the two namespaces.
 data Interface = Interface [GlobalName] [GlobalName]
@@ -70,10 +72,12 @@ data Source
     = ImplicitSource -- Imported implicitly, usually from Prelude.
     | LocalSource -- Not imported, defined locally.
     | ModuleSource (ModuleName SrcSpanInfo)
+    deriving ( Show )
 data ScopedName = ScopedName Source GlobalName
+    deriving ( Show )
 
 data ScopeError
-    = ENotInScope QualifiedName SrcSpanInfo
+    = ENotInScope QualifiedName Namespace SrcSpanInfo
     -- | ETypeNotInScope QualifiedName SrcSpanInfo
     -- | EConstructorNotInScope QualifiedName SrcSpanInfo
     -- | ETypeVariableNotInScope QualifiedName SrcSpanInfo
@@ -89,12 +93,16 @@ data QualifiedName = QualifiedName
     deriving ( Eq, Ord, Show )
 data Namespace
     = NsTypes
+    | NsTypeVariables
     | NsValues
     deriving ( Show )
 data Scope = Scope
-    { scopeTvRoot       :: Maybe SrcLoc
+    { scopeTvRoot       :: Maybe SrcSpanInfo
     , scopeModuleName   :: String
     , scopeTypes        :: Map QualifiedName [ScopedName]
+    -- XXX: limitTyVarScope requires tyvars to be separate from types.
+    --      Sigh.
+    , scopeTyVars       :: Map QualifiedName [ScopedName]
     , scopeValues       :: Map QualifiedName [ScopedName]
     , scopeErrors       :: [ScopeError]
     }
@@ -103,15 +111,16 @@ instance Monoid Scope where
         { scopeTvRoot       = Nothing
         , scopeModuleName   = "Main"
         , scopeTypes        = Map.empty
+        , scopeTyVars       = Map.empty
         , scopeValues       = Map.empty
         , scopeErrors       = [] }
-    -- FIXME: Catch ambiguous definitions.
     mappend a b = Scope
-        { scopeTvRoot = scopeTvRoot a
+        { scopeTvRoot     = scopeTvRoot a
         , scopeModuleName = scopeModuleName a
-        , scopeTypes = scopeTypes a `Map.union` scopeTypes b
-        , scopeValues = scopeValues a `Map.union` scopeValues b
-        , scopeErrors = scopeErrors a ++ scopeErrors b }
+        , scopeTypes      = scopeTypes a `Map.union` scopeTypes b
+        , scopeTyVars     = scopeTyVars a `Map.union` scopeTyVars b
+        , scopeValues     = scopeValues a `Map.union` scopeValues b
+        , scopeErrors     = scopeErrors a ++ scopeErrors b }
 newtype Rename a = Rename { unRename :: ReaderT Scope (Writer Scope) a }
     deriving
         ( Monad, MonadReader Scope, MonadWriter Scope
@@ -130,19 +139,18 @@ runRename action = (scopeErrors scope, a)
   where
     (a, scope) = runWriter (runReaderT (unRename action) scope)
 
-getTvRoot :: Rename (Maybe SrcLoc)
+getTvRoot :: Rename (Maybe SrcSpanInfo)
 getTvRoot = asks scopeTvRoot
 
-withTvRoot :: SrcLoc -> Rename a -> Rename a
+withTvRoot :: SrcSpanInfo -> Rename a -> Rename a
 withTvRoot root = local $ \env -> env{ scopeTvRoot = Just root }
 
 -- Run action without letting the tyVars escsape the scope.
 limitTyVarScope :: Rename a -> Rename a
-limitTyVarScope = limitScope
---limitTyVarScope action = Rename $ ReaderT $ \scope ->
---    let inScope = scope{ scopeTyVars = scopeTyVars scope `Map.union` scopeTyVars nestedScope}
---        (a, nestedScope) = runWriter $ runReaderT (unRename action) inScope
---    in WriterT $ Identity (a, nestedScope{ scopeTyVars = Map.empty })
+limitTyVarScope action = Rename $ ReaderT $ \scope ->
+    let inScope = scope{ scopeTyVars = scopeTyVars scope `Map.union` scopeTyVars nestedScope}
+        (a, nestedScope) = runWriter $ runReaderT (unRename action) inScope
+    in WriterT $ Identity (a, nestedScope{ scopeTyVars = Map.empty })
 
 limitScope :: Rename a -> Rename a
 limitScope action = Rename $ ReaderT $ \scope ->
@@ -167,8 +175,11 @@ resolveName :: Namespace -> Resolve Name
 resolveName = resolveName' ""
 
 resolveName' :: String -> Namespace -> Resolve Name
-resolveName' qualification ns name =
-    con <$> getScoped src <*> pure nameString
+resolveName' = resolveName'' Nothing
+
+resolveName'' :: Maybe SrcSpanInfo -> String -> Namespace -> Resolve Name
+resolveName'' mbDefault qualification ns name =
+    con <$> getScoped <*> pure nameString
   where
     (con, src, nameString) =
         case name of
@@ -178,19 +189,31 @@ resolveName' qualification ns name =
     worker field = do
         m <- asks field
         let ret = case Map.lookup qname m of
-                Nothing -> Left (ENotInScope qname src)
+                Nothing ->
+                    case mbDefault of
+                        Nothing ->
+                            Left (ENotInScope qname ns src)
+                        Just defaultValue ->
+                            Right [ScopedName LocalSource (GlobalName defaultValue qname)]
                 Just var -> Right var
             nameInfo =
                 case ret of
                     Left err -> ScopeError err
                     Right [ScopedName _ gname] -> Resolved gname
+                    _ -> error "resolveName: ambiguous"
         tell mempty{ scopeErrors =
                         maybeToList (either (Just) (const Nothing) ret) }
         return $ Origin nameInfo src
-    getScoped span =
+    getScoped =
         case ns of
-            NsValues -> worker scopeValues
-            NsTypes  -> worker scopeTypes
+            NsValues        -> worker scopeValues
+            NsTypes         -> worker scopeTypes
+            NsTypeVariables -> worker scopeTyVars
+
+resolveTyVar :: Resolve Name
+resolveTyVar name = do
+    mbDefault <- getTvRoot
+    resolveName'' mbDefault "" NsTypeVariables name
 
 resolveQName :: Namespace -> Resolve QName
 resolveQName ns qname =
@@ -215,8 +238,12 @@ defineName ns name = do
         gname = GlobalName src (QualifiedName thisModule ident)
         resolved = ScopedName LocalSource gname
     case ns of
-        NsValues -> tell mempty{ scopeValues = Map.singleton qname [resolved]}
-        NsTypes  -> tell mempty{ scopeTypes = Map.singleton qname [resolved]}
+        NsValues ->
+            tell mempty{ scopeValues = Map.singleton qname [resolved]}
+        NsTypes  ->
+            tell mempty{ scopeTypes = Map.singleton qname [resolved]}
+        NsTypeVariables ->
+            tell mempty{ scopeTyVars = Map.singleton qname [resolved] }
     resolveName ns name
 
 -- resolveMaybe :: Resolve a -> Resolve (Maybe a)
@@ -230,51 +257,36 @@ resolveMaybe fn mbValue =
 ---- Name resolution
 
 resolveSafety :: Resolve Safety
-resolveSafety safety =
-    case safety of
-        PlayRisky src  ->
-            pure $ PlayRisky (Origin None src)
-        PlaySafe src b ->
-            pure $ PlaySafe (Origin None src) b
-        PlayInterruptible src ->
-            pure $ PlayInterruptible (Origin None src)
+resolveSafety = pure . fmap (Origin None)
 
 resolveCallConv :: Resolve CallConv
-resolveCallConv conv = pure $
-    case conv of
-        StdCall src   -> StdCall (Origin None src)
-        CCall src     -> CCall (Origin None src)
-        CPlusPlus src -> CPlusPlus (Origin None src)
-        DotNet src    -> DotNet (Origin None src)
-        Jvm src       -> Jvm (Origin None src)
-        Js src        -> Js (Origin None src)
-        CApi src      -> CApi (Origin None src)
+resolveCallConv = pure . fmap (Origin None)
 
 resolveKind :: Resolve Kind
 resolveKind kind =
     case kind of
-        KindStar span -> pure $ KindStar (Origin None span)
+        KindStar src -> pure $ KindStar (Origin None src)
         _ -> error "resolveKind"
 
 resolveTyVarBind :: Resolve TyVarBind
 resolveTyVarBind tyVarBind =
     case tyVarBind of
-        KindedVar span name kind ->
+        KindedVar src name kind ->
             KindedVar
-                <$> pure (Origin None span)
-                <*> defineName NsTypes name
+                <$> pure (Origin None src)
+                <*> defineName NsTypeVariables name
                 <*> resolveKind kind
-        UnkindedVar span name    ->
+        UnkindedVar src name    ->
             UnkindedVar
-                <$> pure (Origin None span)
-                <*> defineName NsTypes name
+                <$> pure (Origin None src)
+                <*> defineName NsTypeVariables name
 
 resolveDeclHead :: Resolve DeclHead
 resolveDeclHead dhead =
     case dhead of
-        DHead span name tyVarBinds ->
+        DHead src name tyVarBinds ->
             DHead
-                <$> pure (Origin None span)
+                <$> pure (Origin None src)
                 <*> defineName NsTypes name
                 <*> mapM resolveTyVarBind tyVarBinds
         DHInfix{} -> error "resolveDeclHead"
@@ -286,10 +298,7 @@ resolveContext ctx =
         _ -> error "resolveContext"
 
 resolveDataOrNew :: Resolve DataOrNew
-resolveDataOrNew dataOrNew =
-    case dataOrNew of
-        DataType span -> pure $ DataType (Origin None span)
-        NewType span  -> pure $ NewType (Origin None span)
+resolveDataOrNew = pure . fmap (Origin None)
 
 resolveInstHead :: Resolve InstHead
 resolveInstHead instHead =
@@ -304,9 +313,9 @@ resolveInstHead instHead =
                 <$> resolveInstHead sub
 
 resolveDeriving :: Resolve Deriving
-resolveDeriving (Deriving span instHeads) =
+resolveDeriving (Deriving src instHeads) =
     Deriving
-        <$> pure (Origin None span)
+        <$> pure (Origin None src)
         <*> mapM resolveInstHead instHeads
 
 resolveSpecialCon :: Resolve SpecialCon
@@ -327,7 +336,7 @@ resolveType ty =
                 <$> resolveQName NsTypes qname
         TyVar src tyVar ->
             TyVar (Origin None src)
-                <$> resolveName NsTypes tyVar
+                <$> resolveTyVar tyVar
         TyFun src a b ->
             TyFun (Origin None src)
                 <$> resolveType a
@@ -368,14 +377,15 @@ resolveFieldDecl fieldDecl =
 resolveConDecl :: Resolve ConDecl
 resolveConDecl conDecl =
     case conDecl of
-        ConDecl span name bangTys ->
-            ConDecl (Origin None span)
+        ConDecl src name bangTys ->
+            ConDecl (Origin None src)
                 <$> defineName NsValues name
                 <*> mapM resolveBangType bangTys
         RecDecl src name fieldDecls ->
             RecDecl (Origin None src)
                 <$> defineName NsValues name
                 <*> mapM resolveFieldDecl fieldDecls
+        _ -> error "resolveConDecl"
 
 resolveQualConDecl :: Resolve QualConDecl
 resolveQualConDecl (QualConDecl src mbTyVarBinds ctx conDecl) =
@@ -563,12 +573,13 @@ resolveDecl rContext decl =
         -- Gather up all the unbound type variables and bind them
         -- to the point of the signature.
         TypeSig src names ty | rContext == ResolveToplevel -> do
-            withTvRoot (getPointLoc src) $
+            -- FIXME: Bind tyvars to the src of the definition, not the tysig.
+            withTvRoot src $
                 TypeSig (Origin None src)
                     <$> mapM (resolveName NsValues) names
                     <*> resolveType ty
         TypeSig src names ty | rContext == ResolveClass -> do
-            withTvRoot (getPointLoc src) $
+            withTvRoot src $
                 TypeSig (Origin None src)
                     <$> mapM (defineName NsValues) names
                     <*> resolveType ty
@@ -587,7 +598,7 @@ resolveDecl rContext decl =
 
         ForImp src conv safety ident name ty ->
             -- Bind free type variables to the foreign import.
-            withTvRoot (getPointLoc src) $
+            withTvRoot src $
                 ForImp (Origin None src)
                     <$> resolveCallConv conv
                     <*> resolveMaybe resolveSafety safety

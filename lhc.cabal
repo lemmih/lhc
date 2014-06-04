@@ -1,6 +1,6 @@
 cabal-version:       >= 1.6
 name:                lhc
-version:             0.12
+version:             0.0.1
 synopsis:            The Luxurious LHC Optimization System
 description:
   LHC rewrite number 4.
@@ -32,6 +32,7 @@ Executable lhc
                      hse-cpp          >= 0.1,
                      haskell-packages >= 0.2,
                      haskell-src-exts >= 1.15.0,
+                     tagged,
 
                      bedrock
 

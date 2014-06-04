@@ -5,7 +5,12 @@ module Main where
 
 
 data RealWorld
-type IO a = RealWorld -> IOUnit a
+data IO a = IO (RealWorld -> IOUnit a)
+unIO :: IO a -> (RealWorld -> IOUnit a)
+unIO io =
+  case io of
+    IO action -> action
+
 data Ptr a
 data I8
 data I32
@@ -22,17 +27,19 @@ data IOUnit a = IOUnit a RealWorld
 --foreign import ccall returnIO :: a -> IO a
 --foreign import ccall bindIO :: IO a -> (a -> IO b) -> IO b
 --foreign import ccall unsafePerformIO :: IO a -> a
+
+foreign import ccall unsafe realWorld :: RealWorld
 unsafePerformIO io =
-  case io 0# of
+  case unIO io realWorld of
     IOUnit a s' -> a
 
 returnIO :: a -> IO a
-returnIO a s = IOUnit a s
+returnIO a = IO (\s -> IOUnit a s)
 
 bindIO :: IO a -> (a -> IO b) -> IO b
-bindIO f g s = 
-  case f s of
-    IOUnit a s' -> g a s'
+bindIO f g = IO (\s ->
+  case unIO f s of
+    IOUnit a s' -> unIO (g a) s')
 
 thenIO :: IO a -> IO b -> IO b
 thenIO a b = bindIO a (\c -> b)

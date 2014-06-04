@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Language.Haskell.TypeCheck.Monad where
 
+import Data.List
 import Data.IORef
 import           Control.Applicative
 import           Control.Monad.State
@@ -15,17 +16,24 @@ import           Language.Haskell.TypeCheck.Types
 data TcEnv = TcEnv
     { -- Globals such as Nothing, Just, etc
       tcEnvGlobals   :: Map GlobalName TcType
-    , tcEnvVariables :: Map SrcLoc TcType
+    , tcEnvVariables :: Map SrcSpanInfo TcType
     , tcEnvUnique    :: Int
     }
 newtype TI a = TI { unTI :: StateT TcEnv IO a }
     deriving ( Monad, Functor, Applicative, MonadState TcEnv, MonadIO )
 
-type Infer a = a Scoped -> TI (a Typed)
+--type Infer a = a Origin -> TI (a Typed)
 
 runTI :: TI a -> IO TcEnv
-runTI action = execStateT (unTI action) env
+runTI action = execStateT (unTI f) env
   where
+    f = do
+        action
+        vars <- gets tcEnvVariables
+        vars' <- forM (Map.assocs vars) $ \(src, ty) -> do
+            ty' <- zonk ty
+            return (src, ty')
+        modify $ \st -> st{tcEnvVariables = Map.fromList vars'}
     env = TcEnv
         { tcEnvGlobals   = Map.empty
         , tcEnvVariables = Map.empty
@@ -37,11 +45,16 @@ newUnique = do
     modify $ \env -> env{ tcEnvUnique = u + 1 }
     return u
 
-setAssumption :: SrcLoc -> TcType -> TI ()
+getFreeMetaVariables :: TI [TcMetaVar]
+getFreeMetaVariables = do
+    m <- gets tcEnvVariables
+    return $ nub $ concatMap metaVariables (Map.elems m)
+
+setAssumption :: SrcSpanInfo -> TcType -> TI ()
 setAssumption ident tySig = modify $ \env ->
     env{ tcEnvVariables = Map.insert ident tySig (tcEnvVariables env) }
 
-findAssumption :: SrcLoc -> TI TcType
+findAssumption :: SrcSpanInfo -> TI TcType
 findAssumption ident = do
     m <- gets tcEnvVariables
     case Map.lookup ident m of
@@ -70,9 +83,9 @@ freshInst (TcForall tyvars (preds :=> t0)) = do
                 TcForall{} -> error "freshInst"
                 TcFun a b -> TcFun (instantiate a) (instantiate b)
                 TcApp a b -> TcApp (instantiate a) (instantiate b)
-                TcVar v ->
+                TcRef v ->
                     case lookup v subst of
-                        Nothing -> TcVar v
+                        Nothing -> TcRef v
                         Just ref -> TcMetaVar ref
                 TcCon{} -> ty
                 TcMetaVar{} -> ty -- FIXME: Is this an error?
@@ -89,7 +102,7 @@ unify (TcFun la lb) (TcFun ra rb) = do
 unify (TcCon left) (TcCon right) =
     if left == right
         then return ()
-        else error "unify con"
+        else error $ "unify con: " ++ show (left,right)
 unify (TcMetaVar ref) a = unifyMetaVar ref a
 unify a (TcMetaVar ref) = unifyMetaVar ref a
 unify a b               = error $ "unify: " ++ show (a,b)
@@ -108,7 +121,7 @@ zonk ty =
         TcForall{} -> pure ty
         TcFun a b -> TcFun <$> zonk a <*> zonk b
         TcApp a b -> TcApp <$> zonk a <*> zonk b
-        TcVar{}   -> pure ty
+        TcRef{}   -> pure ty
         TcCon{}   -> pure ty
         TcMetaVar (TcMetaRef _name meta) -> do
             mbTy <- liftIO (readIORef meta)
@@ -116,11 +129,11 @@ zonk ty =
                 Nothing -> pure ty
                 Just sub -> zonk sub
 
-tcVarFromName :: Name Scoped -> TcVar
+tcVarFromName :: Name Origin -> TcVar
 tcVarFromName name =
-    (getNameIdentifier name, src)
+    TcVar (getNameIdentifier name) src
   where
-    Scoped (TypeVar src) _ = ann name
+    Origin (Resolved (GlobalName src _qname)) _ = ann name
 
 newTcVar :: TI TcMetaVar
 newTcVar = do
@@ -128,18 +141,23 @@ newTcVar = do
     ref <- liftIO $ newIORef Nothing
     return $ TcMetaRef ("v"++show u) ref
 
-typeToTcType :: Type Scoped -> TcType
+typeToTcType :: Type Origin -> TcType
 typeToTcType ty =
     case ty of
         TyFun _ a b -> TcFun (typeToTcType a) (typeToTcType b)
-        TyVar _ name -> TcVar (tcVarFromName name)
+        TyVar _ name -> TcRef (tcVarFromName name)
         TyCon _ qname ->
-            let Scoped (Global gname) _ = ann qname
+            let Origin (Resolved gname) _ = ann qname
             in TcCon gname
+        TyApp _ a b -> TcApp (typeToTcType a) (typeToTcType b)
+        TyParen _ t -> typeToTcType t
         _ -> error $ "typeToTcType: " ++ show ty
 
 --tcTypeToScheme :: TcType -> TcType
 --tcTypeToScheme ty = Scheme (freeTcVariables ty) ([] :=> ty)
+
+explicitTcForall :: TcType -> TcType
+explicitTcForall ty = TcForall (freeTcVariables ty) ([] :=> ty)
 
 freeTcVariables :: TcType -> [TcVar]
 freeTcVariables = worker []
@@ -149,9 +167,46 @@ freeTcVariables = worker []
             TcForall{} -> error "freeTcVariables"
             TcFun a b -> worker ignore a ++ worker ignore b
             TcApp a b -> worker ignore a ++ worker ignore b
-            TcVar v | v `elem` ignore -> []
+            TcRef v | v `elem` ignore -> []
                     | otherwise       -> [v]
             TcCon{} -> []
             TcMetaVar{} -> []
 
+metaVariables :: TcType -> [TcMetaVar]
+metaVariables ty =
+    case ty of
+        -- XXX: There shouldn't be any meta variables inside a forall scope.
+        TcForall _ (_ :=> ty') -> metaVariables ty'
+        TcFun a b -> metaVariables a ++ metaVariables b
+        TcApp a b -> metaVariables a ++ metaVariables b
+        TcRef{} -> []
+        TcCon{} -> []
+        TcMetaVar var -> [var]
 
+-- Replace free meta vars with tcvars. Compute the smallest context.
+-- 
+generalize :: [TcMetaVar] -> TcType -> TI TcType
+generalize free ty = do
+    forM_ unbound $ \var@(TcMetaRef _name ref) ->
+        liftIO $ writeIORef ref (Just (TcRef (toTcVar var)))
+    ty' <- zonk ty
+    return $ TcForall (map toTcVar unbound) ([] :=> ty')
+  where
+    unbound = nub (metaVariables ty) \\ free
+    toTcVar (TcMetaRef name _) = TcVar name noSrcSpanInfo
+    --replace ty =
+    --    case ty of
+    --        TcForall{} -> error "generalize"
+    --        TcFun a b -> TcFun (replace a) (replace b)
+    --        TcApp a b -> TcApp (replace a) (replace b)
+    --        TcRef{}   -> ty
+    --        TcCon{}   -> ty
+    --        TcMetaVar var
+    --            | var `elem` unbound -> TcRef (toTcVar var)
+    --            | otherwise          -> ty
+
+noSrcSpanInfo :: SrcSpanInfo
+noSrcSpanInfo = infoSpan (mkSrcSpan noLoc noLoc) []
+
+mkBuiltIn :: String -> String -> GlobalName
+mkBuiltIn m ident = GlobalName noSrcSpanInfo (QualifiedName m ident)

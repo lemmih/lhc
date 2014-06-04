@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash, KindSignatures #-}
 module Test where
 
 data Bool = True | False
@@ -15,22 +16,32 @@ data I32
 data I64
 data Addr a
 
-data Int = Int I64
-data Int32 = Int32 I32
+data Int = I64 I64
+data Int32 = I32 I32
 data Ptr a = Ptr (Addr I8)
 
 data IOUnit a = IOUnit a RealWorld
 
 --returnIO :: a -> IO a
 --returnIO a s = IOUnit a s
+
+bindIO :: IO a -> (a -> IO b) -> IO b
 bindIO f g = IO (\s ->
-  case f s of
+  case unIO f s of
     IOUnit a s' -> unIO (g a) s')
 
---thenIO a b = bindIO a (\c -> b)
+thenIO a b = bindIO a (\c -> b)
 
---foreign import ccall puts :: Addr I8 -> IO I32
-        
+primTest a b =
+    case a of
+        I64 a# ->
+            case b of
+                I64 b# -> I64 (a# +# b#)
+
+foreign import ccall (+#) :: I64 -> I64 -> I64
+
+foreign import ccall puts :: Addr I8 -> IO I32
+
 --class Not a where
 --    not :: a -> Bool
 
