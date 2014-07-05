@@ -67,7 +67,16 @@ Performance improvements over GHC:
       is too expensive and it is often not more efficient than a linked list.
       This should be a win in some situations, a loss in others.
     * Single threaded mutator. All concurrency is shared-nothing.
-  
+
+Optimizing from cradle to grave:
+  High level optimizing is mostly inlining and specialization. Supercompilation
+  is great at this. The optimizer at this level should transform
+  'map f . map g' to 'map (f . g)'.
+  Mid level optimizations are focused on unboxing and arity raising. Using
+  a strict, first-order intermediate language together with whole-program
+  analysis should give good results.
+  Low level optimizations are done entirely by LLVM.
+
 
 Interesting avenues to explore:
   Immix.
@@ -553,3 +562,48 @@ Block allocator and the GC:
   newSlice :: Arena -> IO (Ptr, Size)
   free :: Arena -> IO ()
   allocateLarge :: Arena -> Size -> IO Ptr
+
+Type checking:
+  
+  Polymorphic types cannot be inferred. Instead, monotypes are inferred and
+  then generalized.
+
+  Plain HM: All types are inferred, type signatures only used for verification
+  and specialization. Since polytypes cannot be inferred, higher-rank types are
+  not supported.
+
+  Bi-directional checker: The system mixes type inference with type checking.
+  Higher-rank types are supported through explicit type annotations which are
+  merely checked (not inferred).
+
+  Boxy types: Sometimes switching between type inference and type checking
+  isn't expressive enough. Sometimes we want to check parts of a type and
+  infer the rest.
+
+  FPH: impredicative system.
+
+  OutsideIn(X): Is this an extension of Boxy or FPH? Adds support for local
+  assumptions.
+
+
+  Understanding type inference by example:
+    Unification
+    Subsumption
+    Coercion
+      Without subsumption, coercions are always simple, either abs, ap or id.
+      With subsumption we sometimes have to apply some type variables but not
+      others. For example:
+        f :: forall a b. a -> b
+        g :: (forall a. a -> Maybe a) -> Int
+        e = g f
+      'f' takes two type arguments, 'a' and 'b', but in the body of 'e' we only
+      apply one, namely 'b'. So with explicit types the code looks like this:
+        e = g (\a -> f a (Maybe a))
+
+        h :: (forall a b. a -> b) -> Int
+        r = h f
+        r = h (\a b -> f a b)
+
+
+
+
