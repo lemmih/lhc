@@ -15,9 +15,10 @@ import           Language.Haskell.TypeCheck.Types
 
 data TcEnv = TcEnv
     { -- Globals such as Nothing, Just, etc
-      tcEnvGlobals   :: Map GlobalName TcType
+      tcEnvGlobals   :: Map QualifiedName TcType
     , tcEnvVariables :: Map SrcSpanInfo TcType
     , tcEnvUnique    :: Int
+    , tcEnvCoercions :: Map SrcSpanInfo Coercion
     }
 newtype TI a = TI { unTI :: StateT TcEnv IO a }
     deriving ( Monad, Functor, Applicative, MonadState TcEnv, MonadIO )
@@ -37,7 +38,8 @@ runTI action = execStateT (unTI f) env
     env = TcEnv
         { tcEnvGlobals   = Map.empty
         , tcEnvVariables = Map.empty
-        , tcEnvUnique    = 0 }
+        , tcEnvUnique    = 0
+        , tcEnvCoercions = Map.empty }
 
 newUnique :: TI Int
 newUnique = do
@@ -61,18 +63,22 @@ findAssumption ident = do
         Nothing -> error $ "Missing ident: " ++ show ident
         Just scheme -> return scheme
 
-setGlobal :: GlobalName -> TcType -> TI ()
+setCoercion :: SrcSpanInfo -> Coercion -> TI ()
+setCoercion src coercion = modify $ \env ->
+    env{ tcEnvCoercions = Map.insert src coercion (tcEnvCoercions env) }
+
+setGlobal :: QualifiedName -> TcType -> TI ()
 setGlobal gname scheme = modify $ \env ->
     env{ tcEnvGlobals = Map.insert gname scheme (tcEnvGlobals env) }
 
-findGlobal :: GlobalName -> TI TcType
+findGlobal :: QualifiedName -> TI TcType
 findGlobal gname = do
     m <- gets tcEnvGlobals
     case Map.lookup gname m of
         Nothing -> error $ "Missing global: " ++ show gname
         Just scheme -> return scheme
 
-freshInst :: TcType -> TI (Qual TcType)
+freshInst :: TcType -> TI (Qual TcType, Coercion)
 freshInst (TcForall tyvars (preds :=> t0)) = do
     refs <- replicateM (length tyvars) newTcVar
     let subst = zip tyvars refs
@@ -89,8 +95,8 @@ freshInst (TcForall tyvars (preds :=> t0)) = do
                         Just ref -> TcMetaVar ref
                 TcCon{} -> ty
                 TcMetaVar{} -> ty -- FIXME: Is this an error?
-    return $ map instPred preds :=> instantiate t0
-freshInst ty = pure ([] :=> ty)
+    return (map instPred preds :=> instantiate t0, CoerceAp refs)
+freshInst ty = pure ([] :=> ty, CoerceId )
 
 unify :: TcType -> TcType -> TI ()
 unify (TcApp la lb) (TcApp ra rb) = do
@@ -146,9 +152,9 @@ typeToTcType ty =
     case ty of
         TyFun _ a b -> TcFun (typeToTcType a) (typeToTcType b)
         TyVar _ name -> TcRef (tcVarFromName name)
-        TyCon _ qname ->
-            let Origin (Resolved gname) _ = ann qname
-            in TcCon gname
+        TyCon _ conName ->
+            let Origin (Resolved (GlobalName _ qname)) _ = ann conName
+            in TcCon qname
         TyApp _ a b -> TcApp (typeToTcType a) (typeToTcType b)
         TyParen _ t -> typeToTcType t
         _ -> error $ "typeToTcType: " ++ show ty
@@ -160,7 +166,7 @@ explicitTcForall :: TcType -> TcType
 explicitTcForall ty = TcForall (freeTcVariables ty) ([] :=> ty)
 
 freeTcVariables :: TcType -> [TcVar]
-freeTcVariables = worker []
+freeTcVariables = nub . worker []
   where
     worker ignore ty =
         case ty of
@@ -185,12 +191,13 @@ metaVariables ty =
 
 -- Replace free meta vars with tcvars. Compute the smallest context.
 -- 
-generalize :: [TcMetaVar] -> TcType -> TI TcType
+generalize :: [TcMetaVar] -> TcType -> TI (TcType, Coercion)
 generalize free ty = do
     forM_ unbound $ \var@(TcMetaRef _name ref) ->
         liftIO $ writeIORef ref (Just (TcRef (toTcVar var)))
     ty' <- zonk ty
-    return $ TcForall (map toTcVar unbound) ([] :=> ty')
+    let tcVars = map toTcVar unbound
+    return ( TcForall tcVars ([] :=> ty'), CoerceAbs tcVars)
   where
     unbound = nub (metaVariables ty) \\ free
     toTcVar (TcMetaRef name _) = TcVar name noSrcSpanInfo
@@ -208,5 +215,5 @@ generalize free ty = do
 noSrcSpanInfo :: SrcSpanInfo
 noSrcSpanInfo = infoSpan (mkSrcSpan noLoc noLoc) []
 
-mkBuiltIn :: String -> String -> GlobalName
-mkBuiltIn m ident = GlobalName noSrcSpanInfo (QualifiedName m ident)
+mkBuiltIn :: String -> String -> QualifiedName
+mkBuiltIn m ident = QualifiedName m ident

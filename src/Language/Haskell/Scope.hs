@@ -222,9 +222,11 @@ resolveQName ns qname =
             Qual (Origin None src)
                 <$> pure (ModuleName (Origin None l) m)
                 <*> resolveName' m ns name
-        UnQual src name ->
-            UnQual (Origin None src)
-                <$> resolveName ns name
+        UnQual src name -> do
+            name' <- resolveName ns name
+            let Origin origin _ = ann name'
+            UnQual (Origin origin src)
+                <$> pure name'
         Special src specialCon ->
             Special (Origin None src)
                 <$> resolveSpecialCon specialCon

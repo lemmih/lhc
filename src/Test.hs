@@ -1,6 +1,9 @@
-{-# LANGUAGE MagicHash, KindSignatures #-}
+{-# LANGUAGE MagicHash, KindSignatures, RankNTypes #-}
 module Test where
 
+import Data.Typeable
+
+{-
 data Bool = True | False
 --data List a = Nil | Cons a (List a)
 data Maybe a = Nothing | Just a
@@ -76,3 +79,40 @@ Test.Nothing :: forall a. Test.Maybe a
 Test.Just :: forall a. a -> Test.Maybe a
 
 -}
+
+
+-}
+
+
+class Depth a where
+    depth :: a -> Int
+
+instance Depth () where
+    depth ~() = 0
+
+instance Depth a => Depth (Maybe a) where
+    depth ~(Just a) = 1 + depth a
+
+--depthMethod :: Type a -> a -> Int
+--depthMethod ty v =
+--    case ty of
+--        Unit -> depthUnit v
+--        Maybe subTy -> depthMaybe subTy v
+
+--depthUnit :: () -> Int
+--depthUnit _ = 0
+
+--depthMaybe :: Type a -> Maybe a -> Int
+--depthMaybe ty ~(Just a) = 1 + depthMethod ty a
+
+
+mkDepth :: Depth a => Int -> a -> Int
+mkDepth 0 v = depth v
+mkDepth n v = mkDepth (n-1) (Just v)
+
+--mkDepth :: /\a -> Int -> a -> Int
+--mkDepth a 0 v = depth a v
+--mkDepth a n v = mkDepth (Maybe a) (n-1) (Just v)
+
+fn :: (forall a. a -> a) -> ((), Bool)
+fn i = (i (), i False)

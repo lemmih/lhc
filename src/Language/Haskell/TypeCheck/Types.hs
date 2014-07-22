@@ -1,5 +1,6 @@
 module Language.Haskell.TypeCheck.Types where
 
+import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
 import Language.Haskell.Exts.SrcLoc
 import qualified Text.PrettyPrint.ANSI.Leijen as Doc
@@ -23,10 +24,27 @@ data TcType
     | TcApp TcType TcType
     -- Uninstantiated tyvar
     | TcRef TcVar
-    | TcCon GlobalName
+    | TcCon QualifiedName
     -- Instantiated tyvar
     | TcMetaVar TcMetaVar
+    | TcUndefined
     deriving ( Show )
+
+data Coercion
+    = CoerceId
+    | CoerceAbs [TcVar]
+    | CoerceAp [TcMetaVar]
+    deriving ( Show )
+
+instance Doc.Pretty Coercion where
+    pretty c =
+        case c of
+            CoerceId  ->
+                Doc.text "id"
+            CoerceAbs vars ->
+                Doc.text "abs" Doc.<+> Doc.pretty vars
+            CoerceAp metas ->
+                Doc.text "ap" Doc.<+> Doc.pretty metas
 
 instance Doc.Pretty TcType where
     pretty ty =
@@ -41,17 +59,24 @@ instance Doc.Pretty TcType where
                 Doc.text "→ " Doc.<+> Doc.pretty b
             TcApp a b ->
                 Doc.pretty a Doc.<+> Doc.pretty b
-            TcCon (GlobalName _ (QualifiedName m ident)) ->
+            TcCon (QualifiedName m ident) ->
                 Doc.text (m ++ "." ++ ident)
             TcRef var -> Doc.pretty var
             TcMetaVar meta ->
                 Doc.pretty meta
+            TcUndefined ->
+                Doc.red (Doc.text "undefined")
 
 instance Doc.Pretty TcVar where
     pretty (TcVar ident _src) = Doc.text ident
 
 instance Doc.Pretty TcMetaVar where
-    pretty (TcMetaRef ident _) = Doc.blue (Doc.text ident)
+    pretty (TcMetaRef ident ref) = unsafePerformIO $ do
+        mbTy <- readIORef ref
+        case mbTy of
+            Just ty -> return $ Doc.pretty ty
+            Nothing -> return $ Doc.blue (Doc.text ident)
+    --pretty (TcMetaRef ident _) = Doc.blue (Doc.text ident)
 
 instance Doc.Pretty t => Doc.Pretty (Qual t) where
     pretty ([] :=> t) = Doc.pretty t

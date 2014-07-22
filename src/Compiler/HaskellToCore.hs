@@ -3,35 +3,35 @@ module Compiler.HaskellToCore
     ( convert
     ) where
 
-import Control.Applicative
+import           Control.Applicative
 import           Control.Monad.Reader
+import           Control.Monad.RWS
 import           Control.Monad.State
 import           Control.Monad.Writer
-import           Control.Monad.RWS
-import           Data.Map                        (Map)
-import qualified Data.Map                        as Map
+import           Data.Map                         (Map)
+import qualified Data.Map                         as Map
 import           Data.Maybe
-import qualified Language.Haskell.Exts.Annotated as HS
+import qualified Language.Haskell.Exts.Annotated  as HS
 
 import           Compiler.Core
-import Data.Bedrock.Misc
-import           Data.Bedrock                    (AvailableNamespace(..),
-                                                  CType (..), Foreign (..),
-                                                  Name (..), Type (..),
-                                                  Variable (..), NodeDefinition(..))
-import           Language.Haskell.Scope          (GlobalName (..),
-                                                  QualifiedName(..),
-                                                  NameInfo(..),
-                                                  Origin(..),
-                                                  getNameIdentifier)
-import qualified Language.Haskell.Scope as Scope
-import Language.Haskell.TypeCheck.Monad (TcEnv(..))
+import           Data.Bedrock                     (AvailableNamespace (..),
+                                                   CType (..), Foreign (..),
+                                                   Name (..),
+                                                   Type (..))
+import           Data.Bedrock.Misc
+import           Language.Haskell.Scope           (GlobalName (..),
+                                                   NameInfo (..), Origin (..),
+                                                   QualifiedName (..),
+                                                   getNameIdentifier)
+import qualified Language.Haskell.Scope           as Scope
+import           Language.Haskell.TypeCheck.Monad (TcEnv (..), mkBuiltIn)
+import           Language.Haskell.TypeCheck.Types (Coercion (..),TcType(..),Qual(..))
 
-import Debug.Trace
+import           Debug.Trace
 
 data Scope = Scope
     { scopeVariables    :: Map GlobalName Name
-    , scopeNodes        :: Map GlobalName Name
+    , scopeNodes        :: Map QualifiedName Name
     , scopeConstructors :: Map GlobalName Name -- XXX: Merge with scopeNodes?
     , scopeTcEnv        :: TcEnv
     }
@@ -45,6 +45,7 @@ instance Monoid Scope where
               tcEnvGlobals   = Map.empty
             , tcEnvVariables = Map.empty
             , tcEnvUnique    = 0
+            , tcEnvCoercions = Map.empty
             }
         }
     mappend a b = Scope
@@ -133,26 +134,34 @@ bindName hsName =
 bindVariable :: HS.Name Origin -> M Variable
 bindVariable hsName = do
     name <- bindName hsName
+    ty <- lookupType hsName
+    return $ Variable name ty
+  where
+    Origin info _ = HS.ann hsName
+
+lookupType :: HS.Name Origin -> M TcType
+lookupType hsName = do
     case info of
-        Resolved (GlobalName src _qname) -> do
+        Resolved (GlobalName src qname) -> do
             tcEnv <- asks scopeTcEnv
             case Map.lookup src (tcEnvVariables tcEnv) of
-                Nothing -> error "Missing type info"
-                Just ty -> trace (show name ++ " :: " ++ show ty) $
-                    return (Variable name NodePtr)
-                    --error $ "Type: " ++ show (name, ty)
+                Nothing ->
+                    case Map.lookup qname (tcEnvGlobals tcEnv) of
+                        Nothing -> error "Missing type info"
+                        Just ty -> return ty
+                Just ty -> return ty
   where
     Origin info _ = HS.ann hsName
 
 bindConstructor :: HS.Name Origin -> Name -> M Name
 bindConstructor dataCon mkCon =
     case info of
-        Resolved global@(GlobalName src (QualifiedName m ident)) -> do
+        Resolved global@(GlobalName src qname@(QualifiedName m ident)) -> do
             name <- newName ident
             let n = name{nameModule = [m]}
             tell $ mempty{envScope = mempty
-                { scopeNodes = Map.singleton global n
-                , scopeConstructors = Map.singleton global mkCon } }
+                { scopeNodes = Map.singleton qname n
+                , scopeVariables = Map.singleton global mkCon } }
             return n
         _ -> error "bindName"
   where
@@ -171,11 +180,11 @@ resolveName hsName =
     scopeError = error $ "resolveName: Not in scope: " ++
                     getNameIdentifier hsName
 
-resolveGlobalName :: GlobalName -> M Name
-resolveGlobalName gname =
-    asks $ Map.findWithDefault scopeError gname . scopeNodes
+resolveQualifiedName :: QualifiedName -> M Name
+resolveQualifiedName qname =
+    asks $ Map.findWithDefault scopeError qname . scopeNodes
   where
-    scopeError = error $ "resolveGlobalName: Not in scope: " ++ show gname
+    scopeError = error $ "resolveGlobalName: Not in scope: " ++ show qname
 
 resolveQName :: HS.QName Origin -> M Name
 resolveQName qname =
@@ -183,6 +192,12 @@ resolveQName qname =
         HS.Qual _ _ name -> resolveName name
         HS.UnQual _ name -> resolveName name
         _ -> error "HaskellToCore.resolveQName"
+
+unQName :: HS.QName Origin -> HS.Name Origin
+unQName qname =
+    case qname of
+        HS.Qual _ _ name -> name
+        HS.UnQual _ name -> name
 
 -- XXX: Ugly, ugly code.
 resolveQGlobalName :: HS.QName Origin -> M Name
@@ -193,13 +208,19 @@ resolveQGlobalName qname =
         _ -> error "HaskellToCore.resolveQName"
   where
     worker name =
-        let Origin (Resolved gname) _ = HS.ann name
-        in resolveGlobalName gname
+        let Origin (Resolved (GlobalName _ qname)) _ = HS.ann name
+        in resolveQualifiedName qname
+
+findCoercion :: HS.SrcSpanInfo -> M Coercion
+findCoercion src = do
+    tiEnv <- asks scopeTcEnv
+    return $ Map.findWithDefault CoerceId src (tcEnvCoercions tiEnv)
+
 
 --resolveConstructor :: HS.QName Scoped -> M Name
 --resolveConstructor con = do
 --    name <- resolveQName con
---    asks 
+--    asks
 
 convert :: TcEnv -> HS.Module Origin -> Module
 convert tcEnv (HS.Module _ _ _ _ decls) = Module
@@ -215,56 +236,95 @@ convert _ _ = error "HaskellToCore.convert"
 convertDecl :: HS.Decl Origin -> M ()
 convertDecl decl =
     case decl of
-        HS.FunBind _ [HS.Match _ name pats rhs _] ->
+        HS.FunBind _ [HS.Match _ name pats rhs _] -> do
+            let Origin _ src = HS.ann name
+            coercion <- findCoercion src
             pushDecl =<< Decl
-                <$> bindName name
-                <*> convertPats pats rhs
+                <$> lookupType name
+                <*> bindName name
+                <*> (WithCoercion coercion <$> convertPats pats rhs)
             -- (convertName name, convertPats pats rhs)
         HS.PatBind _ (HS.PVar _ name) _type rhs _binds ->
             pushDecl =<< Decl
-                <$> bindName name
+                <$> lookupType name
+                <*> bindName name
                 <*> convertRhs rhs
         HS.ForImp _ _conv _safety mbExternal name ty -> do
             let external = fromMaybe (getNameIdentifier name) mbExternal
+            foreignTy <- lookupType name
             pushDecl =<< Decl
-                <$> bindName name
-                <*> convertExternal external ty
-
+                <$> lookupType name
+                <*> bindName name
+                <*> convertExternal external foreignTy
+            
             unless (isPrimitive external) $ do
-                let (argTypes, _isIO, retType) = ffiTypes ty
+                let (argTypes, _isIO, retType) = ffiTypes foreignTy
                 pushForeign $ Foreign
                     { foreignName = external
-                    , foreignReturn = retType
-                    , foreignArguments = argTypes }
+                    , foreignReturn = toCType retType
+                    , foreignArguments = map toCType argTypes }
 
-        HS.DataDecl _ (HS.DataType _) _ctx _dhead qualCons _deriving ->
-            mapM_ convertQualCon qualCons
+        HS.DataDecl _ HS.DataType{} _ctx _dhead qualCons _deriving ->
+            mapM_ (convertQualCon False) qualCons
+        HS.DataDecl _ HS.NewType{} _ctx _dhead qualCons _deriving ->
+            mapM_ (convertQualCon True) qualCons
         _ -> return ()
 
 isPrimitive "realWorld" = True
 isPrimitive _ = False
 
-convertQualCon :: HS.QualConDecl Origin -> M ()
-convertQualCon (HS.QualConDecl _ _tyvars _ctx con) =
-    convertConDecl con
+-- XXX: Don't use Bool for isNewtype
+convertQualCon :: Bool -> HS.QualConDecl Origin -> M ()
+convertQualCon isNewtype (HS.QualConDecl _ _tyvars _ctx con) =
+    convertConDecl isNewtype con
 
-convertConDecl :: HS.ConDecl Origin -> M ()
-convertConDecl con =
+-- XXX: Don't use Bool for isNewtype
+convertConDecl :: Bool -> HS.ConDecl Origin -> M ()
+convertConDecl isNewtype con =
     case con of
         HS.ConDecl _ name tys -> do
-            
+
             u <- newUnique
             let mkCon = Name [] ("mk" ++ getNameIdentifier name) u
 
             conName <- bindConstructor name mkCon
-            rockTypes <- mapM convertBangType tys
 
             argNames <- replicateM (length tys) (newName "arg")
-            let args = zipWith Variable argNames rockTypes
-            pushDecl $ Decl mkCon (Lam args $ Con conName args)
+            ty <- lookupType name
+            let args = zipWith Variable argNames (splitTy ty)
+            pushDecl $ Decl ty mkCon (Lam args $ Con conName args)
 
-            pushNode $ NodeDefinition conName rockTypes
+            pushNode $ NodeDefinition conName (init $ splitTy ty)
+        --HS.RecDecl _ name fieldDecls -> do
         _ -> error "convertCon"
+  where
+    -- XXX: Temporary measure. 2014-07-11
+    splitTy (TcForall _ (_ :=> ty)) = splitTy ty
+    splitTy (TcFun a b) = a : splitTy b
+    splitTy ty = [ty]
+
+toCType :: TcType -> CType
+toCType ty =
+    case ty of
+        TcApp (TcCon qname) ty'
+            | qname == mkBuiltIn "LHC.Prim" "Addr" ->
+                CPointer (toCType ty')
+        TcCon qname
+            | qname == mkBuiltIn "LHC.Prim" "I8" ->
+                I8
+        TcCon qname
+            | qname == mkBuiltIn "LHC.Prim" "I32" ->
+                I32
+        TcCon qname
+            | qname == mkBuiltIn "LHC.Prim" "CInt" ->
+                I32
+        TcCon qname
+            | qname == mkBuiltIn "LHC.Prim" "Unit" ->
+                CVoid
+        TcApp (TcCon qname) ty'
+            | qname == mkBuiltIn "LHC.Prim" "IO" ->
+                toCType ty'
+        _ -> error $ "toCType: " ++ show ty
 
 convertBangType :: HS.BangType Origin -> M Type
 convertBangType bty =
@@ -301,61 +361,73 @@ convertType ty =
 
 
 -- cfun :: Addr I8 -> IO ()
--- \ptr s -> External cfun Void [ptr,s]
+-- \ptr -> IO (\s -> WithExternal cfun Void [ptr,s]) (IOUnit boxed s))
 -- cfun :: Addr I8 -> IO CInt
--- \ptr s -> External cfun CInt [ptr,s]
+-- \ptr -> IO (\s -> WithExternal cfun CInt [ptr,s]) (IOUnit boxed s))
 -- cfun :: CInt -> CInt
--- \cint -> External cfun [cint]
-convertExternal :: String -> HS.Type Origin -> M Expr
+-- \cint -> WithExternal cfun [cint] boxed
+convertExternal :: String -> TcType -> M Expr
 convertExternal "realWorld" _ty = return (Lit (LitInt 0))
+convertExternal cName ty = do
+    args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
+    primArgs <- return args
+    primOut <- Variable <$> newName "primOut" <*> pure i32
+    action <- Variable <$> newName "action" <*> pure TcUndefined 
+    s <- Variable <$> newName "s" <*> pure TcUndefined
+    boxed <- Variable <$> newName "boxed" <*> pure retType
+
+    io <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IO"
+    ioUnit <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IOUnit"
+    cint <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "CInt"
+
+    return $
+        Lam args $
+        Let (NonRec action $
+                Lam [s] $
+                WithExternal primOut cName primArgs s $
+                Let (NonRec boxed $ Con cint [primOut]) $
+                Con ioUnit [boxed, s]
+            ) 
+        (Con io [action])
+  where
+    (argTypes, isIO@True, retType) = ffiTypes ty
+    i32 = TcCon $ mkBuiltIn "LHC.Prim" "I32"
 convertExternal cName ty
     | isIO      = do
         out <- newName "out"
-        let outV = Variable out (Primitive retType)
-        unit <- error "convertExternal" -- resolveGlobalName (GlobalName "Main" "IOUnit")
-        let mkUnit = Variable unit NodePtr
-        pure $ Lam (args ++ [s])
-            (WithExternal outV cName retType args s
-                (Con unit [outV, s]))
+        boxed <- newName "boxed"
+        let outV = Variable out retType
+            boxedV = Variable boxed retType
+        io <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IO"
+        unit <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IOUnit"
+        cint <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "CInt"
+        pure $ Lam args $ App (Lam [tmp] (Con io [tmp]))
+                (Lam [s]
+            (WithExternal outV cName args s
+                (Let (NonRec boxedV $ Con cint [outV]) $ Con unit [boxedV, s])))
     -- | otherwise = pure $ Lam args (ExternalPure cName retType args)
   where
-    s = Variable (Name [] "s" 0) NodePtr
+    tmp = Variable (Name [] "tmp" 0) TcUndefined
+    s = Variable (Name [] "s" 0) TcUndefined -- NodePtr
     (argTypes, isIO, retType) = ffiTypes ty
     args =
-        [ Variable (Name [] "arg" 0) (Primitive t)
+        [ Variable (Name [] "arg" 0) t -- (Primitive t)
         | t <- argTypes ]
 
 --packCType :: CType -> Expr -> M Expr
---packCType 
+--packCType
 
-ffiTypes :: HS.Type Origin -> ([CType], Bool, CType)
-ffiTypes = error "ffiTypes"
---ffiTypes = worker []
-
---  where
---    worker acc ty =
---        case ty of
---            HS.TyFun _ t ty' -> worker (toBedrockType t : acc) ty'
---            HS.TyApp _ (HS.TyCon _ qname) sub
---                | toGlobalName qname == GlobalName "Main" "IO"
---                    -> (reverse acc, True, toBedrockType sub)
---            _ -> (reverse acc, False, toBedrockType ty)
---            --_ -> error "ffiArguments"
---    -- Addr ty
---    toBedrockType (HS.TyApp _ (HS.TyCon _ qname) ty)
---        | toGlobalName qname == GlobalName "Main" "Addr"
---            = CPointer (toBedrockType ty)
---    -- Void
---    toBedrockType (HS.TyCon _ (HS.Special _ (HS.UnitCon _)))
---        = CVoid
---    -- I8, I32
---    toBedrockType (HS.TyCon _ qname)
---        | toGlobalName qname == GlobalName "Main" "I8"
---            = I8
---        | toGlobalName qname == GlobalName "Main" "I32"
---            = I32
---    toBedrockType t = error $ "toBedrockType: " ++ show t
-
+ffiTypes :: TcType -> ([TcType], Bool, TcType)
+ffiTypes = worker []
+  where
+    worker acc ty =
+        case ty of
+            TcFun t ty' -> worker (t : acc) ty'
+            TcApp (TcCon qname) sub
+                | qname == mkBuiltIn "LHC.Prim" "IO"
+                    -> (reverse acc, True, sub)
+            _ -> (reverse acc, False, ty)
+            --_ -> error "ffiArguments"
 
 convertPats :: [HS.Pat Origin] -> HS.Rhs Origin -> M Expr
 convertPats [] rhs = convertRhs rhs
@@ -374,11 +446,14 @@ convertExp :: HS.Exp Origin -> M Expr
 convertExp expr =
     case expr of
         HS.Var _ name -> do
+            let Origin _ src = HS.ann name
+            coercion <- findCoercion src
             n <- resolveQName name
-            return $ Var (Variable n NodePtr)
+            ty <- lookupType $ unQName name
+            return $ WithCoercion coercion (Var (Variable n ty))
         HS.Con _ name -> do
             n <- resolveQName name
-            return $ Var (Variable n NodePtr)
+            return $ Var (Variable n TcUndefined)
         HS.App _ a b ->
             App
                 <$> convertExp a
@@ -387,7 +462,7 @@ convertExp expr =
             ae <- convertExp a
             be <- convertExp b
             n <- resolveQName var
-            pure $ App (App (Var (Variable n NodePtr)) ae) be
+            pure $ App (App (Var (Variable n TcUndefined)) ae) be
         HS.Paren _ sub -> convertExp sub
         HS.Lambda _ pats sub ->
             Lam
@@ -408,7 +483,7 @@ convertAlt :: HS.Alt Origin -> M Alt
 convertAlt alt =
     case alt of
         HS.Alt _ (HS.PApp _ name pats) (HS.UnGuardedAlt _ branch) Nothing -> do
-            args <- sequence [ Variable <$> bindName var <*> pure NodePtr
+            args <- sequence [ Variable <$> bindName var <*> lookupType var
                              | HS.PVar _ var <- pats ]
             Alt <$> (ConPat <$> resolveQGlobalName name <*> pure args)
                 <*> convertExp branch

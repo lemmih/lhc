@@ -168,6 +168,17 @@ compileBlock block =
         Bind [bind] (TypeCast arg) rest -> do
             value <- resolve arg
             case (variableType bind, variableType arg) of
+                (Primitive CPointer{}, Primitive CPointer{}) ->
+                    bindVariable bind value $ compileBlock rest
+                
+                (Primitive (CPointer ty), Primitive{}) -> do
+                    --typedValue <- asPointer value
+                    typedValue <- asCType value (CPointer ty) -- :: Value -> CType -> Gen Value
+                    bindVariable bind typedValue $ compileBlock rest
+                (Primitive ty, Primitive CPointer{}) -> do
+                    typedValue <- asCType value ty
+                    bindVariable bind typedValue $ compileBlock rest
+                
                 (Primitive{}, ptr) | ptr `elem` [NodePtr,FramePtr] -> do
                     typedValue <- asWord value
                     bindVariable bind typedValue $ compileBlock rest
@@ -267,7 +278,8 @@ compileAdd a b = do
 
 compileWrite :: Variable -> Int -> Variable -> Gen Value
 compileWrite word nth var = do
-    argValue <- asWord =<< resolve var
+    resolved <- resolve var
+    argValue <- asCType resolved IWord
     
     wordValue <- resolve word
     ptr <- asPointer wordValue
@@ -402,6 +414,10 @@ asCType value cType = do
             ptr <- asPointer value
             llvmType <- liftIO $ cTypeToLLVM ty
             buildTruncOrBitCast ptr (LLVM.pointerType llvmType 0) ""
+        IWord -> do
+            word <- asWord value
+            llvmType <- liftIO $ cTypeToLLVM cType
+            buildZExtOrBitCast word llvmType ""
         _ -> do
             word <- asWord value
             llvmType <- liftIO $ cTypeToLLVM cType
@@ -451,7 +467,6 @@ castPtrToWord value = do
     buildPtrToInt value wordTy ""
     --return $ LLVM.constPtrToInt value wordTy
 
-
 buildRetVoid :: Gen Value
 buildRetVoid = withBuilder $ \bld -> do
     liftIO $ LLVM.buildRetVoid bld
@@ -479,6 +494,10 @@ _buildBitCast value ty name = withBuilder $ \bld ->
 buildTruncOrBitCast :: Value -> LLVM.Type -> String -> Gen Value
 buildTruncOrBitCast value ty name = withBuilder $ \bld ->
     liftIO $ LLVM.buildTruncOrBitCast bld value ty name
+
+buildZExtOrBitCast :: Value -> LLVM.Type -> String -> Gen Value
+buildZExtOrBitCast value ty name = withBuilder $ \bld ->
+    liftIO $ LLVM.buildZExtOrBitCast bld value ty name
 
 buildGEP :: Value -> [Value] -> String -> Gen Value
 buildGEP ptrValue indices name = withBuilder $ \bld ->

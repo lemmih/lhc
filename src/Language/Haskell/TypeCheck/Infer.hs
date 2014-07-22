@@ -12,7 +12,6 @@ import           Language.Haskell.Scope
 import           Language.Haskell.TypeCheck.Monad
 import           Language.Haskell.TypeCheck.Types
 
-
 tiGuardedAlts :: GuardedAlts Origin -> TI TcType
 tiGuardedAlts galts =
     case galts of
@@ -28,10 +27,10 @@ tiAlt scrutTy (Alt _ pat alts _mbBinds) = do
 tiLit :: Literal Origin -> TI TcType
 tiLit lit =
     case lit of
-        PrimInt{} -> return $ TcCon (mkBuiltIn "Main" "I64")
+        PrimInt{} -> return $ TcCon (mkBuiltIn "LHC.Prim" "I64")
         PrimString{} -> return $ TcApp
-            (TcCon (mkBuiltIn "Main" "Addr"))
-            (TcCon (mkBuiltIn "Main" "I8"))
+            (TcCon (mkBuiltIn "LHC.Prim" "Addr"))
+            (TcCon (mkBuiltIn "LHC.Prim" "I8"))
         _ -> error $ "tiLit: " ++ show lit
 
 tiQOp :: QOp Origin -> TI TcType
@@ -52,14 +51,16 @@ tiExp expr =
             mapM_ (unify ty) altTys
             return ty
         Var _ qname -> do
-            let Origin (Resolved (GlobalName src _qname)) _ = ann qname
+            let Origin (Resolved (GlobalName src _qname)) pin = ann qname
             tySig <- findAssumption src
-            _preds :=> ty <- freshInst tySig
+            (_preds :=> ty, coercion) <- freshInst tySig
+            setCoercion pin coercion
             return ty
-        Con _ qname -> do
-            let Origin (Resolved gname) _ = ann qname
-            tySig <- findGlobal gname
-            _preds :=> ty <- freshInst tySig
+        Con _ conName -> do
+            let Origin (Resolved (GlobalName _ qname)) pin = ann conName
+            tySig <- findGlobal qname
+            (_preds :=> ty, coercion) <- freshInst tySig
+            setCoercion pin coercion
             return ty
         App _ fn a -> do
             ty <- TcMetaVar <$> newTcVar
@@ -94,9 +95,9 @@ tiPat pat =
             return tv
         PApp _ con pats -> do
             ty <- TcMetaVar <$> newTcVar
-            let Origin (Resolved gname) _ = ann con
-            conSig <- findGlobal gname
-            _preds :=> conTy <- freshInst conSig
+            let Origin (Resolved (GlobalName _ qname)) _ = ann con
+            conSig <- findGlobal qname
+            (_preds :=> conTy, coercion) <- freshInst conSig
             patTys <- mapM tiPat pats
             unify conTy (foldr TcFun ty patTys)
             return ty
@@ -166,22 +167,22 @@ declHeadType :: DeclHead Origin -> ([TcVar], TcType)
 declHeadType dhead =
     case dhead of
         DHead _ name tyVarBinds ->
-            let Origin (Resolved gname) _ = ann name
+            let Origin (Resolved (GlobalName _ qname)) _ = ann name
                 tcVars = map tcVarFromTyVarBind tyVarBinds
-            in (tcVars, foldl TcApp (TcCon gname) (map TcRef tcVars))
+            in (tcVars, foldl TcApp (TcCon qname) (map TcRef tcVars))
         _ -> error "declHeadType"
   where
     tcVarFromTyVarBind (KindedVar _ name _) = tcVarFromName name
     tcVarFromTyVarBind (UnkindedVar _ name) = tcVarFromName name
 
-tiConDecl :: [TcVar] -> TcType -> ConDecl Origin -> TI (GlobalName, [TcType])
+tiConDecl :: [TcVar] -> TcType -> ConDecl Origin -> TI (QualifiedName, [TcType])
 tiConDecl tvars dty conDecl =
     case conDecl of
         ConDecl _ con bangTys -> do
-            let Origin (Resolved gname) _ = ann con
+            let Origin (Resolved (GlobalName _ gname)) _ = ann con
             return (gname, map getTcType bangTys)
         RecDecl _ con fields -> do
-            let Origin (Resolved gname) _ = ann con
+            let Origin (Resolved (GlobalName _ gname)) _ = ann con
                 conTys = concat
                     [ replicate (length names) (getTcType bangTy)
                     | FieldDecl _ names bangTy <- fields ]
@@ -197,7 +198,8 @@ tiConDecl tvars dty conDecl =
     getTcType (UnBangedTy _ ty) = typeToTcType ty
     getTcType (UnpackedTy _ ty) = typeToTcType ty
 
-tiQualConDecl :: [TcVar] -> TcType -> QualConDecl Origin -> TI (GlobalName, [TcType])
+tiQualConDecl :: [TcVar] -> TcType -> QualConDecl Origin ->
+                 TI (QualifiedName, [TcType])
 tiQualConDecl tvars dty (QualConDecl _ _ _ con) =
     tiConDecl tvars dty con
 
@@ -240,32 +242,39 @@ tiPrepareDecl decl =
             setAssumption src (typeToTcType ty)
         TypeSig _ names ty -> do
             forM_ names $ \name -> do
-                setAssumption (nameIdentifier name) (explicitTcForall $ typeToTcType ty)
+                setAssumption (nameIdentifier name)
+                    (explicitTcForall $ typeToTcType ty)
+                --setCoercion (nameIdentifier name)
+                --    (CoerceAbs (freeTcVariables $ typeToTcType ty))
         _ -> error $ "tiPrepareDecl: " ++ show decl
 
 tiExpl :: (Decl Origin, SrcSpanInfo) -> TI ()
 tiExpl (decl, binder) = do
+    free <- getFreeMetaVariables
     ty <- TcMetaVar <$> newTcVar
     tiDecl decl ty
     tySig <- findAssumption binder
-    _preds :=> expected <- freshInst tySig
+    (_preds :=> expected, coercion) <- freshInst tySig
     unify ty expected
+    (_, coercion) <- generalize free expected
+    setCoercion binder coercion
 
 tiDecls :: [(Decl Origin, SrcSpanInfo)] -> TI ()
 tiDecls decls = do
     free <- getFreeMetaVariables
     liftIO $ print $ map snd decls
-    forM_ decls $ \(decl, binder) -> do
+    forM_ decls $ \(_decl, binder) -> do
         ty <- TcMetaVar <$> newTcVar
         setAssumption binder ty
     forM_ decls $ \(decl, binder) -> do
         ty <- findAssumption binder
         tiDecl decl ty
-    forM_ decls $ \(decl, binder) -> do
+    forM_ decls $ \(_decl, binder) -> do
         ty <- findAssumption binder
         rTy <- zonk ty
         liftIO $ print $ Doc.pretty rTy
-        gTy <- generalize free rTy
+        (gTy, coercion) <- generalize free rTy
+        setCoercion binder coercion
         liftIO $ print $ Doc.pretty gTy
         setAssumption binder gTy
 

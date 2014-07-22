@@ -63,6 +63,11 @@ runPipeline keepIntermediateFiles verbose title m0 =
     hpt0 = runHPT m0
     dstFile n tag = title <.> show n <.> tag <.> "rock"
 
+compileModule :: Module -> FilePath -> IO ()
+compileModule m path = do
+    result <- runPipeline True True (takeBaseName path) m stdPipeline
+    LLVM.compile result (replaceExtension path "bc")
+
 compileFromFile :: FilePath -> IO ()
 compileFromFile = compileFromFileWithOpts True True
 
@@ -73,19 +78,7 @@ compileFromFileWithOpts keepIntermediateFiles verbose path = do
     case ret of
         Left err -> print err
         Right m  -> do
-            result <- runPipeline keepIntermediateFiles verbose base m
-                [ "rename"          :> unique
-                , PerformHPT
-                , "no-laziness"     :?> runGen . lowerEvalApply
-                , "no-exceptions"   :> unique . runGen cpsTransformation
-                , PerformHPT
-                , "no-invoke"       :?> runGen . lowerInvoke
-                , "no-unknown-size" :?> runGen . lowerNodeSize
-                , "no-nodes"        :> unique . registerIntroduction
-                , "no-allocs"       :> unique . runGen lowerAlloc
-                , "no-gc"           :> unique . lowerGC fixedGC
-                , "no-globals"      :> unique . lowerGlobalRegisters
-                ]
+            result <- runPipeline keepIntermediateFiles verbose base m stdPipeline
             LLVM.compile result (replaceExtension path "bc")
   where
     base = takeBaseName path
@@ -93,7 +86,14 @@ compileFromFileWithOpts keepIntermediateFiles verbose path = do
 compileWithOpts :: KeepIntermediateFiles -> Verbose
                 -> FilePath -> Module -> IO ()
 compileWithOpts keepIntermediateFiles verbose path m = do
-    result <- runPipeline keepIntermediateFiles verbose base m
+    result <- runPipeline keepIntermediateFiles verbose base m stdPipeline
+    LLVM.compile result (replaceExtension path "bc")
+  where
+    base = takeBaseName path
+
+
+stdPipeline :: Pipeline
+stdPipeline =
         [ "rename"          :> unique
         , PerformHPT
         , "no-laziness"     :?> runGen . lowerEvalApply
@@ -106,6 +106,4 @@ compileWithOpts keepIntermediateFiles verbose path m = do
         , "no-gc"           :> unique . lowerGC fixedGC
         , "no-globals"      :> unique . lowerGlobalRegisters
         ]
-    LLVM.compile result (replaceExtension path "bc")
-  where
-    base = takeBaseName path
+

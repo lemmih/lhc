@@ -1,5 +1,8 @@
 module Data.Bedrock where
 
+import Test.QuickCheck
+import Control.Applicative ((<$>), (<*>), pure )
+
 data Name = Name
 	{ nameModule     :: [String]
 	, nameIdentifier :: String
@@ -25,6 +28,7 @@ data AvailableNamespace = AvailableNamespace
 	, nsNextGlobalId    :: Int
 	} deriving (Show)
 
+-- XXX: Rename to FFIType? ForeignType?
 data CType
 	= I8
 	| I32
@@ -136,4 +140,136 @@ data Block
 	| Exit
 	| Panic String
 	deriving (Show)
+
+
+
+
+
+-----------------------------------------------
+-- QuickCheck instances
+
+instance Arbitrary Name where
+	arbitrary = Name
+		<$> listOf moduleName
+		<*> variableName
+		<*> fmap abs arbitrary
+	  where
+	  	moduleName = (:) <$> elements ['A'..'Z'] <*> listOf (elements ['a'..'z'])
+	  	variableName = listOf1 (elements ['a'..'z'])
+  	
+instance Arbitrary Type where
+	arbitrary = oneof
+		[ elements
+			[ NodePtr
+			, Node
+			, FramePtr ]
+		, StaticNode <$> fmap abs arbitrary
+		, Primitive <$> arbitrary ]
+
+instance Arbitrary Variable where
+	arbitrary = Variable <$> arbitrary <*> arbitrary
+
+instance Arbitrary CType where
+	arbitrary = oneof
+		[ CPointer <$> arbitrary
+		, elements
+			[ I8
+			, I32
+			, I64
+			, IWord
+			, CVoid ]
+		]
+
+instance Arbitrary Foreign where
+	arbitrary = Foreign
+		<$> listOf1 (elements ['a'..'z'])
+		<*> arbitrary
+		<*> arbitrary
+
+instance Arbitrary Module where
+	arbitrary = Module
+		<$> arbitrary
+		<*> arbitrary
+		<*> arbitrary
+		<*> arbitrary
+		<*> pure (AvailableNamespace 0 0 0 0)
+
+instance Arbitrary NodeName where
+	arbitrary = oneof
+		[ ConstructorName <$> arbitrary
+		, FunctionName <$> arbitrary <*> fmap abs arbitrary ]
+
+instance Arbitrary NodeDefinition where
+	arbitrary = NodeDefinition <$> arbitrary <*> arbitrary
+
+instance Arbitrary Attribute where
+	arbitrary = elements [ NoCPS, Internal ]
+
+instance Arbitrary Function where
+	arbitrary = Function
+		<$> arbitrary
+		<*> arbitrary
+		<*> arbitrary
+		<*> arbitrary
+		<*> arbitrary
+
+instance Arbitrary Pattern where
+	arbitrary = oneof
+		[ NodePat <$> arbitrary <*> arbitrary
+		, LitPat <$> arbitrary ]
+
+instance Arbitrary Alternative where
+	arbitrary = Alternative <$> arbitrary <*> arbitrary
+
+instance Arbitrary Literal where
+	arbitrary = oneof
+		[ LiteralInt <$> arbitrary
+		, LiteralString <$> arbitrary ]
+
+instance Arbitrary MemAttributes where
+	arbitrary = MemAttributes
+		<$> arbitrary
+		<*> arbitrary
+
+plainIdentifier = listOf1 (elements ['a'..'z'])
+
+instance Arbitrary Expression where
+	arbitrary = oneof
+		[ Application <$> arbitrary <*> arbitrary
+		, CCall <$> plainIdentifier <*> arbitrary
+		, Catch <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+		, Alloc <$> arbitrary `suchThat` (>0)
+		, Store <$> arbitrary <*> arbitrary
+		, Write <$> arbitrary <*> fmap abs arbitrary <*> arbitrary
+		, Address <$> arbitrary <*> fmap abs arbitrary
+		, Fetch <$> arbitrary <*> arbitrary
+		, Load <$> arbitrary <*> arbitrary <*> fmap abs arbitrary
+		, Add <$> arbitrary <*> arbitrary
+		, ReadRegister <$> plainIdentifier
+		, WriteRegister <$> plainIdentifier <*> arbitrary
+		, ReadGlobal <$> plainIdentifier
+		, WriteGlobal <$> plainIdentifier <*> arbitrary
+		, TypeCast <$> arbitrary
+		, MkNode <$> arbitrary <*> arbitrary
+		, Literal <$> arbitrary
+		, Eval <$> arbitrary
+		, Apply <$> arbitrary <*> arbitrary
+		-- , GCAllocate
+		-- , GCBegin
+		-- , GCEnd
+		-- , GCMark
+		-- , GCMarkNode
+		]
+
+instance Arbitrary Block where
+	arbitrary = oneof
+		[ Case <$> arbitrary <*> arbitrary <*> arbitrary
+		, Bind <$> arbitrary <*> arbitrary <*> arbitrary
+		, Return <$> arbitrary
+		, Raise <$> arbitrary
+		, TailCall <$> arbitrary <*> arbitrary
+		, Invoke <$> arbitrary <*> arbitrary
+		, InvokeHandler <$> arbitrary <*> arbitrary
+		, pure Exit
+		, Panic <$> arbitrary ]
 

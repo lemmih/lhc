@@ -39,7 +39,7 @@ library
   -- other-modules:       
   build-depends:       base ==4.*, ansi-wl-pprint,
                        parsec, containers, mtl, vector,
-                       llvm-base, filepath
+                       llvm-base, filepath, QuickCheck
 
   ghc-options:         -fwarn-incomplete-patterns -fwarn-unused-binds
                        -fwarn-unused-imports -Werror

@@ -21,3 +21,18 @@ Misc:
 * create allocs when fixing node size. Apply lowerAllocs before lowering
   nodes such that we can correctly gcMarkNode all nodes.
 * Support variable length encoding of nodes.
+
+Benchmarks:
+  Simulated annealing
+  Parse all cabal files from hackage.
+
+Pipeline:
+  Parse Haskell - done
+  Origin analysis - done
+  Type check - not done
+  haskell->core - partial
+  core->bedrock - partial
+  bedrock->llvm - done
+
+
+
