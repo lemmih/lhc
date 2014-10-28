@@ -156,7 +156,7 @@ instance Arbitrary Name where
 	  where
 	  	moduleName = (:) <$> elements ['A'..'Z'] <*> listOf (elements ['a'..'z'])
 	  	variableName = listOf1 (elements ['a'..'z'])
-  	
+
 instance Arbitrary Type where
 	arbitrary = oneof
 		[ elements
