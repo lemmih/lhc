@@ -36,7 +36,7 @@ convert :: Core.Module -> Bedrock.Module
 convert m = Bedrock.Module
   { modForeigns  = Core.coreForeigns m
   , nodes        = map convertNodeDefinition (Core.coreNodes m)
-  , entryPoint   = Name [] "entryPoint" 28
+  , entryPoint   = Name [] "entryPoint" 38
   , functions    = fns
   , modNamespace = ns }
   where

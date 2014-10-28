@@ -25,13 +25,13 @@ unIO action =
     case action of
         IO unit -> unit
 
---bindIO :: IO a -> (a -> IO b) -> IO b
---bindIO f g = IO (\s ->
---  case unIO f s of
---    IOUnit a s' -> unIO (g a) s')
+bindIO :: IO a -> (a -> IO b) -> IO b
+bindIO f g = IO (\s ->
+  case unIO f s of
+    IOUnit a s' -> unIO (g a) s')
 
---thenIO :: IO a -> IO b -> IO b
---thenIO a b = bindIO a (\c -> b)
+thenIO :: IO a -> IO b -> IO b
+thenIO a b = bindIO a (\c -> b)
 
 --return :: a -> IO a
 --return a = IO (\s -> IOUnit a s)
@@ -44,7 +44,7 @@ unsafePerformIO action =
 foreign import ccall unsafe "puts" puts :: Addr I8 -> IO CInt
 
 main :: IO CInt
-main = puts "Hello world!"#
+main = thenIO (puts "Hello world!"#) (puts "Another message!"#)
 
 entryPoint :: CInt
 entryPoint = unsafePerformIO main

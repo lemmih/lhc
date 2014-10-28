@@ -35,7 +35,7 @@ data Step
 infixr 9 :>
 infixr 9 :?>
 
-runPipeline :: KeepIntermediateFiles -> Verbose
+    runPipeline :: KeepIntermediateFiles -> Verbose
             -> String -> Module -> Pipeline -> IO Module
 runPipeline keepIntermediateFiles verbose title m0 =
     worker hpt0 0 m0

@@ -5,7 +5,7 @@ Goals:
   Origin analysis of recursive modules.
   Fast.
   Support rebindable syntax.
-  Support scoped type variables? Hm, maybe.
+  Support scoped type variables.
 
 Bugs:
   Instance methods aren't resolved properly.
@@ -15,6 +15,15 @@ Notes:
   the relevant functions and add them to the module interface. When desugaring
   with RebindableSyntax enabled, those functions can be used instead of the
   default Prelude ones.
+  This wont' work. We need to inspect the scope at the locations the rebindable
+  functions are used. Looking at the global scope isn't enough.
+
+  Scope environment:
+  We need to know about the fields of data construtors:
+  fn DataType{..} = ...
+  We need to know about the members of classes:
+  instance Module.Class Ty where
+    thisMethodDoesNotHaveToBeQualified = ...
 
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}

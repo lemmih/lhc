@@ -116,3 +116,17 @@ mkDepth n v = mkDepth (n-1) (Just v)
 
 fn :: (forall a. a -> a) -> ((), Bool)
 fn i = (i (), i False)
+
+fn :: (/\a. a -> a) -> ((), Bool)
+fn = \(i::/\a. a -> a) -> ( i () (), i Bool False)
+
+
+k :: forall a b. a -> b -> b
+f1 :: (Int -> Int -> Int) -> Int
+f2 :: (forall x. x -> x -> x) -> Int
+
+expr :: Int
+expr = f1 (k Int Int)
+
+expr2 :: Int
+expr2 = f2 (k Int Int)
