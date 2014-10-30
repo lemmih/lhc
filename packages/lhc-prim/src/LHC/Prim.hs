@@ -14,13 +14,13 @@ data CInt = CInt I32
 
 data RealWorld = RealWorld
 
-data IOUnit a = IOUnit a RealWorld
+-- data IOUnit a = IOUnit a RealWorld
 --newtype IO a = IO { unIO :: RealWorld -> IOUnit a }
-newtype IO a = IO (RealWorld -> IOUnit a)
+newtype IO a = IO (RealWorld -> (# RealWorld, a #))
 
 data Unit = Unit
 
-unIO :: IO a -> RealWorld -> IOUnit a
+unIO :: IO a -> RealWorld -> (# RealWorld, a #)
 unIO action =
     case action of
         IO unit -> unit
@@ -28,7 +28,7 @@ unIO action =
 bindIO :: IO a -> (a -> IO b) -> IO b
 bindIO f g = IO (\s ->
   case unIO f s of
-    IOUnit a s' -> unIO (g a) s')
+    (# s', a #) -> unIO (g a) s'
 
 thenIO :: IO a -> IO b -> IO b
 thenIO a b = bindIO a (\c -> b)

@@ -244,7 +244,7 @@ convertDecl decl =
                 <*> bindName name
                 <*> (WithCoercion coercion <$> convertPats pats rhs)
             -- (convertName name, convertPats pats rhs)
-        HS.PatBind _ (HS.PVar _ name) _type rhs _binds ->
+        HS.PatBind _ (HS.PVar _ name) rhs _binds ->
             pushDecl =<< Decl
                 <$> lookupType name
                 <*> bindName name
@@ -256,7 +256,7 @@ convertDecl decl =
                 <$> lookupType name
                 <*> bindName name
                 <*> convertExternal external foreignTy
-            
+
             unless (isPrimitive external) $ do
                 let (argTypes, _isIO, retType) = ffiTypes foreignTy
                 pushForeign $ Foreign
@@ -326,12 +326,12 @@ toCType ty =
                 toCType ty'
         _ -> error $ "toCType: " ++ show ty
 
-convertBangType :: HS.BangType Origin -> M Type
-convertBangType bty =
-    case bty of
-        HS.UnBangedTy _ ty -> convertType ty
-        HS.BangedTy _ ty -> convertType ty
-        _ -> error "convertBangType"
+-- convertBangType :: HS.BangType Origin -> M Type
+-- convertBangType bty =
+--     case bty of
+--         HS.UnBangedTy _ ty -> convertType ty
+--         HS.BangedTy _ ty -> convertType ty
+--         _ -> error "convertBangType"
 
 convertType :: HS.Type Origin -> M Type
 convertType ty =
@@ -372,7 +372,7 @@ convertExternal cName ty = do
     args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
     primArgs <- return args
     primOut <- Variable <$> newName "primOut" <*> pure i32
-    action <- Variable <$> newName "action" <*> pure TcUndefined 
+    action <- Variable <$> newName "action" <*> pure TcUndefined
     s <- Variable <$> newName "s" <*> pure TcUndefined
     boxed <- Variable <$> newName "boxed" <*> pure retType
 
@@ -387,7 +387,7 @@ convertExternal cName ty = do
                 WithExternal primOut cName primArgs s $
                 Let (NonRec boxed $ Con cint [primOut]) $
                 Con ioUnit [boxed, s]
-            ) 
+            )
         (Con io [action])
   where
     (argTypes, isIO@True, retType) = ffiTypes ty
@@ -482,11 +482,11 @@ convertExp expr =
 convertAlt :: HS.Alt Origin -> M Alt
 convertAlt alt =
     case alt of
-        HS.Alt _ (HS.PApp _ name pats) (HS.UnGuardedAlt _ branch) Nothing -> do
+        HS.Alt _ (HS.PApp _ name pats) rhs Nothing -> do
             args <- sequence [ Variable <$> bindName var <*> lookupType var
                              | HS.PVar _ var <- pats ]
             Alt <$> (ConPat <$> resolveQGlobalName name <*> pure args)
-                <*> convertExp branch
+                <*> convertRhs rhs
         _ -> error "convertAlt"
 
 

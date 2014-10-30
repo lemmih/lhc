@@ -12,17 +12,17 @@ import           Language.Haskell.Scope
 import           Language.Haskell.TypeCheck.Monad
 import           Language.Haskell.TypeCheck.Types
 
-tiGuardedAlts :: GuardedAlts Origin -> TI TcType
-tiGuardedAlts galts =
-    case galts of
-        UnGuardedAlt _ branch -> tiExp branch
-        _ -> error "tiGuardedAlts"
+-- tiGuardedAlts :: GuardedAlts Origin -> TI TcType
+-- tiGuardedAlts galts =
+--     case galts of
+--         UnGuardedAlt _ branch -> tiExp branch
+--         _ -> error "tiGuardedAlts"
 
 tiAlt :: TcType -> Alt Origin -> TI TcType
-tiAlt scrutTy (Alt _ pat alts _mbBinds) = do
+tiAlt scrutTy (Alt _ pat rhs _mbBinds) = do
     patTy <- tiPat pat
     unify scrutTy patTy
-    tiGuardedAlts alts
+    tiRhs rhs
 
 tiLit :: Literal Origin -> TI TcType
 tiLit lit =
@@ -135,7 +135,7 @@ tiDecl decl ty =
         FunBind _ matches -> do
             ts <- mapM tiMatch matches
             mapM_ (unify ty) ts
-        PatBind _ _pat _ty rhs _binds -> do
+        PatBind _ _pat rhs _binds -> do
             rhsTy <- tiRhs rhs
             unify ty rhsTy
         _ -> error $ "tiDecl: " ++ show decl
@@ -166,10 +166,13 @@ declIdent decl =
 declHeadType :: DeclHead Origin -> ([TcVar], TcType)
 declHeadType dhead =
     case dhead of
-        DHead _ name tyVarBinds ->
+        DHead _ name ->
             let Origin (Resolved (GlobalName _ qname)) _ = ann name
-                tcVars = map tcVarFromTyVarBind tyVarBinds
-            in (tcVars, foldl TcApp (TcCon qname) (map TcRef tcVars))
+            in ([], TcCon qname)
+        DHApp _ dh tyVarBind ->
+            let (tcVars, ty) = declHeadType dh
+                var = tcVarFromTyVarBind tyVarBind
+            in (tcVars ++ [var], TcApp ty (TcRef var))
         _ -> error "declHeadType"
   where
     tcVarFromTyVarBind (KindedVar _ name _) = tcVarFromName name
@@ -178,25 +181,21 @@ declHeadType dhead =
 tiConDecl :: [TcVar] -> TcType -> ConDecl Origin -> TI (QualifiedName, [TcType])
 tiConDecl tvars dty conDecl =
     case conDecl of
-        ConDecl _ con bangTys -> do
+        ConDecl _ con tys -> do
             let Origin (Resolved (GlobalName _ gname)) _ = ann con
-            return (gname, map getTcType bangTys)
+            return (gname, map typeToTcType tys)
         RecDecl _ con fields -> do
             let Origin (Resolved (GlobalName _ gname)) _ = ann con
                 conTys = concat
-                    [ replicate (length names) (getTcType bangTy)
-                    | FieldDecl _ names bangTy <- fields ]
-            forM_ fields $ \(FieldDecl _ names bangTy) -> do
-                let ty = TcFun dty (getTcType bangTy)
+                    [ replicate (length names) (typeToTcType ty)
+                    | FieldDecl _ names ty <- fields ]
+            forM_ fields $ \(FieldDecl _ names fTy) -> do
+                let ty = TcFun dty (typeToTcType fTy)
                 forM_ names $ \name -> do
                     let Origin (Resolved (GlobalName src _qname)) _ = ann name
                     setAssumption src (TcForall tvars $ [] :=> ty)
             return (gname, conTys)
         _ -> error "tiConDecl"
-  where
-    getTcType (BangedTy _ ty) = typeToTcType ty
-    getTcType (UnBangedTy _ ty) = typeToTcType ty
-    getTcType (UnpackedTy _ ty) = typeToTcType ty
 
 tiQualConDecl :: [TcVar] -> TcType -> QualConDecl Origin ->
                  TI (QualifiedName, [TcType])
@@ -206,23 +205,23 @@ tiQualConDecl tvars dty (QualConDecl _ _ _ con) =
 tiClassDecl :: Decl Origin -> TI ()
 tiClassDecl decl =
     case decl of
-        ClassDecl _ _ctx (DHead _ className [tyBind]) _deps (Just decls) ->
-            sequence_
-                [ worker className tyBind name ty
-                | ClsDecl _ (TypeSig _ names ty) <- decls, name <- names ]
+        -- ClassDecl _ _ctx (DHead _ className [tyBind]) _deps (Just decls) ->
+        --     sequence_
+        --         [ worker className tyBind name ty
+        --         | ClsDecl _ (TypeSig _ names ty) <- decls, name <- names ]
         _ -> error "tiClassDecl"
   where
     -- tcVarFromName :: Name Origin -> TcVar
-    tcVarFromTyVarBind (KindedVar _ name _) = tcVarFromName name
-    tcVarFromTyVarBind (UnkindedVar _ name) = tcVarFromName name
-    worker className tyBind name ty = do
-        -- name :: className tybind => ty
-        let Origin (Resolved gname) _ = ann className
-            Origin (Resolved (GlobalName src _qname)) _ = ann name
-            tcVar = tcVarFromTyVarBind tyBind
-            tcType = typeToTcType ty
-        let scheme = TcForall [tcVar] ([IsIn gname (TcRef tcVar)] :=> tcType)
-        setAssumption src scheme
+    -- tcVarFromTyVarBind (KindedVar _ name _) = tcVarFromName name
+    -- tcVarFromTyVarBind (UnkindedVar _ name) = tcVarFromName name
+    -- worker className tyBind name ty = do
+    --     -- name :: className tybind => ty
+    --     let Origin (Resolved gname) _ = ann className
+    --         Origin (Resolved (GlobalName src _qname)) _ = ann name
+    --         tcVar = tcVarFromTyVarBind tyBind
+    --         tcType = typeToTcType ty
+    --     let scheme = TcForall [tcVar] ([IsIn gname (TcRef tcVar)] :=> tcType)
+    --     setAssumption src scheme
 
 
 tiPrepareDecl :: Decl Origin -> TI ()
@@ -309,12 +308,12 @@ tiBindGroup decls = do
     scc = stronglyConnComp graph
 
 -- FIXME: Rename this function. We're not finding free variables, we finding
---        all references. 
+--        all references.
 declFreeVariables :: Decl Origin -> [SrcSpanInfo]
 declFreeVariables decl =
     case decl of
         FunBind _ matches -> concatMap freeMatch matches
-        PatBind _ _pat _ty rhs _binds -> freeRhs rhs
+        PatBind _ _pat rhs _binds -> freeRhs rhs
         _ -> error $ "declFreeVariables: " ++ show decl
   where
     freeMatch match =
@@ -340,10 +339,7 @@ declFreeVariables decl =
         case op of
             QVarOp _ qname -> [qnameIdentifier qname]
             QConOp{} -> []
-    freeAlt (Alt _ _pat guarded _binds) =
-        case guarded of
-            UnGuardedAlt _ expr -> freeExp expr
-            _ -> error "declFreeVariables, freeAlt"
+    freeAlt (Alt _ _pat rhs _binds) = freeRhs rhs
 
 qnameIdentifier :: QName Origin -> SrcSpanInfo
 qnameIdentifier qname =
@@ -371,7 +367,7 @@ declBinders decl =
                     let Origin _ loc = ann name
                     in [loc]
                 _ -> error "declBinders, FunBind"
-        PatBind _ pat _ty _rhs _binds ->
+        PatBind _ pat _rhs _binds ->
             patBinders pat
         TypeDecl{} -> []
         TypeSig{} -> []

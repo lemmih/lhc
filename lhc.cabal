@@ -1,4 +1,3 @@
-cabal-version:       >= 1.6
 name:                lhc
 version:             0.0.1
 synopsis:            The Luxurious LHC Optimization System
@@ -31,7 +30,7 @@ Executable lhc
                      haskell-names    >= 0.3,
                      hse-cpp          >= 0.1,
                      haskell-packages >= 0.2,
-                     haskell-src-exts >= 1.15.0,
+                     haskell-src-exts >= 1.16.0,
                      tagged,
 
                      bedrock
@@ -41,4 +40,4 @@ Executable lhc
  ghc-options:        -fwarn-unused-imports -fwarn-unused-binds
                      -fwarn-incomplete-patterns
  Default-language:   Haskell2010
- Extensions:         
+ Extensions:

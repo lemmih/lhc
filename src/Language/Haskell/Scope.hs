@@ -86,7 +86,7 @@ data ScopedName = ScopedName Source GlobalName
     deriving ( Show )
 
 data ScopeError
-    = ENotInScope QualifiedName Namespace SrcSpanInfo
+    = ENotInScope QualifiedName RNamespace SrcSpanInfo
     -- | ETypeNotInScope QualifiedName SrcSpanInfo
     -- | EConstructorNotInScope QualifiedName SrcSpanInfo
     -- | ETypeVariableNotInScope QualifiedName SrcSpanInfo
@@ -100,7 +100,7 @@ data QualifiedName = QualifiedName
     { gnameModule     :: String
     , gnameIdentifier :: String }
     deriving ( Eq, Ord, Show )
-data Namespace
+data RNamespace
     = NsTypes
     | NsTypeVariables
     | NsValues
@@ -180,13 +180,13 @@ matchName (InfixMatch _span _left name _right _rhs _binds) = name
 -- Name binding and resolution
 
 -- FIXME: Use ETypeNotInScope, EConstructorNotInScope, etc.
-resolveName :: Namespace -> Resolve Name
+resolveName :: RNamespace -> Resolve Name
 resolveName = resolveName' ""
 
-resolveName' :: String -> Namespace -> Resolve Name
+resolveName' :: String -> RNamespace -> Resolve Name
 resolveName' = resolveName'' Nothing
 
-resolveName'' :: Maybe SrcSpanInfo -> String -> Namespace -> Resolve Name
+resolveName'' :: Maybe SrcSpanInfo -> String -> RNamespace -> Resolve Name
 resolveName'' mbDefault qualification ns name =
     con <$> getScoped <*> pure nameString
   where
@@ -224,7 +224,7 @@ resolveTyVar name = do
     mbDefault <- getTvRoot
     resolveName'' mbDefault "" NsTypeVariables name
 
-resolveQName :: Namespace -> Resolve QName
+resolveQName :: RNamespace -> Resolve QName
 resolveQName ns qname =
     case qname of
         Qual src (ModuleName l m) name ->
@@ -240,7 +240,7 @@ resolveQName ns qname =
             Special (Origin None src)
                 <$> resolveSpecialCon specialCon
 
-defineName :: Namespace -> Resolve Name
+defineName :: RNamespace -> Resolve Name
 defineName ns name = do
     thisModule <- asks scopeModuleName
     let src = ann name
@@ -295,11 +295,15 @@ resolveTyVarBind tyVarBind =
 resolveDeclHead :: Resolve DeclHead
 resolveDeclHead dhead =
     case dhead of
-        DHead src name tyVarBinds ->
+        DHApp src dh tyVarBind ->
+            DHApp
+                <$> pure (Origin None src)
+                <*> resolveDeclHead dh
+                <*> resolveTyVarBind tyVarBind
+        DHead src name ->
             DHead
                 <$> pure (Origin None src)
                 <*> defineName NsTypes name
-                <*> mapM resolveTyVarBind tyVarBinds
         DHInfix{} -> error "resolveDeclHead"
         DHParen _ next -> resolveDeclHead next
 
@@ -308,26 +312,36 @@ resolveContext ctx =
     case ctx of
         _ -> error "resolveContext"
 
+resolveOverlap :: Resolve Overlap
+resolveOverlap overlap =
+    case overlap of
+        _ -> error "resolveOverlap"
+
 resolveDataOrNew :: Resolve DataOrNew
 resolveDataOrNew = pure . fmap (Origin None)
 
 resolveInstHead :: Resolve InstHead
 resolveInstHead instHead =
     case instHead of
-        IHead src className tys ->
-            IHead (Origin None src)
-                <$> resolveQName NsTypes className
-                <*> mapM resolveType tys
+        -- IHead src className tys ->
+        --     IHead (Origin None src)
+        --         <$> resolveQName NsTypes className
+        --         <*> mapM resolveType tys
         IHInfix{} -> error "resolveInstHead"
         IHParen src sub ->
             IHParen (Origin None src)
                 <$> resolveInstHead sub
 
+resolveInstRule :: Resolve InstRule
+resolveInstRule instRule =
+    case instRule of
+        _ -> error "resolveInstRule"
+
 resolveDeriving :: Resolve Deriving
-resolveDeriving (Deriving src instHeads) =
+resolveDeriving (Deriving src instRules) =
     Deriving
         <$> pure (Origin None src)
-        <*> mapM resolveInstHead instHeads
+        <*> mapM resolveInstRule instRules
 
 resolveSpecialCon :: Resolve SpecialCon
 resolveSpecialCon specialCon = pure $
@@ -367,31 +381,26 @@ resolveType ty =
 resolveBangType :: Resolve BangType
 resolveBangType bangTy =
     case bangTy of
-        BangedTy src ty ->
-            BangedTy (Origin None src)
-                <$> resolveType ty
-        UnBangedTy src ty ->
-            UnBangedTy (Origin None src)
-                <$> resolveType ty
-        UnpackedTy src ty ->
-            UnpackedTy (Origin None src)
-                <$> resolveType ty
+        BangedTy src ->
+            pure $ BangedTy (Origin None src)
+        UnpackedTy src ->
+            pure $ UnpackedTy (Origin None src)
 
 resolveFieldDecl :: Resolve FieldDecl
 resolveFieldDecl fieldDecl =
     case fieldDecl of
-        FieldDecl src names bangTy ->
+        FieldDecl src names ty ->
             FieldDecl (Origin None src)
                 <$> mapM (defineName NsValues) names
-                <*> resolveBangType bangTy
+                <*> resolveType ty
 
 resolveConDecl :: Resolve ConDecl
 resolveConDecl conDecl =
     case conDecl of
-        ConDecl src name bangTys ->
+        ConDecl src name tys ->
             ConDecl (Origin None src)
                 <$> defineName NsValues name
-                <*> mapM resolveBangType bangTys
+                <*> mapM resolveType tys
         RecDecl src name fieldDecls ->
             RecDecl (Origin None src)
                 <$> defineName NsValues name
@@ -425,19 +434,19 @@ resolvePat pat =
                 <$> mapM resolvePat pats
         _ -> error $ "resolvePat: " ++ show pat
 
-resolveGuardedAlts :: Resolve GuardedAlts
-resolveGuardedAlts galts =
-    case galts of
-        UnGuardedAlt src expr ->
-            UnGuardedAlt (Origin None src)
-                <$> resolveExp expr
-        _ -> error "resolveGuardedAlts"
+-- resolveGuardedAlts :: Resolve GuardedAlts
+-- resolveGuardedAlts galts =
+--     case galts of
+--         UnGuardedAlt src expr ->
+--             UnGuardedAlt (Origin None src)
+--                 <$> resolveExp expr
+--         _ -> error "resolveGuardedAlts"
 
 resolveAlt :: Resolve Alt
-resolveAlt (Alt src pat guarded mbBinds) = limitScope $
+resolveAlt (Alt src pat rhs mbBinds) = limitScope $
     Alt (Origin None src)
         <$> resolvePat pat
-        <*> resolveGuardedAlts guarded
+        <*> resolveRhs rhs
         <*> resolveMaybe undefined mbBinds
 
 resolveQOp :: Resolve QOp
@@ -572,10 +581,9 @@ resolveDecl rContext decl =
                 <$> mapM resolveMatch matches
 
         -- FIXME: PatBind in classes and instances
-        PatBind src pat ty rhs binds ->
+        PatBind src pat rhs binds ->
             PatBind (Origin None src)
                 <$> resolvePat pat
-                <*> resolveMaybe resolveType ty
                 <*> resolveRhs rhs
                 <*> resolveMaybe undefined binds
 
@@ -601,10 +609,10 @@ resolveDecl rContext decl =
                 <*> mapM resolveFunDep deps
                 <*> resolveMaybe (mapM resolveClassDecl) decls
 
-        InstDecl src ctx instHead decls ->
+        InstDecl src mbOverlap instRule decls ->
             InstDecl (Origin None src)
-                <$> resolveMaybe resolveContext ctx
-                <*> resolveInstHead instHead
+                <$> resolveMaybe resolveOverlap mbOverlap
+                <*> resolveInstRule instRule
                 <*> resolveMaybe (mapM resolveInstDecl) decls
 
         ForImp src conv safety ident name ty ->
