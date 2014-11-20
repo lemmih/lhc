@@ -1,22 +1,40 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Compiler.Core where
 
-import           Data.Bedrock           (AvailableNamespace, CType, Foreign,
-                                         Name )
-import Data.Bedrock.PrettyPrint ()
-import Language.Haskell.TypeCheck.Types (Coercion(..), TcType)
-
+import           Data.Bedrock           (AvailableNamespace(..), CType(..), Foreign,
+                                         Name(..), Foreign(..) )
+import           Data.Bedrock.PrettyPrint ()
+import           Language.Haskell.Exts.SrcLoc
+import           Language.Haskell.TypeCheck.Types (Coercion(..), TcType(..), Qual(..),
+                                                   Pred(..),TcVar(..))
+import           Data.Binary
+import           Data.Derive.Binary
+import           Data.DeriveTH
+import           Language.Haskell.Scope                 (QualifiedName (..), GlobalName(..))
+import Data.Monoid (Monoid(..))
 import Text.PrettyPrint.ANSI.Leijen
 
 data Module = Module
     { coreForeigns  :: [Foreign]
     , coreDecls     :: [Decl]
     , coreNodes     :: [NodeDefinition]
+    , coreNewTypes  :: [NewType]
     , coreNamespace :: AvailableNamespace
     }
+
+instance Monoid Module where
+    mempty = Module [] [] [] [] (AvailableNamespace 0 0 0 0)
+    mappend a b = Module
+        { coreForeigns = coreForeigns a ++ coreForeigns b
+        , coreDecls = coreDecls a ++ coreDecls b
+        , coreNodes = coreNodes a ++ coreNodes b
+        , coreNewTypes = coreNewTypes a ++ coreNewTypes b
+        , coreNamespace = coreNamespace a }
 
 instance Pretty Module where
     pretty m = vsep
         [ vsep (map pretty (coreNodes m))
+        , vsep (map pretty (coreNewTypes m))
         , vsep (map pretty (coreDecls m))
         ]
 
@@ -35,15 +53,21 @@ instance Pretty NodeDefinition where
     pretty (NodeDefinition name args) =
         text "node" <+> pretty name <+> hsep (map pretty args)
 
+data NewType = NewType Name
+
+instance Pretty NewType where
+    pretty (NewType con) =
+        text "newtype" <+> pretty con
 
 data Variable = Variable
     { varName :: Name
     , varType :: TcType
-    } deriving ( Show )
+    } deriving ( Show, Eq )
 
 data Expr
     = Var Variable
-    | Con Name [Variable]
+    | Con Name
+    | UnboxedTuple [Variable]
     | Lit Literal
     | WithExternal Variable String [Variable] Variable Expr
     -- | ExternalPure String CType [Variable]
@@ -51,6 +75,7 @@ data Expr
     | Lam [Variable] Expr
     | Let LetBind Expr
     | Case Expr [Alt]
+    | Cast Expr TcType
     | Id
     | WithCoercion Coercion Expr
     deriving ( Show )
@@ -67,7 +92,11 @@ instance Pretty Expr where
     pretty expr =
         case expr of
             Var var -> pretty var
-            Con name vars -> pretty name <+> ppVars vars
+            Con name -> pretty name -- <+> ppVars vars
+            UnboxedTuple vars ->
+                text "(#" <+>
+                (hsep $ punctuate comma $ map pretty vars) <+>
+                text "#)"
             Lit lit -> pretty lit
             App a b ->
                 pretty a <+> parens (pretty b)
@@ -76,6 +105,8 @@ instance Pretty Expr where
             Case scrut alts ->
                 text "case" <+> pretty scrut <+> text "of" <$$>
                 indent 2 (vsep $ map pretty alts)
+            Cast expr ty ->
+                parens (pretty expr <+> text ":::" <+> pretty ty)
             Id -> text "id"
             WithCoercion CoerceId e -> pretty e
             WithCoercion c e ->
@@ -85,7 +116,7 @@ instance Pretty Expr where
                     text "external" <+> pretty cName <+> ppVars args <$$>
                 pretty cont
             Let (NonRec name e1) e2 ->
-                text "let" <+> pretty name <+> equals <+> pretty e1 <$$>
+                text "let" <+> ppTypedVariable name <+> equals <+> pretty e1 <$$>
                 pretty e2
 
 ppTypedVariable :: Variable -> Doc
@@ -110,6 +141,7 @@ instance Pretty Alt where
 data Pattern
     = ConPat Name [Variable]
     | LitPat Literal
+    | UnboxedPat [Variable]
     deriving ( Show )
 
 instance Pretty Pattern where
@@ -118,6 +150,10 @@ instance Pretty Pattern where
             ConPat name vars ->
                 pretty name <+> ppTypedVars vars
             LitPat lit -> pretty lit
+            UnboxedPat vars ->
+                text "(#" <+>
+                (hsep $ punctuate comma $ map pretty vars) <+>
+                text "#)"
 
 -- All unlifted.
 data Literal
@@ -135,4 +171,33 @@ instance Pretty Literal where
             LitChar c     -> pretty c
             LitInt i      -> pretty i
             LitString str -> pretty str
+
+-- FIXME: Move orphan instance to their rightful modules.
+
+derive makeBinary ''SrcSpan
+derive makeBinary ''SrcSpanInfo
+derive makeBinary ''QualifiedName
+derive makeBinary ''GlobalName
+derive makeBinary ''Pred
+derive makeBinary ''Qual
+derive makeBinary ''TcVar
+derive makeBinary ''TcType
+derive makeBinary ''Name
+derive makeBinary ''Variable
+derive makeBinary ''Literal
+derive makeBinary ''Pattern
+derive makeBinary ''LetBind
+derive makeBinary ''Coercion
+derive makeBinary ''NodeDefinition
+derive makeBinary ''CType
+derive makeBinary ''Foreign
+derive makeBinary ''Alt
+derive makeBinary ''Expr
+derive makeBinary ''Decl
+derive makeBinary ''AvailableNamespace
+derive makeBinary ''NewType
+derive makeBinary ''Module
+
+
+
 

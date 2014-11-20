@@ -83,7 +83,7 @@ cpsExpresion origin binds simple rest =
             mkContinuation $ \continuationFrame ->
                 Bind [exSusp] (MkNode (FunctionName exh 2) exhArgs) $
                 Bind [exceptionFrame]
-                    (Store (ConstructorName exhFrameName)
+                    (Store (ConstructorName exhFrameName 0)
                         [ continuationFrame
                         , exSusp ]) $
                 TailCall fn (fnArgs ++ [exceptionFrame])
@@ -98,13 +98,13 @@ cpsExpresion origin binds simple rest =
         MkNode (FunctionName fn blanks) args ->
             return $ Bind binds (MkNode (FunctionName fn (blanks+1)) args) rest
         other -> return $ Bind binds other rest
-  where    
+  where
     mkContinuation use = do
         cFrameName <- tagName ("frame") (fnName origin)
         let stdContinuationFrame = Variable
                 { variableName = cFrameName
                 , variableType = FramePtr }
-    
+
         let continuationArgs = (Set.toList (freeVariables rest) \\ binds)
         contFnName <- tagName "continuation" (fnName origin)
         pushFunction $

@@ -50,6 +50,8 @@ runPipeline keepIntermediateFiles verbose title m0 =
                 m' <- runAction n m tag (action hpt)
                 worker hpt (n+1) m' steps
             PerformHPT -> do
+                when verbose $
+                    printf "** HPT Analysis\n"
                 let hpt' = runHPT m
                 when verbose $ ppHPTResult hpt'
                 worker hpt' n m steps
@@ -66,7 +68,7 @@ runPipeline keepIntermediateFiles verbose title m0 =
 compileModule :: Module -> FilePath -> IO ()
 compileModule m path = do
     result <- runPipeline True True (takeBaseName path) m stdPipeline
-    LLVM.compile result (replaceExtension path "bc")
+    LLVM.compile result (replaceExtension path "ll")
 
 compileFromFile :: FilePath -> IO ()
 compileFromFile = compileFromFileWithOpts True True
@@ -79,7 +81,7 @@ compileFromFileWithOpts keepIntermediateFiles verbose path = do
         Left err -> print err
         Right m  -> do
             result <- runPipeline keepIntermediateFiles verbose base m stdPipeline
-            LLVM.compile result (replaceExtension path "bc")
+            LLVM.compile result (replaceExtension path "ll")
   where
     base = takeBaseName path
 
@@ -87,7 +89,7 @@ compileWithOpts :: KeepIntermediateFiles -> Verbose
                 -> FilePath -> Module -> IO ()
 compileWithOpts keepIntermediateFiles verbose path m = do
     result <- runPipeline keepIntermediateFiles verbose base m stdPipeline
-    LLVM.compile result (replaceExtension path "bc")
+    LLVM.compile result (replaceExtension path "ll")
   where
     base = takeBaseName path
 

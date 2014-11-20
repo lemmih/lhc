@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 module Data.Bedrock.RegisterIntroduction
     ( registerIntroduction ) where
 
@@ -11,7 +12,10 @@ import qualified Data.Map             as Map
 import           Data.Bedrock
 import           Data.Bedrock.Misc
 
-type Env = Map Variable [Variable]
+data Env = Env
+    { envRegisters :: Map Variable [Variable]
+    , envSignatures :: Map Name [Variable]
+    }
 
 newtype Uniq a = Uniq { unUniq :: ReaderT Env (State AvailableNamespace) a }
     deriving ( Monad, MonadReader Env, MonadState AvailableNamespace
@@ -20,7 +24,11 @@ newtype Uniq a = Uniq { unUniq :: ReaderT Env (State AvailableNamespace) a }
 registerIntroduction :: Module -> Module
 registerIntroduction m = evalState (runReaderT (unUniq (uniqModule m)) env) st
   where
-    env = Map.empty
+    env = Env
+        { envRegisters = Map.empty
+        , envSignatures = Map.fromList
+            [ (fnName, fnArguments) | Function{..} <- functions m ]
+        }
     st = modNamespace m
 
 
@@ -46,7 +54,8 @@ lower old action =
             newNames <- replicateM n (newName (Just Node) (variableName old))
             let newVars =
                     [ Variable name (Primitive IWord) | name <- newNames ]
-            local (Map.insert old newVars) action
+            local (\env -> env{envRegisters = Map.insert old newVars (envRegisters env)})
+                action
         Node -> error $ "RegisterIntroduction: Found node: " ++ show old
         _  -> action
 
@@ -54,10 +63,24 @@ lowerMany :: [Variable] -> Uniq a -> Uniq a
 lowerMany xs action = foldr lower action xs
 
 resolve :: Variable -> Uniq [Variable]
-resolve var = asks $ Map.findWithDefault [var] var
+resolve var = asks $ Map.findWithDefault [var] var . envRegisters
 
 resolveMany :: [Variable] -> Uniq [Variable]
 resolveMany = fmap concat . mapM resolve
+
+resolveArgs :: Name -> [Variable] -> Uniq [Variable]
+resolveArgs fn vars = do
+    fnArgs <- asks (\env -> envSignatures env Map.! fn)
+    let n = sum
+            [ case variableType arg of
+                StaticNode n -> n
+                _ -> 1
+            | arg <- fnArgs ]
+    resolved <- resolveMany vars
+    return (take n $ resolved ++ repeat undefinedVariable)
+
+undefinedVariable :: Variable
+undefinedVariable = Variable (Name [] "undefined" 0) (Primitive IWord)
 
 uniqModule :: Module -> Uniq Module
 uniqModule m =
@@ -76,7 +99,7 @@ uniqModule m =
 
 uniqNode :: NodeDefinition -> Uniq NodeDefinition
 uniqNode = return {-
-uniqNode (NodeDefinition name args) = 
+uniqNode (NodeDefinition name args) =
     NodeDefinition <$> resolveName name <*> pure args
 -}
 uniqFunction :: Function -> Uniq Function
@@ -86,7 +109,7 @@ uniqFunction (Function name attrs args rets body) = lowerMany args $
         <*> pure attrs
         <*> resolveMany args
         <*> pure rets
-        <*> uniqBlock body
+        <*> (Bind [undefinedVariable] Undefined <$> uniqBlock body)
 
 bindMany :: [(Variable, Variable)] -> Block -> Block
 bindMany lst rest =
@@ -95,6 +118,12 @@ bindMany lst rest =
 uniqBlock :: Block -> Uniq Block
 uniqBlock block =
     case block of
+        Case scrut Nothing [Alternative (NodePat UnboxedTupleName args) block] -> do
+            scruts <- resolve scrut
+            lowerMany args $ do
+                flatVars <- resolveMany args
+                bindMany (zip flatVars scruts)
+                    <$> uniqBlock block
         Case scrut mbBranch alts -> do
             scruts <- resolve scrut
             case scruts of
@@ -114,6 +143,11 @@ uniqBlock block =
                 <$> resolve bind
                 <*> pure (Literal lit)
                 <*> uniqBlock rest
+        Bind [bind] (MkNode UnboxedTupleName nodeArgs) rest -> lower bind $ do
+            nodeBinds <- resolve bind
+            rest' <- uniqBlock rest
+            return $
+                bindMany (zip nodeBinds nodeArgs) rest'
         Bind [bind] (MkNode nodeName nodeArgs) rest -> lower bind $ do
             (tagBind:nodeBinds) <- resolve bind
             rest' <- uniqBlock rest
@@ -140,7 +174,7 @@ uniqBlock block =
         Raise var ->
             pure $ Raise var
         TailCall fn vars ->
-            TailCall fn <$> resolveMany vars
+            TailCall fn <$> resolveArgs fn vars
         -- FIXME: the code for Invoke is wrong.
         Invoke fn vars ->
             Invoke <$> pure fn <*> resolveMany vars
@@ -172,7 +206,7 @@ uniqExpression :: Expression -> Uniq Expression
 uniqExpression expr =
     case expr of
         Application fn vars ->
-            Application fn <$> resolveMany vars
+            Application fn <$> resolveArgs fn vars
         CCall fn vars ->
             CCall fn <$> resolveMany vars
         Catch exh exhArgs fn fnArgs ->

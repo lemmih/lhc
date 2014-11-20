@@ -67,10 +67,11 @@ resolveName name = do
 resolveNodeName :: NodeName -> Uniq NodeName
 resolveNodeName nodeName =
     case nodeName of
-        ConstructorName name ->
-            ConstructorName <$> resolveName name
+        ConstructorName name blanks ->
+            ConstructorName <$> resolveName name <*> pure blanks
         FunctionName name blanks ->
             FunctionName <$> resolveName name <*> pure blanks
+        UnboxedTupleName -> pure UnboxedTupleName
         --CatchFrame name blanks ->
         --    CatchFrame <$> resolveName name <*> pure blanks
 
@@ -155,6 +156,11 @@ uniqAlternative (Alternative pattern branch) =
                         <$> resolveNodeName nodeName
                         <*> mapM resolve vars)
                     <*> uniqBlock branch
+        -- UnboxedPat vars ->
+        --     renameVariables vars $
+        --         Alternative
+        --             <$> (UnboxedPat <$> mapM resolve vars)
+        --             <*> uniqBlock branch
 
 
 uniqMaybe :: (a -> Uniq a) -> Maybe a -> Uniq (Maybe a)
@@ -188,6 +194,7 @@ uniqSimple simple =
             Load constant <$> resolve var <*> pure idx
         Add a b ->
             Add <$> resolve a <*> resolve b
+        Undefined -> pure Undefined
         Eval var ->
             Eval <$> resolve var
         Apply a b ->

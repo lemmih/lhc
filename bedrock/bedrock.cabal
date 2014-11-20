@@ -38,8 +38,8 @@ library
                        Data.Bedrock.Rename
   -- other-modules:
   build-depends:       base ==4.*, ansi-wl-pprint,
-                       parsec, containers, mtl, vector,
-                       llvm-general-pure, llvm-general, filepath, QuickCheck
+                       parsec, containers, mtl >= 2.2.1, vector,
+                       llvm-general-pure, llvm-general >= 3.4.4.1, filepath, QuickCheck
 
   ghc-options:         -fwarn-incomplete-patterns -fwarn-unused-binds
                        -fwarn-unused-imports
@@ -47,7 +47,7 @@ library
 executable bedrock
   main-is:             cli/Main.hs
 
-  build-depends:       base ==4.*, cmdtheline, bedrock,
+  build-depends:       base ==4.*, optparse-applicative, bedrock,
                        process, filepath
 
 

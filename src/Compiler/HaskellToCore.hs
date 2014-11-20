@@ -34,6 +34,7 @@ data Scope = Scope
     , scopeNodes        :: Map QualifiedName Name
     , scopeConstructors :: Map GlobalName Name -- XXX: Merge with scopeNodes?
     , scopeTcEnv        :: TcEnv
+    , scopeArity        :: Map GlobalName Int
     }
 instance Monoid Scope where
     mempty = Scope
@@ -42,23 +43,25 @@ instance Monoid Scope where
         , scopeConstructors = Map.empty
         , scopeTcEnv        = TcEnv
             { -- Globals such as Nothing, Just, etc
-              tcEnvGlobals   = Map.empty
-            , tcEnvVariables = Map.empty
+              tcEnvValues    = Map.empty
             , tcEnvUnique    = 0
             , tcEnvCoercions = Map.empty
             }
+        , scopeArity         = Map.empty
         }
     mappend a b = Scope
         { scopeVariables    = w scopeVariables
         , scopeNodes        = w scopeNodes
         , scopeConstructors = w scopeConstructors
-        , scopeTcEnv        = scopeTcEnv a }
+        , scopeTcEnv        = scopeTcEnv a
+        , scopeArity        = w scopeArity }
         where w f = mappend (f a) (f b)
 
 data Env = Env
     { envScope        :: Scope
     , envForeigns     :: [Foreign]
     , envNodes        :: [NodeDefinition]
+    , envNewTypes     :: [NewType]
     , envDecls        :: [Decl]
     , envConstructors :: Map Name Name
     }
@@ -68,6 +71,7 @@ instance Monoid Env where
         { envScope    = mempty
         , envForeigns = mempty
         , envNodes    = mempty
+        , envNewTypes = mempty
         , envDecls    = mempty
         , envConstructors = mempty
         }
@@ -75,6 +79,7 @@ instance Monoid Env where
         { envScope    = w envScope
         , envForeigns = w envForeigns
         , envNodes    = w envNodes
+        , envNewTypes = w envNewTypes
         , envDecls    = w envDecls
         , envConstructors = w envConstructors
         }
@@ -101,6 +106,9 @@ pushDecl decl = tell mempty{ envDecls = [decl] }
 pushNode :: NodeDefinition -> M ()
 pushNode def = tell mempty{ envNodes = [def] }
 
+pushNewType :: NewType -> M ()
+pushNewType def = tell mempty{ envNewTypes = [def] }
+
 newUnique :: M Int
 newUnique = do
     ns <- get
@@ -116,17 +124,11 @@ newName ident = do
 bindName :: HS.Name Origin -> M Name
 bindName hsName =
     case info of
-        Scope.Resolved gname -> do
-            name <- newName (getNameIdentifier hsName)
+        Scope.Resolved gname@(GlobalName src qname@(QualifiedName m ident)) -> do
+            let name = Name [m] (getNameIdentifier hsName) 0
             tell $ mempty{envScope = mempty
                 { scopeVariables = Map.singleton gname name } }
             return name
-        --Scope.Global global@(GlobalName m ident) -> do
-        --    name <- newName ident
-        --    let n = name{nameModule = [m]}
-        --    tell $ mempty{envScope = mempty
-        --        { scopeNodes = Map.singleton global n } }
-        --    return n
         _ -> error "bindName"
   where
     Origin info _ = HS.ann hsName
@@ -142,26 +144,23 @@ bindVariable hsName = do
 lookupType :: HS.Name Origin -> M TcType
 lookupType hsName = do
     case info of
-        Resolved (GlobalName src qname) -> do
+        Resolved gname -> do
             tcEnv <- asks scopeTcEnv
-            case Map.lookup src (tcEnvVariables tcEnv) of
-                Nothing ->
-                    case Map.lookup qname (tcEnvGlobals tcEnv) of
-                        Nothing -> error "Missing type info"
-                        Just ty -> return ty
+            case Map.lookup gname (tcEnvValues tcEnv) of
+                Nothing -> error "Missing type info"
                 Just ty -> return ty
   where
     Origin info _ = HS.ann hsName
 
-bindConstructor :: HS.Name Origin -> Name -> M Name
-bindConstructor dataCon mkCon =
+bindConstructor :: HS.Name Origin -> Int -> M Name
+bindConstructor dataCon arity =
     case info of
         Resolved global@(GlobalName src qname@(QualifiedName m ident)) -> do
-            name <- newName ident
-            let n = name{nameModule = [m]}
+            let n = Name [m] ident 0
             tell $ mempty{envScope = mempty
                 { scopeNodes = Map.singleton qname n
-                , scopeVariables = Map.singleton global mkCon } }
+                , scopeVariables = Map.singleton global n
+                , scopeArity = Map.singleton global arity } }
             return n
         _ -> error "bindName"
   where
@@ -170,8 +169,11 @@ bindConstructor dataCon mkCon =
 resolveName :: HS.Name Origin -> M Name
 resolveName hsName =
     case info of
-        Resolved gname -> do
-            asks $ Map.findWithDefault scopeError gname . scopeVariables
+        Scope.Resolved gname@(GlobalName src qname@(QualifiedName m ident)) -> do
+            let name = Name [m] (getNameIdentifier hsName) 0
+            return name
+        -- Resolved gname -> do
+        --     asks $ Map.findWithDefault scopeError gname . scopeVariables
         --Scope.Global gname ->
         --    asks $ Map.findWithDefault scopeError gname . scopeConstructors
         _ -> error "resolveName"
@@ -227,6 +229,7 @@ convert tcEnv (HS.Module _ _ _ _ decls) = Module
     { coreForeigns  = envForeigns env
     , coreDecls     = envDecls env
     , coreNodes     = envNodes env
+    , coreNewTypes  = envNewTypes env
     , coreNamespace = ns }
   where
     (ns, env) = runM tcEnv $ do
@@ -287,14 +290,17 @@ convertConDecl isNewtype con =
             u <- newUnique
             let mkCon = Name [] ("mk" ++ getNameIdentifier name) u
 
-            conName <- bindConstructor name mkCon
+            conName <- bindConstructor name (length tys)
 
             argNames <- replicateM (length tys) (newName "arg")
             ty <- lookupType name
             let args = zipWith Variable argNames (splitTy ty)
-            pushDecl $ Decl ty mkCon (Lam args $ Con conName args)
+            -- pushDecl $ Decl ty mkCon (Lam args $ Con conName args)
 
-            pushNode $ NodeDefinition conName (init $ splitTy ty)
+            -- pushNode $ NodeDefinition conName (init $ splitTy ty)
+            if isNewtype
+                then pushNewType $ NewType conName
+                else pushNode $ NodeDefinition conName (init $ splitTy ty)
         --HS.RecDecl _ name fieldDecls -> do
         _ -> error "convertCon"
   where
@@ -316,7 +322,7 @@ toCType ty =
             | qname == mkBuiltIn "LHC.Prim" "I32" ->
                 I32
         TcCon qname
-            | qname == mkBuiltIn "LHC.Prim" "CInt" ->
+            | qname == mkBuiltIn "LHC.Prim" "Int32" ->
                 I32
         TcCon qname
             | qname == mkBuiltIn "LHC.Prim" "Unit" ->
@@ -372,23 +378,20 @@ convertExternal cName ty = do
     args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
     primArgs <- return args
     primOut <- Variable <$> newName "primOut" <*> pure i32
-    action <- Variable <$> newName "action" <*> pure TcUndefined
-    s <- Variable <$> newName "s" <*> pure TcUndefined
+    s <- Variable <$> newName "s" <*> pure (TcCon $ mkBuiltIn "LHC.Prim" "RealWorld")
     boxed <- Variable <$> newName "boxed" <*> pure retType
 
     io <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IO"
-    ioUnit <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IOUnit"
-    cint <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "CInt"
+    -- ioUnit <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IOUnit"
+    cint <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "Int32"
 
     return $
         Lam args $
-        Let (NonRec action $
-                Lam [s] $
+        let action = Lam [s] $
                 WithExternal primOut cName primArgs s $
-                Let (NonRec boxed $ Con cint [primOut]) $
-                Con ioUnit [boxed, s]
-            )
-        (Con io [action])
+                Let (NonRec boxed $ App (Con cint) (Var primOut)) $
+                UnboxedTuple [s, boxed]
+        in (App (Con io) action)
   where
     (argTypes, isIO@True, retType) = ffiTypes ty
     i32 = TcCon $ mkBuiltIn "LHC.Prim" "I32"
@@ -400,11 +403,12 @@ convertExternal cName ty
             boxedV = Variable boxed retType
         io <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IO"
         unit <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IOUnit"
-        cint <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "CInt"
-        pure $ Lam args $ App (Lam [tmp] (Con io [tmp]))
+        cint <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "Int32"
+        pure $ Lam args $ App (Lam [tmp] (App (Con io) (Var tmp)))
                 (Lam [s]
             (WithExternal outV cName args s
-                (Let (NonRec boxedV $ Con cint [outV]) $ Con unit [boxedV, s])))
+                (Let (NonRec boxedV $ App (Con cint) (Var outV)) $
+                    App (App (Con unit) (Var boxedV)) (Var s))))
     -- | otherwise = pure $ Lam args (ExternalPure cName retType args)
   where
     tmp = Variable (Name [] "tmp" 0) TcUndefined
@@ -453,7 +457,7 @@ convertExp expr =
             return $ WithCoercion coercion (Var (Variable n ty))
         HS.Con _ name -> do
             n <- resolveQName name
-            return $ Var (Variable n TcUndefined)
+            return $ Con n
         HS.App _ a b ->
             App
                 <$> convertExp a
@@ -462,7 +466,8 @@ convertExp expr =
             ae <- convertExp a
             be <- convertExp b
             n <- resolveQName var
-            pure $ App (App (Var (Variable n TcUndefined)) ae) be
+            ty <- lookupType $ unQName var
+            pure $ App (App (Var (Variable n ty)) ae) be
         HS.Paren _ sub -> convertExp sub
         HS.Lambda _ pats sub ->
             Lam
@@ -474,9 +479,12 @@ convertExp expr =
                 <$> convertExp scrut
                 <*> mapM convertAlt alts
         HS.Lit _ lit -> pure $ Lit (convertLiteral lit)
-        --HS.Tuple  _ HS.Unboxed exprs ->
-        --    Var [ Variable (convertQName name) NodePtr
-        --        | HS.Var _ name <- exprs ]
+        HS.Tuple  _ HS.Unboxed exprs -> do
+            vars <- forM exprs $ \(HS.Var _ name) -> do
+                n <- resolveQName name
+                ty <- lookupType $ unQName name
+                return $ Variable n ty
+            return $ UnboxedTuple vars
         _ -> error $ "convertExp: " ++ show expr
 
 convertAlt :: HS.Alt Origin -> M Alt
@@ -487,6 +495,11 @@ convertAlt alt =
                              | HS.PVar _ var <- pats ]
             Alt <$> (ConPat <$> resolveQGlobalName name <*> pure args)
                 <*> convertRhs rhs
+        HS.Alt _ (HS.PTuple _ HS.Unboxed pats) rhs Nothing -> do
+            args <- sequence [ Variable <$> bindName var <*> lookupType var
+                             | HS.PVar _ var <- pats ]
+            Alt (UnboxedPat args)
+                <$> convertRhs rhs
         _ -> error "convertAlt"
 
 

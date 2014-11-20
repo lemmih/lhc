@@ -1,8 +1,15 @@
 {-# LANGUAGE MagicHash, ForeignFunctionInterface #-}
+{-# LANGUAGE UnboxedTuples #-}
 module LHC.Prim
-    ( I8
+    ( IO
+    , Unit(Unit)
+    , I8
     , I64
     , Addr
+    , puts
+    , bindIO
+    , return
+    , unsafePerformIO
     ) where
 
 data I8
@@ -10,7 +17,7 @@ data I32
 data I64
 data Addr a
 
-data CInt = CInt I32
+data Int32 = Int32 I32
 
 data RealWorld = RealWorld
 
@@ -28,24 +35,18 @@ unIO action =
 bindIO :: IO a -> (a -> IO b) -> IO b
 bindIO f g = IO (\s ->
   case unIO f s of
-    (# s', a #) -> unIO (g a) s'
+    (# s', a #) -> unIO (g a) s')
 
 thenIO :: IO a -> IO b -> IO b
 thenIO a b = bindIO a (\c -> b)
 
---return :: a -> IO a
---return a = IO (\s -> IOUnit a s)
+return :: a -> IO a
+return a = IO (\s -> (# s, a #))
 
 unsafePerformIO :: IO a -> a
 unsafePerformIO action =
     case unIO action RealWorld of
-        IOUnit val st -> val
+        (# st, val #) -> val
 
-foreign import ccall unsafe "puts" puts :: Addr I8 -> IO CInt
-
-main :: IO CInt
-main = thenIO (puts "Hello world!"#) (puts "Another message!"#)
-
-entryPoint :: CInt
-entryPoint = unsafePerformIO main
+foreign import ccall unsafe "puts" puts :: Addr I8 -> IO Int32
 

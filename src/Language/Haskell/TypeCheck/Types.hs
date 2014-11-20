@@ -4,6 +4,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
 import Language.Haskell.Exts.SrcLoc
 import qualified Text.PrettyPrint.ANSI.Leijen as Doc
+import Data.Binary
 
 import Language.Haskell.Scope ( GlobalName(..), QualifiedName(..) )
 
@@ -12,11 +13,20 @@ import Language.Haskell.Scope ( GlobalName(..), QualifiedName(..) )
 -- forall.
 data TcVar = TcVar String SrcSpanInfo
     deriving ( Show, Eq )
+
 data TcMetaVar = TcMetaRef String (IORef (Maybe TcType))
 instance Show TcMetaVar where
     show (TcMetaRef name _) = name
 instance Eq TcMetaVar where
     TcMetaRef _ r1 == TcMetaRef _ r2 = r1==r2
+
+instance Binary TcMetaVar where
+    put (TcMetaRef name _) = put name
+    -- put = error "Binary.put: TcMetaVar"
+    get = do
+        name <- get
+        return $ TcMetaRef name (unsafePerformIO $ newIORef Nothing)
+    -- get = error "Binary.get: TcMetaVar"
 
 data TcType
     = TcForall [TcVar] (Qual TcType)
@@ -27,14 +37,15 @@ data TcType
     | TcCon QualifiedName
     -- Instantiated tyvar
     | TcMetaVar TcMetaVar
+    | TcUnboxedTuple [TcType]
     | TcUndefined
-    deriving ( Show )
+    deriving ( Show, Eq )
 
 data Coercion
     = CoerceId
     | CoerceAbs [TcVar]
     | CoerceAp [TcMetaVar]
-    deriving ( Show )
+    deriving ( Show , Eq)
 
 instance Doc.Pretty Coercion where
     pretty c =
@@ -64,6 +75,10 @@ instance Doc.Pretty TcType where
             TcRef var -> Doc.pretty var
             TcMetaVar meta ->
                 Doc.pretty meta
+            TcUnboxedTuple tys ->
+                Doc.text "(#" Doc.<+>
+                (Doc.hsep $ Doc.punctuate Doc.comma $ map Doc.pretty tys) Doc.<+>
+                Doc.text "#)"
             TcUndefined ->
                 Doc.red (Doc.text "undefined")
 
@@ -88,9 +103,9 @@ instance Doc.Pretty Pred where
     pretty (IsIn _gname _t) = error "Pretty pred"
 
 data Qual t = [Pred] :=> t
-    deriving ( Show )
+    deriving ( Show, Eq )
 data Pred = IsIn GlobalName TcType
-    deriving ( Show )
+    deriving ( Show, Eq )
 
 -- Uninstantiated type signature.
 -- eg: forall a. Maybe a -- type of Nothing

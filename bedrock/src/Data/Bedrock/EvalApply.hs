@@ -59,11 +59,15 @@ mkEval hpt origin bind var rest = do
             Alternative (NodePat name args) $
             TailCall fn args
         mkAlt name@(FunctionName fn n) =
-            let args = reverse . drop n . reverse $ hptFnArgs hpt Map.! fn in
+            let args = reverse . drop n . reverse $ hptFnArgs hpt Map.! fn
+                ret = Variable evalRet (StaticNode (length args+1)) in
             Alternative (NodePat name args) $
-            Return [preEvalObject]
-        mkAlt name@(ConstructorName con) =
-            let args = hptNodeArgs hpt Map.! con
+            Bind [ret] (MkNode name args) $
+            Return [ret]
+            -- Alternative (NodePat name args) $
+            -- Return [preEvalObject{variableType = StaticNode (length args+1)}]
+        mkAlt name@(ConstructorName con blanks) =
+            let args = dropLast blanks $ hptNodeArgs hpt Map.! con
                 ret = Variable evalRet (StaticNode (length args+1)) in
             Alternative (NodePat name args) $
             Bind [ret] (MkNode name args) $
@@ -98,6 +102,11 @@ mkApply hpt origin bind obj arg rest = do
             let args = dropLast n $ hptFnArgs hpt Map.! fn in
             Alternative (NodePat name args) $
             Bind [applyRet] (MkNode (FunctionName fn (n-1)) (args++[applyArg])) $
+            Return [applyRet]
+        mkAlt name@(ConstructorName fn n) =
+            let args = dropLast n $ hptNodeArgs hpt Map.! fn in
+            Alternative (NodePat name args) $
+            Bind [applyRet] (MkNode (ConstructorName fn (n-1)) (args++[applyArg])) $
             Return [applyRet]
         mkAlt _ = error "mkApply"
     pushFunction Function

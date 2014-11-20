@@ -27,8 +27,15 @@ Notes:
 
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 module Language.Haskell.Scope
-    ( Origin(..)
+    ( ResolveEnv
+    , emptyResolveEnv
+    , lookupInterface
+    , fromInterfaces
+    , getModuleName
+
+    , Origin(..)
     , NameInfo(..)
     , GlobalName(..)
     , QualifiedName(..)
@@ -36,6 +43,7 @@ module Language.Haskell.Scope
     , Source(..)
     , ScopeError(..)
     , resolve
+    , globalNameSrcSpanInfo
 
     -- XXX: Dont export.
     , getNameIdentifier
@@ -51,9 +59,62 @@ import           Data.Maybe
 import           Language.Haskell.Exts.Annotated.Syntax
 import           Language.Haskell.Exts.SrcLoc
 
+-- ModuleName -> Interface
+type ResolveEnv = Map String Interface
+
+emptyResolveEnv :: ResolveEnv
+emptyResolveEnv = Map.empty
+
+addInterface :: String -> Interface -> ResolveEnv -> ResolveEnv
+addInterface = Map.insert
+
+fromInterfaces :: [(String, Interface)] -> ResolveEnv
+fromInterfaces = Map.fromList
+
+lookupInterface :: String -> ResolveEnv -> Maybe Interface
+lookupInterface = Map.lookup
+
+
+
+deriveInterface :: Module Origin -> Interface
+deriveInterface m =
+    case m of
+        Module _ (Just (ModuleHead _ _ _ (Just (ExportSpecList _ exports)))) _ _ _ ->
+            Interface
+            { ifaceValues =
+                [ gname
+                | EVar _ _ns qname <- exports
+                , Origin (Resolved gname) _ <- [ann qname] ] ++
+                [ gname
+                | EThingWith _ _qname cnames <- exports
+                , ConName _ name <- cnames
+                , Origin (Resolved gname) _ <- [ann name] ]
+
+            , ifaceTypes =
+                [ (gname, [])
+                | EAbs _ qname <- exports
+                , Origin (Resolved gname) _ <- [ann qname] ] ++
+                [ (gname, [])
+                | EThingWith _ qname _cnames <- exports
+                , Origin (Resolved gname) _ <- [ann qname] ]
+            , ifaceConstructors = []
+            , ifaceClasses = []
+            }
+        _ -> error "Language.Haskell.Scope.deriveInterface: undefined"
+
+-- FIXME: Move this to a utilities module.
+getModuleName :: Module a -> String
+getModuleName m =
+    case m of
+        Module _ (Just (ModuleHead _ (ModuleName _ name) _ _)) _ _ _ -> name
+
 -- Resolve all names in a module
-resolve :: Module SrcSpanInfo -> ([ScopeError], Module Origin)
-resolve m = runRename $ resolveModule m
+resolve :: ResolveEnv -> Module SrcSpanInfo -> (ResolveEnv, [ScopeError], Module Origin)
+resolve resolveEnv m =
+    let (errs, m') = runRename resolveEnv $ resolveModule m
+        iface = deriveInterface m'
+        name = getModuleName m
+    in (addInterface name iface resolveEnv, errs, m')
 
 
 
@@ -73,14 +134,25 @@ data NameInfo
 data GlobalName = GlobalName SrcSpanInfo QualifiedName
     deriving ( Show, Eq, Ord )
 
--- Module interface, list of names in the two namespaces.
-data Interface = Interface [GlobalName] [GlobalName]
+globalNameSrcSpanInfo :: GlobalName -> SrcSpanInfo
+globalNameSrcSpanInfo (GlobalName src _) = src
+
+globalNameIdentifier :: GlobalName -> String
+globalNameIdentifier (GlobalName _ (QualifiedName _mod ident)) = ident
+
+data Interface =
+    Interface
+    { ifaceValues       :: [GlobalName]
+    , ifaceTypes        :: [(GlobalName, [GlobalName])]
+    , ifaceConstructors :: [(GlobalName, [GlobalName])]
+    , ifaceClasses      :: [(GlobalName, [GlobalName])]
+    }
 
 -- Used for error reporting.
 data Source
     = ImplicitSource -- Imported implicitly, usually from Prelude.
     | LocalSource -- Not imported, defined locally.
-    | ModuleSource (ModuleName SrcSpanInfo)
+    | ModuleSource (ModuleName Origin)
     deriving ( Show )
 data ScopedName = ScopedName Source GlobalName
     deriving ( Show )
@@ -130,9 +202,10 @@ instance Monoid Scope where
         , scopeTyVars     = scopeTyVars a `Map.union` scopeTyVars b
         , scopeValues     = scopeValues a `Map.union` scopeValues b
         , scopeErrors     = scopeErrors a ++ scopeErrors b }
-newtype Rename a = Rename { unRename :: ReaderT Scope (Writer Scope) a }
+
+newtype Rename a = Rename { unRename :: ReaderT (ResolveEnv, Scope) (Writer Scope) a }
     deriving
-        ( Monad, MonadReader Scope, MonadWriter Scope
+        ( Monad, MonadReader (ResolveEnv, Scope), MonadWriter Scope
         , Functor, Applicative )
 
 data ResolveContext = ResolveToplevel | ResolveClass | ResolveInstance
@@ -143,28 +216,55 @@ type Resolve a = a SrcSpanInfo -> Rename (a Origin)
 -----------------------------------------------------------
 -- Utilities
 
-runRename :: Rename a -> ([ScopeError], a)
-runRename action = (scopeErrors scope, a)
+runRename :: ResolveEnv -> Rename a -> ([ScopeError], a)
+runRename resolveEnv action = (scopeErrors scope, a)
   where
-    (a, scope) = runWriter (runReaderT (unRename action) scope)
+    (a, scope) = runWriter (runReaderT (unRename action) (resolveEnv, scope))
 
 getTvRoot :: Rename (Maybe SrcSpanInfo)
-getTvRoot = asks scopeTvRoot
+getTvRoot = asks (scopeTvRoot . snd)
 
 withTvRoot :: SrcSpanInfo -> Rename a -> Rename a
-withTvRoot root = local $ \env -> env{ scopeTvRoot = Just root }
+withTvRoot root = local $ \(resolveEnv, env) -> (resolveEnv, env{ scopeTvRoot = Just root })
+
+getInterface :: String -> Rename Interface
+getInterface modName = do
+    resolveEnv <- asks fst
+    case lookupInterface modName resolveEnv of
+        Nothing -> error $ "Language.Haskell.Scope.getInterface: module not found: " ++ modName
+        Just iface -> return iface
+
+addToScope :: Source -> String -> Interface -> Rename ()
+addToScope src modName iface = do
+    tell mempty
+        { scopeTypes = Map.fromList
+            [ (QualifiedName modName ident, [ScopedName src gname])
+            | (gname, _) <- ifaceTypes iface
+            , let ident = globalNameIdentifier gname ]
+                   -- :: Map QualifiedName [ScopedName]
+        , scopeValues = Map.fromList
+            [ (QualifiedName modName ident, [ScopedName src gname])
+            | gname <- ifaceValues iface
+            , let ident = globalNameIdentifier gname]
+        }
+    --      ifaceValues       :: [GlobalName]
+    -- , ifaceTypes        :: [(GlobalName, [GlobalName])]
+    -- ,
+
+withLimitedScope :: Interface -> Rename a -> Rename a
+withLimitedScope = undefined
 
 -- Run action without letting the tyVars escsape the scope.
 limitTyVarScope :: Rename a -> Rename a
-limitTyVarScope action = Rename $ ReaderT $ \scope ->
+limitTyVarScope action = Rename $ ReaderT $ \(resolveEnv, scope) ->
     let inScope = scope{ scopeTyVars = scopeTyVars scope `Map.union` scopeTyVars nestedScope}
-        (a, nestedScope) = runWriter $ runReaderT (unRename action) inScope
+        (a, nestedScope) = runWriter $ runReaderT (unRename action) (resolveEnv, inScope)
     in WriterT $ Identity (a, nestedScope{ scopeTyVars = Map.empty })
 
 limitScope :: Rename a -> Rename a
-limitScope action = Rename $ ReaderT $ \scope ->
+limitScope action = Rename $ ReaderT $ \(resolveEnv, scope) ->
     let inScope = (scope `mappend` nestedScope){ scopeErrors = []}
-        (a, nestedScope) = runWriter $ runReaderT (unRename action) inScope
+        (a, nestedScope) = runWriter $ runReaderT (unRename action) (resolveEnv, inScope)
     in WriterT $ Identity (a, mempty{ scopeErrors = scopeErrors nestedScope})
 
 getNameIdentifier :: Name l -> String
@@ -196,7 +296,7 @@ resolveName'' mbDefault qualification ns name =
             Symbol a b -> (Symbol, a, b)
     qname = QualifiedName qualification nameString
     worker field = do
-        m <- asks field
+        m <- asks (field . snd)
         let ret = case Map.lookup qname m of
                 Nothing ->
                     case mbDefault of
@@ -242,7 +342,7 @@ resolveQName ns qname =
 
 defineName :: RNamespace -> Resolve Name
 defineName ns name = do
-    thisModule <- asks scopeModuleName
+    thisModule <- asks (scopeModuleName . snd)
     let src = ann name
         ident = getNameIdentifier name
         qname = QualifiedName "" ident
@@ -642,11 +742,34 @@ resolveModuleName (ModuleName src name) = do
     tell mempty{ scopeModuleName = name }
     pure $ ModuleName (Origin None src) name
 
+resolveNamespace :: Resolve Namespace
+resolveNamespace ns =
+    case ns of
+        NoNamespace src ->
+            pure $ NoNamespace (Origin None src)
+        TypeNamespace src ->
+            pure $ TypeNamespace (Origin None src)
+
+resolveCName :: Resolve CName
+resolveCName cname =
+    case cname of
+        ConName src name ->
+            ConName (Origin None src)
+                <$> resolveName NsValues name
+
 resolveExportSpec :: Resolve ExportSpec
 resolveExportSpec spec =
     case spec of
         EAbs src qname ->
             EAbs (Origin None src) <$> resolveQName NsTypes qname
+        EVar src ns qname ->
+            EVar (Origin None src)
+                <$> resolveNamespace ns
+                <*> resolveQName NsValues qname
+        EThingWith src qname cnames ->
+            EThingWith (Origin None src)
+                <$> resolveQName NsTypes qname
+                <*> mapM resolveCName cnames
         _ -> error $ "resolveExportSpec: " ++ show spec
 
 resolveExportSpecList :: Resolve ExportSpecList
@@ -673,6 +796,40 @@ resolveModulePragma pragma =
     scope (Ident src ident) = Ident (Origin None src) ident
     scope (Symbol src symbol) = Symbol (Origin None src) symbol
 
+resolveImportSpec :: Resolve ImportSpec
+resolveImportSpec spec =
+    case spec of
+        IVar src ns name ->
+            IVar (Origin None src)
+                <$> resolveNamespace ns
+                <*> resolveName NsValues name
+        _ -> error "Language.Haskell.Scope.resolveImportSpec"
+
+resolveImportSpecList :: Resolve ImportSpecList
+resolveImportSpecList (ImportSpecList src bool specs) =
+    ImportSpecList (Origin None src) bool
+        <$> mapM resolveImportSpec specs
+
+bindImports :: ImportDecl Origin -> Rename ()
+bindImports ImportDecl{..} = do
+    iface <- getInterface modName
+    addToScope (ModuleSource importModule) "" iface
+  where
+    modName = case importModule of ModuleName _ name -> name
+
+resolveImportDecl :: Resolve ImportDecl
+resolveImportDecl ImportDecl{..} = do
+    decl <- ImportDecl (Origin None importAnn)
+        <$> resolveModuleName importModule
+        <*> pure importQualified
+        <*> pure importSrc
+        <*> pure importSafe
+        <*> pure importPkg
+        <*> resolveMaybe resolveModuleName importAs
+        <*> resolveMaybe resolveImportSpecList importSpecs
+    bindImports decl
+    return decl
+
 resolveModule :: Resolve Module
 resolveModule m =
     case m of
@@ -680,7 +837,7 @@ resolveModule m =
             Module (Origin None src)
                 <$> resolveMaybe resolveModuleHead mhead
                 <*> mapM resolveModulePragma pragma
-                <*> mapM undefined imports
+                <*> mapM resolveImportDecl imports
                 <*> mapM (resolveDecl ResolveToplevel) decls
         _ -> error "resolveModule"
 

@@ -87,14 +87,14 @@ mkInvokeAlts hpt objects args = do
                 Alternative (NodePat name partialArgs) $
                 TailCall fn (map (setVariableSize hpt) $
                     partialArgs ++ args)
-        mkAlt (ConstructorName cons, objArgs) | isCatchFrame cons = do
+        mkAlt (ConstructorName cons 0, objArgs) | isCatchFrame cons = do
             let nextFramePtrs = objArgs Vector.! 0
                 nextFrameLocs = derefPtrs hpt nextFramePtrs
                 nextFrameObjects = derefHeap hpt nextFrameLocs
             nextFramePtr <- newVariable "nextFrame" NodePtr
             nextFrame <- newVariable "nextFrame" (StaticNode (sizeOfObjects hpt nextFrameObjects))
             exhPtr <- newVariable "exhPtr" Node
-            Alternative (NodePat (ConstructorName cons) [nextFramePtr, exhPtr]) .
+            Alternative (NodePat (ConstructorName cons 0) [nextFramePtr, exhPtr]) .
                 Bind [nextFrame] (Fetch anyMemory nextFramePtr) .
                 Case nextFrame Nothing
                     <$> mkInvokeAlts hpt nextFrameObjects args
@@ -125,12 +125,12 @@ mkInvokeHandlerAlts hpt objects arg = do
                         Bind [nextFrame] (Fetch anyMemory nextFramePtr) .
                         Case nextFrame Nothing
                             <$> mkInvokeHandlerAlts hpt nextFrameObjects arg
-        mkAlt (ConstructorName cons, objArgs) | isCatchFrame cons = do
+        mkAlt (ConstructorName cons 0, objArgs) | isCatchFrame cons = do
             let exhVars = objArgs Vector.! 1
                 exhObjects = derefVars hpt exhVars
             nextFramePtr <- newVariable "nextFrame" NodePtr
             exh <- newVariable "exh" (StaticNode (sizeOfObjects hpt exhObjects))
-            Alternative (NodePat (ConstructorName cons) [nextFramePtr, exh]) .
+            Alternative (NodePat (ConstructorName cons 0) [nextFramePtr, exh]) .
                 Case exh Nothing
                     <$> mkInvokeAlts hpt exhObjects [arg, nextFramePtr]
 

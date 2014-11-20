@@ -51,14 +51,14 @@ tiExp expr =
             mapM_ (unify ty) altTys
             return ty
         Var _ qname -> do
-            let Origin (Resolved (GlobalName src _qname)) pin = ann qname
-            tySig <- findAssumption src
+            let Origin (Resolved gname) pin = ann qname
+            tySig <- findAssumption gname
             (_preds :=> ty, coercion) <- freshInst tySig
             setCoercion pin coercion
             return ty
         Con _ conName -> do
-            let Origin (Resolved (GlobalName _ qname)) pin = ann conName
-            tySig <- findGlobal qname
+            let Origin (Resolved gname) pin = ann conName
+            tySig <- findAssumption gname
             (_preds :=> ty, coercion) <- freshInst tySig
             setCoercion pin coercion
             return ty
@@ -83,6 +83,8 @@ tiExp expr =
             eTy <- tiExp e
             return $ foldr TcFun eTy patTys
         Lit _ lit -> tiLit lit
+        Tuple _ Unboxed args ->
+            TcUnboxedTuple <$> mapM tiExp args
         _ -> error $ "tiExp: " ++ show expr
 
 tiPat :: Pat Origin -> TI TcType
@@ -90,13 +92,13 @@ tiPat pat =
     case pat of
         PVar _ name -> do
             tv <- TcMetaVar <$> newTcVar
-            let Origin (Resolved (GlobalName src _qname)) _ = ann name
-            setAssumption src tv
+            let Origin (Resolved gname) _ = ann name
+            setAssumption gname tv
             return tv
         PApp _ con pats -> do
             ty <- TcMetaVar <$> newTcVar
-            let Origin (Resolved (GlobalName _ qname)) _ = ann con
-            conSig <- findGlobal qname
+            let Origin (Resolved gname) _ = ann con
+            conSig <- findAssumption gname
             (_preds :=> conTy, coercion) <- freshInst conSig
             patTys <- mapM tiPat pats
             unify conTy (foldr TcFun ty patTys)
@@ -106,6 +108,9 @@ tiPat pat =
             return ty
         PParen _ sub ->
             tiPat sub
+        PTuple _ Unboxed pats -> do
+            patTys <- mapM tiPat pats
+            return $ TcUnboxedTuple patTys
         _ -> error $ "tiPat: " ++ show pat
 
 tiRhs :: Rhs Origin -> TI TcType
@@ -178,27 +183,27 @@ declHeadType dhead =
     tcVarFromTyVarBind (KindedVar _ name _) = tcVarFromName name
     tcVarFromTyVarBind (UnkindedVar _ name) = tcVarFromName name
 
-tiConDecl :: [TcVar] -> TcType -> ConDecl Origin -> TI (QualifiedName, [TcType])
+tiConDecl :: [TcVar] -> TcType -> ConDecl Origin -> TI (GlobalName, [TcType])
 tiConDecl tvars dty conDecl =
     case conDecl of
         ConDecl _ con tys -> do
-            let Origin (Resolved (GlobalName _ gname)) _ = ann con
+            let Origin (Resolved gname) _ = ann con
             return (gname, map typeToTcType tys)
         RecDecl _ con fields -> do
-            let Origin (Resolved (GlobalName _ gname)) _ = ann con
+            let Origin (Resolved gname) _ = ann con
                 conTys = concat
                     [ replicate (length names) (typeToTcType ty)
                     | FieldDecl _ names ty <- fields ]
             forM_ fields $ \(FieldDecl _ names fTy) -> do
                 let ty = TcFun dty (typeToTcType fTy)
                 forM_ names $ \name -> do
-                    let Origin (Resolved (GlobalName src _qname)) _ = ann name
-                    setAssumption src (TcForall tvars $ [] :=> ty)
+                    let Origin (Resolved gname) _ = ann name
+                    setAssumption gname (TcForall tvars $ [] :=> ty)
             return (gname, conTys)
         _ -> error "tiConDecl"
 
 tiQualConDecl :: [TcVar] -> TcType -> QualConDecl Origin ->
-                 TI (QualifiedName, [TcType])
+                 TI (GlobalName, [TcType])
 tiQualConDecl tvars dty (QualConDecl _ _ _ con) =
     tiConDecl tvars dty con
 
@@ -232,22 +237,23 @@ tiPrepareDecl decl =
             forM_ cons $ \qualCon -> do
                 (con, fieldTys) <- tiQualConDecl tcvars dataTy qualCon
                 let ty = foldr TcFun dataTy fieldTys
-                setGlobal con (TcForall tcvars $ [] :=> ty)
+                setAssumption con (TcForall tcvars $ [] :=> ty)
         FunBind{} -> return ()
         PatBind{} -> return ()
         TypeDecl{} -> return ()
         ForImp _ _conv _safety _mbExternal name ty -> do
-            let Origin _ src = ann name
-            setAssumption src (typeToTcType ty)
+            let Origin (Resolved gname) _ = ann name
+            setAssumption gname (typeToTcType ty)
         TypeSig _ names ty -> do
             forM_ names $ \name -> do
-                setAssumption (nameIdentifier name)
+                let Origin (Resolved gname) _ = ann name
+                setAssumption gname
                     (explicitTcForall $ typeToTcType ty)
                 --setCoercion (nameIdentifier name)
                 --    (CoerceAbs (freeTcVariables $ typeToTcType ty))
         _ -> error $ "tiPrepareDecl: " ++ show decl
 
-tiExpl :: (Decl Origin, SrcSpanInfo) -> TI ()
+tiExpl :: (Decl Origin, GlobalName) -> TI ()
 tiExpl (decl, binder) = do
     free <- getFreeMetaVariables
     ty <- TcMetaVar <$> newTcVar
@@ -256,9 +262,9 @@ tiExpl (decl, binder) = do
     (_preds :=> expected, coercion) <- freshInst tySig
     unify ty expected
     (_, coercion) <- generalize free expected
-    setCoercion binder coercion
+    setCoercion (globalNameSrcSpanInfo binder) coercion
 
-tiDecls :: [(Decl Origin, SrcSpanInfo)] -> TI ()
+tiDecls :: [(Decl Origin, GlobalName)] -> TI ()
 tiDecls decls = do
     free <- getFreeMetaVariables
     liftIO $ print $ map snd decls
@@ -273,7 +279,7 @@ tiDecls decls = do
         rTy <- zonk ty
         liftIO $ print $ Doc.pretty rTy
         (gTy, coercion) <- generalize free rTy
-        setCoercion binder coercion
+        setCoercion (globalNameSrcSpanInfo binder) coercion
         liftIO $ print $ Doc.pretty gTy
         setAssumption binder gTy
 
@@ -309,7 +315,7 @@ tiBindGroup decls = do
 
 -- FIXME: Rename this function. We're not finding free variables, we finding
 --        all references.
-declFreeVariables :: Decl Origin -> [SrcSpanInfo]
+declFreeVariables :: Decl Origin -> [GlobalName]
 declFreeVariables decl =
     case decl of
         FunBind _ matches -> concatMap freeMatch matches
@@ -341,22 +347,22 @@ declFreeVariables decl =
             QConOp{} -> []
     freeAlt (Alt _ _pat rhs _binds) = freeRhs rhs
 
-qnameIdentifier :: QName Origin -> SrcSpanInfo
+qnameIdentifier :: QName Origin -> GlobalName
 qnameIdentifier qname =
     case qname of
         Qual _ _ name -> nameIdentifier name
         UnQual _ name -> nameIdentifier name
         _ -> error "qnameIdentifier"
 
-nameIdentifier :: Name Origin -> SrcSpanInfo
+nameIdentifier :: Name Origin -> GlobalName
 nameIdentifier name =
     case info of
-        Resolved (GlobalName src _qname) -> src
+        Resolved gname -> gname
         _ -> error "nameIdentifier"
   where
     Origin info _ = ann name
 
-declBinders :: Decl Origin -> [SrcSpanInfo]
+declBinders :: Decl Origin -> [GlobalName]
 declBinders decl =
     case decl of
         DataDecl{} -> []
@@ -364,8 +370,8 @@ declBinders decl =
         FunBind _ matches ->
             case head matches of
                 Match _ name _ _ _ ->
-                    let Origin _ loc = ann name
-                    in [loc]
+                    let Origin (Resolved gname) _ = ann name
+                    in [gname]
                 _ -> error "declBinders, FunBind"
         PatBind _ pat _rhs _binds ->
             patBinders pat
@@ -373,12 +379,12 @@ declBinders decl =
         TypeSig{} -> []
         _ -> error $ "declBinders: " ++ show decl
 
-patBinders :: Pat Origin -> [SrcSpanInfo]
+patBinders :: Pat Origin -> [GlobalName]
 patBinders pat =
     case pat of
         PVar _ name ->
-            let Origin _ loc = ann name
-            in [loc]
+            let Origin (Resolved gname) _ = ann name
+            in [gname]
         _ -> error $ "patBinders: " ++ show pat
 
 tiModule :: Module Origin -> TI ()

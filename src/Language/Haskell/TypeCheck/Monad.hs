@@ -1,22 +1,23 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Language.Haskell.TypeCheck.Monad where
 
-import Data.List
-import Data.IORef
 import           Control.Applicative
+import           Control.Monad
 import           Control.Monad.State
-import           Data.Map                         (Map)
-import qualified Data.Map                         as Map
+import           Data.IORef
+import           Data.List
+import           Data.Map                               (Map)
+import qualified Data.Map                               as Map
+import           Language.Haskell.Exts.Annotated.Syntax (Boxed (..), Name,
+                                                         Type (..), ann)
 import           Language.Haskell.Exts.SrcLoc
-import           Language.Haskell.Exts.Annotated.Syntax (Type(..),Name,ann)
 
 import           Language.Haskell.Scope
 import           Language.Haskell.TypeCheck.Types
 
 data TcEnv = TcEnv
-    { -- Globals such as Nothing, Just, etc
-      tcEnvGlobals   :: Map QualifiedName TcType
-    , tcEnvVariables :: Map SrcSpanInfo TcType
+    { -- Values such as 'length', 'Nothing', 'Just', etc
+      tcEnvValues    :: Map GlobalName TcType
     , tcEnvUnique    :: Int
     , tcEnvCoercions :: Map SrcSpanInfo Coercion
     }
@@ -25,21 +26,22 @@ newtype TI a = TI { unTI :: StateT TcEnv IO a }
 
 --type Infer a = a Origin -> TI (a Typed)
 
-runTI :: TI a -> IO TcEnv
-runTI action = execStateT (unTI f) env
+emptyTcEnv :: TcEnv
+emptyTcEnv = TcEnv
+    { tcEnvValues   = Map.empty
+    , tcEnvUnique    = 0
+    , tcEnvCoercions = Map.empty }
+
+runTI :: TcEnv -> TI a -> IO TcEnv
+runTI env action = execStateT (unTI f) env
   where
     f = do
         action
-        vars <- gets tcEnvVariables
+        vars <- gets tcEnvValues
         vars' <- forM (Map.assocs vars) $ \(src, ty) -> do
             ty' <- zonk ty
             return (src, ty')
-        modify $ \st -> st{tcEnvVariables = Map.fromList vars'}
-    env = TcEnv
-        { tcEnvGlobals   = Map.empty
-        , tcEnvVariables = Map.empty
-        , tcEnvUnique    = 0
-        , tcEnvCoercions = Map.empty }
+        modify $ \st -> st{tcEnvValues = Map.fromList vars'}
 
 newUnique :: TI Int
 newUnique = do
@@ -49,34 +51,34 @@ newUnique = do
 
 getFreeMetaVariables :: TI [TcMetaVar]
 getFreeMetaVariables = do
-    m <- gets tcEnvVariables
+    m <- gets tcEnvValues
     return $ nub $ concatMap metaVariables (Map.elems m)
 
-setAssumption :: SrcSpanInfo -> TcType -> TI ()
+setAssumption :: GlobalName -> TcType -> TI ()
 setAssumption ident tySig = modify $ \env ->
-    env{ tcEnvVariables = Map.insert ident tySig (tcEnvVariables env) }
+    env{ tcEnvValues = Map.insert ident tySig (tcEnvValues env) }
 
-findAssumption :: SrcSpanInfo -> TI TcType
+findAssumption :: GlobalName -> TI TcType
 findAssumption ident = do
-    m <- gets tcEnvVariables
+    m <- gets tcEnvValues
     case Map.lookup ident m of
-        Nothing -> error $ "Missing ident: " ++ show ident
+        Nothing -> error $ "Language.Haskell.TypeCheck.findAssumption: Missing ident: " ++ show ident
         Just scheme -> return scheme
 
 setCoercion :: SrcSpanInfo -> Coercion -> TI ()
 setCoercion src coercion = modify $ \env ->
     env{ tcEnvCoercions = Map.insert src coercion (tcEnvCoercions env) }
 
-setGlobal :: QualifiedName -> TcType -> TI ()
-setGlobal gname scheme = modify $ \env ->
-    env{ tcEnvGlobals = Map.insert gname scheme (tcEnvGlobals env) }
+-- setGlobal :: QualifiedName -> TcType -> TI ()
+-- setGlobal gname scheme = modify $ \env ->
+--     env{ tcEnvGlobals = Map.insert gname scheme (tcEnvGlobals env) }
 
-findGlobal :: QualifiedName -> TI TcType
-findGlobal gname = do
-    m <- gets tcEnvGlobals
-    case Map.lookup gname m of
-        Nothing -> error $ "Missing global: " ++ show gname
-        Just scheme -> return scheme
+-- findGlobal :: QualifiedName -> TI TcType
+-- findGlobal gname = do
+--     m <- gets tcEnvGlobals
+--     case Map.lookup gname m of
+--         Nothing -> error $ "Missing global: " ++ show gname
+--         Just scheme -> return scheme
 
 freshInst :: TcType -> TI (Qual TcType, Coercion)
 freshInst (TcForall tyvars (preds :=> t0)) = do
@@ -95,6 +97,7 @@ freshInst (TcForall tyvars (preds :=> t0)) = do
                         Just ref -> TcMetaVar ref
                 TcCon{} -> ty
                 TcMetaVar{} -> ty -- FIXME: Is this an error?
+                TcUnboxedTuple tys -> TcUnboxedTuple (map instantiate tys)
     return (map instPred preds :=> instantiate t0, CoerceAp refs)
 freshInst ty = pure ([] :=> ty, CoerceId )
 
@@ -109,6 +112,8 @@ unify (TcCon left) (TcCon right) =
     if left == right
         then return ()
         else error $ "unify con: " ++ show (left,right)
+unify (TcUnboxedTuple as) (TcUnboxedTuple bs)
+    | length as == length bs = zipWithM_ unify as bs
 unify (TcMetaVar ref) a = unifyMetaVar ref a
 unify a (TcMetaVar ref) = unifyMetaVar ref a
 unify a b               = error $ "unify: " ++ show (a,b)
@@ -124,7 +129,7 @@ unifyMetaVar (TcMetaRef _ident ref) rightTy = do
 zonk :: TcType -> TI TcType
 zonk ty =
     case ty of
-        TcForall{} -> pure ty
+        TcForall tyvars (pred :=> tty) -> TcForall tyvars <$> ( (pred :=> ) <$> zonk tty)
         TcFun a b -> TcFun <$> zonk a <*> zonk b
         TcApp a b -> TcApp <$> zonk a <*> zonk b
         TcRef{}   -> pure ty
@@ -134,6 +139,7 @@ zonk ty =
             case mbTy of
                 Nothing -> pure ty
                 Just sub -> zonk sub
+        TcUnboxedTuple tys -> TcUnboxedTuple <$> mapM zonk tys
 
 tcVarFromName :: Name Origin -> TcVar
 tcVarFromName name =
@@ -157,6 +163,7 @@ typeToTcType ty =
             in TcCon qname
         TyApp _ a b -> TcApp (typeToTcType a) (typeToTcType b)
         TyParen _ t -> typeToTcType t
+        TyTuple _ Unboxed tys -> TcUnboxedTuple (map typeToTcType tys)
         _ -> error $ "typeToTcType: " ++ show ty
 
 --tcTypeToScheme :: TcType -> TcType
@@ -176,6 +183,7 @@ freeTcVariables = nub . worker []
             TcRef v | v `elem` ignore -> []
                     | otherwise       -> [v]
             TcCon{} -> []
+            TcUnboxedTuple tys -> concatMap (worker ignore) tys
             TcMetaVar{} -> []
 
 metaVariables :: TcType -> [TcMetaVar]
@@ -188,9 +196,10 @@ metaVariables ty =
         TcRef{} -> []
         TcCon{} -> []
         TcMetaVar var -> [var]
+        TcUnboxedTuple tys -> concatMap metaVariables tys
 
 -- Replace free meta vars with tcvars. Compute the smallest context.
--- 
+--
 generalize :: [TcMetaVar] -> TcType -> TI (TcType, Coercion)
 generalize free ty = do
     forM_ unbound $ \var@(TcMetaRef _name ref) ->

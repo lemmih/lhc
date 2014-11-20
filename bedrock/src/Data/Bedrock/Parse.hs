@@ -109,11 +109,12 @@ parseLiteral =
 	<?> "literal"
 
 parseNode :: Parser (NodeName, [Variable])
-parseNode = choice 
+parseNode = choice
 	[ do
 		constructor <- parseConstructor
 		binds <- many parseVariable
-		return (ConstructorName constructor, binds)
+		blanks <- many (symbol "_")
+		return (ConstructorName constructor (length blanks), binds)
 	, do
 		fn <- parseName
 		binds <- many parseVariable
@@ -158,7 +159,8 @@ parseExpression = choice
 		parens $ do
 			constructor <- parseConstructor
 			args <- many parseVariable
-			return $ Store (ConstructorName constructor) args
+			blanks <- many (symbol "_")
+			return $ Store (ConstructorName constructor (length blanks)) args
 		  <|> do
 		  	fn <- parseName
 		  	args <- many parseVariable

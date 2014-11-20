@@ -27,11 +27,15 @@ Executable lhc
                      mtl              >= 2.1.2,
                      ansi-wl-pprint   >= 0.6.6,
 
-                     haskell-names    >= 0.3,
                      hse-cpp          >= 0.1,
                      haskell-packages >= 0.2,
+                     Cabal,
                      haskell-src-exts >= 1.16.0,
                      tagged,
+                     optparse-applicative,
+                     binary,
+                     derive,
+                     directory,
 
                      bedrock
 

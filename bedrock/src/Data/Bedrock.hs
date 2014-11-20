@@ -56,8 +56,9 @@ data Module = Module
 	} deriving (Show)
 
 data NodeName
-	= ConstructorName Name
+	= ConstructorName Name Int
 	| FunctionName Name Int
+	| UnboxedTupleName
 		-- ^ name of the function and the number of missing arguments.
 	deriving (Show, Eq, Ord)
 
@@ -80,6 +81,7 @@ data Function = Function
 data Pattern
 	= NodePat NodeName [Variable]
 	| LitPat Literal
+	-- | UnboxedPat [Variable]
 	deriving (Show)
 data Alternative = Alternative Pattern Block
 	deriving (Show)
@@ -107,6 +109,7 @@ data Expression
 	| Fetch MemAttributes Variable
 	| Load MemAttributes Variable Int
 	| Add Variable Variable
+	| Undefined
 
 	-- Global variables.
 	| ReadRegister String
@@ -196,7 +199,7 @@ instance Arbitrary Module where
 
 instance Arbitrary NodeName where
 	arbitrary = oneof
-		[ ConstructorName <$> arbitrary
+		[ ConstructorName <$> arbitrary <*> fmap abs arbitrary
 		, FunctionName <$> arbitrary <*> fmap abs arbitrary ]
 
 instance Arbitrary NodeDefinition where

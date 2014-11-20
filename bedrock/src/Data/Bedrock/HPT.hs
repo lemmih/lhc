@@ -44,6 +44,11 @@ import           Data.Bedrock.Rename
 
 import           Data.Bedrock.PrettyPrint     ()
 
+vector !!! idx = \ident ->
+    if Vector.length vector <= idx
+    then error $ "Invalid index: " ++ ident ++ ": " ++ show (Vector.length vector, idx)
+    else vector Vector.! idx
+
 data HPTResult = HPTResult
     { hptFnArgs              :: FnArgs
     , hptFnRets              :: FnRets
@@ -193,11 +198,11 @@ ppHPTResult hpt = do
         printf "%%%d: %s\n" (idx::Int) (ppObjects objs)
   where
     isSharedHP hp =
-        if hptSharedHeapLocations hpt Vector.! hp
+        if (hptSharedHeapLocations hpt !!! hp) "isSharedHP"
             then "(shared)"
             else ""
     isSharedVar var =
-        if hptSharedVariables hpt Vector.! var
+        if (hptSharedVariables hpt !!! var) "isSharedVar"
             then "(shared)"
             else ""
     heap = hptHeap hpt
@@ -265,7 +270,7 @@ countStores = getSum . execWriter . mapM_ countFn . functions
             _       -> return ()
 
 sizeOfVariable :: HPTResult -> Variable -> Int
-sizeOfVariable hpt var = 
+sizeOfVariable hpt var =
     case variableType var of
         NodePtr      -> 1
         FramePtr     -> 1
@@ -273,21 +278,22 @@ sizeOfVariable hpt var =
         StaticNode n -> n
         Primitive{}  -> 1
   where
-    objects = hptNodeScope hpt Vector.! variableIndex var
+    objects = (hptNodeScope hpt !!! variableIndex var) "objects"
 
 sizeOfObjects :: HPTResult -> Objects -> Int
 sizeOfObjects hpt objects =
-    foldr max 0 [ sizeOfNode hpt node | node <- Map.keys objects ]
+    foldr max 0 [ sizeOfNode hpt node args | (node, args) <- Map.assocs objects ]
 
-sizeOfNode :: HPTResult -> NodeName -> Int
-sizeOfNode hpt (ConstructorName node) =
+sizeOfNode :: HPTResult -> NodeName -> Vector NameSet -> Int
+sizeOfNode hpt (ConstructorName node blanks) _ =
     1 + sum (map (sizeOfVariable hpt) args)
   where
-    args = hptNodeArgs hpt Map.! node
-sizeOfNode hpt (FunctionName fn blanks) =
+    args = dropLast blanks (hptNodeArgs hpt Map.! node)
+sizeOfNode hpt (FunctionName fn blanks) _ =
     1 + sum (map (sizeOfVariable hpt) args)
   where
     args = dropLast blanks (hptFnArgs hpt Map.! fn)
+sizeOfNode hpt UnboxedTupleName args = Vector.length args
 
 setVariableSize :: HPTResult -> Variable -> Variable
 setVariableSize hpt var =
@@ -479,7 +485,7 @@ extract :: Objects -> NodeName -> Int -> NameSet
 extract objs name nth =
     case Map.lookup name objs of
         Nothing    -> IntSet.empty
-        Just names -> names Vector.! nth
+        Just names -> (names !!! nth) ("extract: " ++ show (name, objs, nth))
 
 hptAlternative :: Function -> Variable -> Alternative -> HPT s ()
 hptAlternative origin scrut (Alternative pattern branch) = do
@@ -615,14 +621,14 @@ stackTrace objects = fmap concat $
                     -- Reach top-level and there are no more frames
                     [] -> return [FunctionStackFrame fn blanks Nothing]
                     [frameIdx] -> do
-                        let stackPtrs = objArgs Vector.! frameIdx
+                        let stackPtrs = (objArgs !!! frameIdx) "stackPtrs"
                         stackHps <- derefPtrs stackPtrs
                         return [FunctionStackFrame fn blanks (Just stackHps)]
                     _ -> error "HPT: Too many FramePtr arguments"
             -- CatchFrame *normal_stack *handler
-            ConstructorName cons | isCatchFrame cons -> do
-                let stackPtrs = objArgs Vector.! 0
-                    handlerVars = objArgs Vector.! 1
+            ConstructorName cons 0 | isCatchFrame cons -> do
+                let stackPtrs = (objArgs !!! 0) "stackPtrs"
+                    handlerVars = (objArgs !!! 1) "handlerVars"
                 stackHps <- derefPtrs stackPtrs
 
                 handlerObjs <- derefVars handlerVars
@@ -643,7 +649,7 @@ hptExpression origin binds simple =
                 FunctionName fn _ -> do
                     args <- getFunctionArgumentRegisters fn
                     forM_ (zip vars args) $ uncurry hptCopyVariables
-                ConstructorName name -> do
+                ConstructorName name _ -> do
                     args <- getNodeArgumentRegisters name
                     forM_ (zip vars args) $ uncurry hptCopyVariables
         Fetch _constant ptrRef | [node] <- binds ->
@@ -657,9 +663,10 @@ hptExpression origin binds simple =
                 FunctionName fn _ -> do
                     args <- getFunctionArgumentRegisters fn
                     forM_ (zip vars args) $ uncurry hptCopyVariables
-                ConstructorName name -> do
+                ConstructorName name _ -> do
                     args <- getNodeArgumentRegisters name
                     forM_ (zip vars args) $ uncurry hptCopyVariables
+                UnboxedTupleName -> return ()
         Literal{} -> return ()
         Application fn vars -> do
             foreignRets <- getFunctionReturnRegisters fn
@@ -696,6 +703,10 @@ hptExpression origin binds simple =
                         setNodeScope objRef newObjects
                         fnArgs <- getFunctionArgumentRegisters name
                         hptCopyVariables arg (fnArgs!!(length fnArgs-n))
+                    ConstructorName name n | n > 0 -> do
+                        let newObjects = Map.singleton (ConstructorName name (n-1)) (Vector.snoc args (IntSet.singleton (variableIndex arg)))
+                        setNodeScope objRef newObjects
+                    UnboxedTupleName -> return ()
                     _ -> error $ "invalid apply: " ++ show (objRef, nodeName)
         Add{} -> return ()
         GCAllocate{} -> return ()
@@ -792,7 +803,7 @@ analyseUsage m =
             GCEnd{}                -> return ()
             GCMark var             -> push var
             GCMarkNode var         -> push var
-    
+
 
 
 

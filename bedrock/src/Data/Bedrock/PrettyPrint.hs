@@ -38,7 +38,7 @@ instance Pretty CType where
 
 instance Pretty NodeDefinition where
 	pretty (NodeDefinition name args) =
-		text "node" <+> ppNode (ConstructorName name) (map pretty args)
+		text "node" <+> ppNode (ConstructorName name 0) (map pretty args)
 
 instance Pretty Variable where
 	pretty Variable{ variableName = name, variableType = ty } =
@@ -51,10 +51,12 @@ ppLiteral literal =
 		LiteralString str -> Doc.text (show str)
 
 ppNode :: NodeName -> [Doc] -> Doc
-ppNode (ConstructorName constructor) args =
-	Doc.hsep (Doc.blue (pretty constructor) : args)
+ppNode (ConstructorName constructor blanks) args =
+	Doc.hsep (Doc.blue (pretty constructor) : args ++ replicate blanks (Doc.char '_'))
 ppNode (FunctionName fn blanks) args =
 	Doc.hsep (Doc.magenta (pretty fn) : args ++ replicate blanks (Doc.char '_'))
+ppNode UnboxedTupleName args =
+	Doc.text "(#" <+> ppList (map pretty args) <+> Doc.text "#)"
 --ppNode (CatchFrame fn blanks) args =
 --	Doc.hsep (Doc.green (ppName fn) : args ++ replicate blanks (Doc.char '_'))
 
@@ -63,6 +65,7 @@ ppPattern pattern =
 	case pattern of
 		NodePat name binds -> ppNode name (map pretty binds)
 		LitPat lit         -> ppLiteral lit
+		-- UnboxedPat binds   -> Doc.text "(#" <+> ppList (map pretty binds) <+> Doc.text "#)"
 
 ppList :: [Doc] -> Doc
 ppList = Doc.hsep . Doc.punctuate (Doc.char ',')
@@ -99,6 +102,8 @@ ppExpression simple =
 			Doc.brackets (Doc.int nth)
 		Add lhs rhs ->
 			ppSyntax "@add" <+> pretty lhs <+> pretty rhs
+		Undefined ->
+			ppSyntax "@undefined"
 		Application fn args ->
 			pretty fn <> Doc.parens (ppList $ map pretty args)
 		CCall fn args ->

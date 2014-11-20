@@ -2,8 +2,8 @@
 module Compiler.CoreToBedrock where
 
 
-import           Compiler.Core hiding (Variable(..),NodeDefinition(..))
-import qualified Compiler.Core                   as Core 
+import           Compiler.Core hiding (Variable(..),NodeDefinition(..),UnboxedPat)
+import qualified Compiler.Core                   as Core
 import qualified Compiler.HaskellToCore          as Haskell
 import           Data.Bedrock                    as Bedrock
 import           Data.Bedrock.Misc
@@ -36,7 +36,7 @@ convert :: Core.Module -> Bedrock.Module
 convert m = Bedrock.Module
   { modForeigns  = Core.coreForeigns m
   , nodes        = map convertNodeDefinition (Core.coreNodes m)
-  , entryPoint   = Name [] "entryPoint" 38
+  , entryPoint   = Name ["Main"] "entrypoint" 0
   , functions    = fns
   , modNamespace = ns }
   where
@@ -56,7 +56,11 @@ convertModule m = setArities arities $ do
         , let arity = case expr of
                         Lam vars _ -> length vars
                         WithCoercion _ (Lam vars _) -> length vars
-                        _ -> 0 ]
+                        _ -> 0 ] ++
+        [ (name, length args)
+        | Core.NodeDefinition name args <- coreNodes m ] ++
+        [ (con, 1)
+        | Core.NewType con <- coreNewTypes m ]
 
 data Env = Env
     { envScope :: [Variable]
@@ -70,7 +74,7 @@ newtype M a = M { unM :: RWS Env [Function] AvailableNamespace a }
         , MonadState AvailableNamespace
         , Applicative, Functor )
 runM ::  M a -> AvailableNamespace -> ([Function], AvailableNamespace)
-runM action ns = (fns, ns') 
+runM action ns = (fns, ns')
   where
     (ns',fns) = execRWS (unM action) env ns
     env = Env
@@ -152,7 +156,7 @@ convertDecl :: Core.Decl -> M ()
 convertDecl (Core.Decl _ty name (Lam vars expr)) = do
     vars' <- mapM convertVariable vars
     body <- local (\env -> env{envRoot = name}) $
-            bind vars' $ convertExpr False expr (\val -> pure $ Return [val])
+            bind vars' $ convertExpr False expr (pure . Return)
     let fn = Function
             { fnName = name
             , fnAttributes = []
@@ -165,7 +169,7 @@ convertDecl (Core.Decl _ty name (WithCoercion _ expr)) =
     convertDecl (Core.Decl _ty name expr)
 convertDecl (Core.Decl _ty name expr) = do
     body <- local (\env -> env{envRoot = name}) $
-            convertExpr False expr (\val -> pure $ Return [val])
+            convertExpr False expr (pure . Return)
     let fn = Function
             { fnName = name
             , fnAttributes = []
@@ -191,32 +195,39 @@ setOrigin = local $ \env ->
     let Name orig ident _ = envRoot env
     in env { envLocation = orig ++ [ident] }
 
-convertExpr :: Bool -> Core.Expr -> (Variable -> M Bedrock.Block) -> M Bedrock.Block
+convertExpr :: Bool -> Core.Expr -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
 convertExpr lazy expr rest =
     case expr of
+        UnboxedTuple args -> do
+            tmp <- newVariable [] "unboxed" Node
+            args' <- mapM convertVariable args
+            Bind [tmp] (MkNode UnboxedTupleName args')
+                <$> rest [tmp]
         WithCoercion _ e -> convertExpr lazy e rest
         --CaseUnboxed scrut binds branch | not lazy ->
         --    convertExpr False scrut $ \vars ->
-        Con name args | lazy -> do
+        Con name | lazy -> do
             tmp <- newVariable [] "con" NodePtr
-            args' <- mapM convertVariable args
-            Bind [tmp] (Store (ConstructorName name) args')
-                <$> rest tmp
-        Con name args | not lazy -> do
+            -- args' <- mapM convertVariable args
+            Just arity <- lookupArity name
+            Bind [tmp] (Store (ConstructorName name arity) [])
+                <$> rest [tmp]
+        Con name | not lazy -> do
             tmp <- newVariable [] "con" Node
-            args' <- mapM convertVariable args
-            Bind [tmp] (MkNode (ConstructorName name) args')
-                <$> rest tmp
+            -- args' <- mapM convertVariable args
+            Just arity <- lookupArity name
+            Bind [tmp] (MkNode (ConstructorName name arity) [])
+                <$> rest [tmp]
         Var v | lazy -> do
             v' <- convertVariable v
             let fn = variableName v'
             mbArity <- lookupArity fn
             case mbArity of
-                Nothing -> rest v'
+                Nothing -> rest [v']
                 Just arity -> do
                     tmp <- newVariable [] "thunk" NodePtr
                     Bind [tmp] (Store (FunctionName fn arity) [])
-                        <$> rest tmp
+                        <$> rest [tmp]
         Var v | not lazy -> do
             v' <- convertVariable v
             let fn = variableName v'
@@ -225,23 +236,23 @@ convertExpr lazy expr rest =
                 Nothing -> do
                     tmp <- deriveVariable v' "eval" Node
                     Bind [tmp] (Eval v')
-                        <$> rest tmp
+                        <$> rest [tmp]
                 Just arity -> do
                     tmp <- newVariable [] "thunk" Node
                     Bind [tmp] (MkNode (FunctionName fn arity) [])
-                        <$> rest tmp
+                        <$> rest [tmp]
         Core.Lit (Core.LitString str) -> do
             tmp <- newVariable [] "lit" (Primitive (CPointer I8))
             Bind [tmp] (Bedrock.Literal (LiteralString str))
-                <$> rest tmp
+                <$> rest [tmp]
         Core.Lit (Core.LitInt int) -> do
             tmp <- newVariable [] "int" (Primitive I64)
             Bind [tmp] (Bedrock.Literal (LiteralInt int))
-                <$> rest tmp
+                <$> rest [tmp]
         App a b | lazy -> do
             body <- --setOrigin $
-                convertExpr False a $ \aVal ->
-                convertExpr True b $ \bVal ->  do
+                convertExpr False a $ \[aVal] ->
+                convertExpr True b $ \[bVal] ->  do
                 ret <- deriveVariable aVal "apply" Node
                 Bind [ret] (Apply aVal bVal)
                     <$> pure (Return [ret])
@@ -249,21 +260,21 @@ convertExpr lazy expr rest =
             node <- pushFunction (Left "ap") body
             tmp <- newVariable [] "ap" NodePtr
             Bind [tmp] (Store (FunctionName node 0) scope)
-                <$> rest tmp
+                <$> rest [tmp]
         App a b | not lazy ->
-            convertExpr False a $ \aVal -> -- node
-            convertExpr True b $ \bVal -> do -- nodeptr
+            convertExpr False a $ \[aVal] -> -- node
+            convertExpr True b $ \[bVal] -> do -- nodeptr
             ret <- deriveVariable aVal "apply" Node
             Bind [ret] (Apply aVal bVal)
-                    <$> rest ret
+                    <$> rest [ret]
         Lam v sub | lazy -> do
             scope <- asks envScope
             v' <- mapM convertVariable v
-            body <- bind v' $ convertExpr False sub (\val -> pure $ Return [val])
+            body <- bind v' $ convertExpr False sub (pure . Return)
             node <- bind v' $ pushFunction (Left "lambda") body
             tmp <- newVariable [] "tmp" NodePtr
             Bind [tmp] (Store (FunctionName node (length v)) scope)
-                <$> rest tmp
+                <$> rest [tmp]
         --Lam v sub | not lazy -> do
         --    scope <- asks envScope
         --    body <- bind v $ convertExpr True sub (\val -> pure $ Return [val])
@@ -272,10 +283,10 @@ convertExpr lazy expr rest =
         --    Bind [tmp] (MkNode (FunctionName node (length v)) scope)
         --        <$> rest tmp
         Core.Case scrut alts | not lazy ->
-            convertExpr False scrut $ \val ->
+            convertExpr False scrut $ \[val] ->
             Bedrock.Case val Nothing <$>
             mapM convertAlt alts
-        --External external CVoid args st | not lazy -> do 
+        --External external CVoid args st | not lazy -> do
         --    let tmp = Variable (Name [] "tmp" 0) NodePtr
         --        ret = Variable (Name [] "ret" 0) Node
         --        unit = ConstructorName (Name ["Main"] "IOUnit" 0)
@@ -284,14 +295,14 @@ convertExpr lazy expr rest =
         --     Bind [tmp] (Store tuple []) .
         --     Bind [ret] (MkNode unit [tmp, st]))
         --        <$> rest ret
-        WithExternal binder external args st scoped | not lazy -> do 
+        WithExternal binder external args st scoped | not lazy -> do
             binder' <- convertVariable binder
             args' <- mapM convertVariable args
-            Bind [binder'] (CCall external args')
-                <$> convertExpr False scoped rest 
+            bind [binder'] $ Bind [binder'] (CCall external args')
+                <$> convertExpr False scoped rest
 
         Let (NonRec name e1) e2 ->
-            convertExpr True e1 $ \val -> do
+            convertExpr True e1 $ \[val] -> do
                 name' <- convertVariable name
                 Bind [name'] (TypeCast val) <$> convertExpr lazy e2 rest
 
@@ -300,10 +311,10 @@ convertExpr lazy expr rest =
 
         _ | lazy -> error $ "convertExpr: " ++ show (lazy, expr)
         _ | not lazy ->
-            convertExpr True expr $ \val -> do
+            convertExpr True expr $ \[val] -> do
             tmp <- deriveVariable val "eval" Node
             Bind [tmp] (Eval val)
-                <$> rest tmp
+                <$> rest [tmp]
 
 deriveVariable :: Variable -> String -> Type -> M Variable
 deriveVariable (Variable (Name orig ident _) _) tag ty = do
@@ -317,7 +328,12 @@ convertAlt (Alt pattern branch) =
         ConPat name args -> do
             args' <- mapM convertVariable args
             bind args' $
-              Alternative (NodePat (ConstructorName name) args')
-                <$> convertExpr False branch (pure . Return . return)
+              Alternative (NodePat (ConstructorName name 0) args')
+                <$> convertExpr False branch (pure . Return)
         Core.LitPat{} -> error "convertAlt"
+        Core.UnboxedPat args -> do
+            args' <- mapM convertVariable args
+            bind args' $
+                Alternative (NodePat UnboxedTupleName args')
+                    <$> convertExpr False branch (pure . Return)
 
