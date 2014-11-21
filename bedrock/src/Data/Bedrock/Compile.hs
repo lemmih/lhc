@@ -15,7 +15,7 @@ import           Data.Bedrock.Parse
 import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.RegisterIntroduction
 import           Data.Bedrock.Rename
---import           Data.Bedrock.Simplify
+import           Data.Bedrock.Simplify
 import           Data.Bedrock
 import           Data.Bedrock.NodeSizing
 import           Data.Bedrock.Storage
@@ -96,7 +96,7 @@ compileWithOpts keepIntermediateFiles verbose path m = do
 
 stdPipeline :: Pipeline
 stdPipeline =
-        [ "rename"          :> unique
+        [ "rename"          :> simplify . unique
         , PerformHPT
         , "no-laziness"     :?> runGen . lowerEvalApply
         , "no-exceptions"   :> unique . runGen cpsTransformation

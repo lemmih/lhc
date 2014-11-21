@@ -61,7 +61,7 @@ newVariable ident ty = do
 tagName :: String -> Name -> Gen Name
 tagName tag name = do
     u <- newUnique
-    return $ name{ nameIdentifier = nameIdentifier name ++ "_" ++ tag
+    return $ name{ nameIdentifier = nameIdentifier name ++ "." ++ tag
                  , nameUnique = u}
 
 tagVariable :: String -> Variable -> Gen Variable

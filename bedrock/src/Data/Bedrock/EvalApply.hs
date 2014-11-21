@@ -25,6 +25,10 @@ lowerEvalApply hpt = do
 traverseBlock :: HPTResult -> Function -> Block -> Gen Block
 traverseBlock hpt origin expr =
     case expr of
+        Bind [node] (Apply obj arg) (Return [retNode]) | node == retNode ->
+            mkInlineApply hpt obj arg
+        Bind [node] (Eval var) (Return [retNode]) | node == retNode ->
+            mkInlineEval hpt var
         Bind binds simple rest ->
             traverseExpression hpt origin binds simple =<<
                 traverseBlock hpt origin rest
@@ -42,9 +46,9 @@ traverseExpression hpt origin binds simple rest =
         Apply obj arg | [bind] <- binds -> mkApply hpt origin bind obj arg rest
         _                               -> return $ Bind binds simple rest
 
-mkEval :: HPTResult -> Function -> Variable -> Variable -> Block -> Gen Block
-mkEval hpt origin bind var rest = do
-    evalName <- tagName "eval" (fnName origin)
+
+mkEvalBody :: HPTResult -> Variable -> Gen (Variable, Variable, Block)
+mkEvalBody hpt var = do
     arg <- tagVariable "ptr" var
 
     let HeapLocationSet ptrs = hptPtrScope hpt Vector.! variableIndex var
@@ -72,6 +76,13 @@ mkEval hpt origin bind var rest = do
             Alternative (NodePat name args) $
             Bind [ret] (MkNode name args) $
             Return [ret]
+    return (arg, preEvalObject, body)
+
+mkEval :: HPTResult -> Function -> Variable -> Variable -> Block -> Gen Block
+mkEval hpt origin bind var rest = do
+    evalName <- tagName "eval" (fnName origin)
+    (arg, preEvalObject, body) <- mkEvalBody hpt var
+
     pushFunction Function
         { fnName = evalName
         , fnAttributes = []
@@ -83,13 +94,21 @@ mkEval hpt origin bind var rest = do
         Bind [bind] (Application evalName [var, preEvalObject])
         rest
 
-mkApply :: HPTResult -> Function -> Variable -> Variable -> Variable
-        -> Block -> Gen Block
-mkApply hpt origin bind obj arg rest = do
-    applyName <- tagName "apply" (fnName origin)
+mkInlineEval :: HPTResult -> Variable -> Gen Block
+mkInlineEval hpt var = do
+    (arg, preEvalObject, body) <- mkEvalBody hpt var
+    return $
+        Bind [arg] (TypeCast var) $
+        Bind [preEvalObject] (Fetch anyMemory var) $
+        body
+
+
+mkApplyBody :: HPTResult -> Variable -> Variable
+        -> Gen (Variable, Variable, Block)
+mkApplyBody hpt obj arg = do
     applyObj <- newVariable "node" (StaticNode (sizeOfVariable hpt obj))
-    applyArg <- tagVariable "ptr" arg
-    applyRet <- newVariable "ret" (StaticNode (sizeOfVariable hpt bind))
+    applyArg <- tagVariable "arg" arg
+    applyRet <- newVariable "ret" Node
     let objects = hptNodeScope hpt Vector.! variableIndex obj
         names = Map.keys objects
         body =
@@ -109,6 +128,15 @@ mkApply hpt origin bind obj arg rest = do
             Bind [applyRet] (MkNode (ConstructorName fn (n-1)) (args++[applyArg])) $
             Return [applyRet]
         mkAlt _ = error "mkApply"
+    return (applyObj, applyArg, body)
+
+mkApply :: HPTResult -> Function -> Variable -> Variable -> Variable
+        -> Block -> Gen Block
+mkApply hpt origin bind obj arg rest = do
+    applyName <- tagName "apply" (fnName origin)
+    (applyObj, applyArg, body) <- mkApplyBody hpt obj arg
+
+    applyRet <- newVariable "ret" (StaticNode (sizeOfVariable hpt bind))
     pushFunction Function
         { fnName = applyName
         , fnAttributes = []
@@ -117,6 +145,13 @@ mkApply hpt origin bind obj arg rest = do
         , fnBody = body }
     return $ Bind [bind] (Application applyName [obj, arg]) rest
 
+mkInlineApply :: HPTResult -> Variable -> Variable -> Gen Block
+mkInlineApply hpt obj arg = do
+    (applyObj, applyArg, body) <- mkApplyBody hpt obj arg
+    return $
+        Bind [applyObj] (TypeCast obj) $
+        Bind [applyArg] (TypeCast arg) $
+        body
 
 traverseAlternative :: HPTResult -> Function -> Alternative -> Gen Alternative
 traverseAlternative hpt origin alternative =

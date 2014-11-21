@@ -195,6 +195,14 @@ setOrigin = local $ \env ->
     let Name orig ident _ = envRoot env
     in env { envLocation = orig ++ [ident] }
 
+collectApps :: Core.Expr -> (Core.Expr, [Core.Expr])
+collectApps = worker []
+  where
+    worker acc expr =
+        case expr of
+            App a b -> worker (b:acc) a
+            _ -> (expr, reverse acc)
+
 convertExpr :: Bool -> Core.Expr -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
 convertExpr lazy expr rest =
     case expr of
@@ -206,6 +214,12 @@ convertExpr lazy expr rest =
         WithCoercion _ e -> convertExpr lazy e rest
         --CaseUnboxed scrut binds branch | not lazy ->
         --    convertExpr False scrut $ \vars ->
+        _ | (Con name, args) <- collectApps expr ->
+            convertExprs args $ \args' -> do
+                tmp <- newVariable [] "con" NodePtr
+                Just arity <- lookupArity name
+                Bind [tmp] (Store (ConstructorName name (arity-length args)) args')
+                    <$> rest [tmp]
         Con name | lazy -> do
             tmp <- newVariable [] "con" NodePtr
             -- args' <- mapM convertVariable args
@@ -315,6 +329,13 @@ convertExpr lazy expr rest =
             tmp <- deriveVariable val "eval" Node
             Bind [tmp] (Eval val)
                 <$> rest [tmp]
+
+convertExprs :: [Core.Expr] -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
+convertExprs [] fn = fn []
+convertExprs (x:xs) fn =
+    convertExpr True x $ \v ->
+    convertExprs xs $ \vs ->
+    fn (v ++ vs)
 
 deriveVariable :: Variable -> String -> Type -> M Variable
 deriveVariable (Variable (Name orig ident _) _) tag ty = do
