@@ -31,6 +31,7 @@ library
                        Data.Bedrock.NodeSizing
                        Data.Bedrock.Simplify
                        Data.Bedrock.LLVM
+                       Data.Bedrock.LLVMGen
                        Data.Bedrock.GlobalVariables
                        Data.Bedrock.Storage.Pluggable
                        Data.Bedrock.Storage.Fixed
