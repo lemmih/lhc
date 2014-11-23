@@ -131,8 +131,16 @@ transformExpresion origin binds simple rest =
                 Bind [] (Write hp 0 tmp) $
                 foldr (\(nth, arg) -> Bind [] (Write hp nth arg))
                     (Bind [hp'] (Address hp size) $
-                     Bind [] (WriteRegister "hp" hp') rest) 
+                     Bind [] (WriteRegister "hp" hp') rest)
                     (zip [1..] args)
+        BumpHeapPtr n -> do
+            let size = n
+            hp <- newVariable "hp" NodePtr
+            hp' <- newVariable "hp'" NodePtr
+            return $
+                Bind [hp] (ReadRegister "hp") $
+                Bind [hp'] (Address hp size) $
+                Bind [] (WriteRegister "hp" hp') $ rest
         Alloc n -> do
             continueName <- tagName "with_mem" (fnName origin)
             divertName <- tagName "without_mem" (fnName origin)

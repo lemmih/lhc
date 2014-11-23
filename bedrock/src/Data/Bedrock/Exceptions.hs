@@ -13,11 +13,14 @@ import qualified Data.Map as Map
 
 import           Data.Bedrock
 import           Data.Bedrock.Transform
-import           Data.Bedrock.Misc (constantMemory)
+import           Data.Bedrock.Misc (constantMemory, anyMemory)
 
+stackFrameName :: Name
+stackFrameName = Name ["bedrock"] "StackFrame" 0
 
 cpsTransformation :: Gen ()
 cpsTransformation = do
+    pushNode $ NodeDefinition stackFrameName []
     fs <- gets (Map.elems . envFunctions)
     mapM_ cpsFunction fs
 
@@ -25,32 +28,39 @@ cpsFunction :: Function -> Gen ()
 cpsFunction fn | NoCPS `elem` fnAttributes fn =
     pushFunction fn
 cpsFunction fn = do
-    body <- cpsBlock fn (fnBody fn)
+    frameVar <- newVariable "bedrock.stackframe" FramePtr
+    body <- cpsBlock fn frameVar (fnBody fn)
+    let size = frameSize (fnBody fn)
+        bodyWithFrame =
+            Bind [] (Alloc $ size+1) $ -- size + header
+            Bind [frameVar] (Store (ConstructorName stackFrameName 0) []) $
+            Bind [] (BumpHeapPtr size) $
+            Bind [] (Write frameVar 2 stdContinuation) $
+            body
     let fn' = fn{fnArguments = fnArguments fn ++ [stdContinuation]
                 ,fnResults = []
-                ,fnBody = body}
+                ,fnBody = if size > 0 then bodyWithFrame else body}
     pushFunction fn'
 
 
-cpsBlock :: Function -> Block -> Gen Block
-cpsBlock origin block =
+cpsBlock :: Function -> Variable -> Block -> Gen Block
+cpsBlock origin frameVar block =
     case block of
         Bind binds simple rest ->
-            cpsExpresion origin binds simple =<<
-                cpsBlock origin rest
+            cpsExpresion origin frameVar binds simple rest
         Return args -> do
-            node <- newVariable "contNode" Node
+            node <- newVariable "contNode" (Primitive IWord)
             return $
-                Bind [node] (Fetch constantMemory stdContinuation) $
-                Invoke node args
+                Bind [node] (Load anyMemory stdContinuation 1) $
+                Invoke node (stdContinuation : args)
         Case scrut defaultBranch alternatives ->
             Case scrut
                 <$> pure defaultBranch
-                <*> mapM (cpsAlternative origin) alternatives
+                <*> mapM (cpsAlternative origin frameVar) alternatives
         Raise exception -> do
             node <- newVariable "contNode" Node
             return $
-                Bind [node] (Fetch constantMemory stdContinuation) $
+                Bind [node] (Fetch anyMemory stdContinuation) $
                 InvokeHandler node exception
         TailCall fn args -> do
             noCPS <- hasAttribute fn NoCPS
@@ -66,9 +76,9 @@ isCatchFrame :: Name -> Bool
 isCatchFrame (Name [] ident _) = exhFrameIdentifier == ident
 isCatchFrame _ = False
 
-cpsExpresion :: Function -> [Variable]
+cpsExpresion :: Function -> Variable -> [Variable]
              -> Expression -> Block -> Gen Block
-cpsExpresion origin binds simple rest =
+cpsExpresion origin frameVar binds simple rest =
     case simple of
         Catch exh exhArgs fn fnArgs -> do
             exFrameName <- tagName ("exception_frame") (fnName origin)
@@ -94,45 +104,62 @@ cpsExpresion origin binds simple rest =
                 else mkContinuation $ \continuationFrame ->
                         TailCall fn (fnArgs ++ [continuationFrame])
         Store (FunctionName fn blanks) args ->
-            return $ Bind binds (Store (FunctionName fn (blanks+1)) args) rest
+            Bind binds (Store (FunctionName fn (blanks+1)) args)
+                <$> cpsBlock origin frameVar rest
         MkNode (FunctionName fn blanks) args ->
-            return $ Bind binds (MkNode (FunctionName fn (blanks+1)) args) rest
-        other -> return $ Bind binds other rest
+            Bind binds (MkNode (FunctionName fn (blanks+1)) args)
+                <$> cpsBlock origin frameVar rest
+        Save var n ->
+            Bind binds (Write frameVar n var) <$> cpsBlock origin frameVar rest
+        Restore n ->
+            Bind binds (Load anyMemory frameVar n) <$> cpsBlock origin frameVar rest
+        other -> Bind binds other <$> cpsBlock origin frameVar rest
   where
     mkContinuation use = do
-        cFrameName <- tagName ("frame") (fnName origin)
-        let stdContinuationFrame = Variable
-                { variableName = cFrameName
-                , variableType = FramePtr }
 
-        let continuationArgs = (Set.toList (freeVariables rest) \\ binds)
+        fnPtr <- newVariable "fnPtr" (Primitive $ CPointer (CFunction CVoid [CPointer IWord]))
+
+        framePtr <- newVariable "bedrock.stackframe.cont" FramePtr
+
         contFnName <- tagName "continuation" (fnName origin)
-        pushFunction $
+
+        body <- cpsBlock origin framePtr $
+            Bind [stdContinuation] (Load anyMemory framePtr 2) $ rest
+        pushHelper $
             Function { fnName      = contFnName
                      , fnAttributes = []
-                     , fnArguments = continuationArgs ++ binds
+                     , fnArguments = framePtr : binds
                      , fnResults   = []
-                     , fnBody      = rest }
-        return $
-            Bind [stdContinuationFrame]
-                (Store (FunctionName contFnName (length binds))
-                    continuationArgs) $
-            use stdContinuationFrame
+                     , fnBody      = body }
 
-cpsAlternative :: Function -> Alternative -> Gen Alternative
-cpsAlternative origin (Alternative pattern expr) =
+        return $
+            Bind [fnPtr] (FunctionPointer contFnName) $
+            Bind [] (Write frameVar 1 fnPtr) $
+            use frameVar
+
+cpsAlternative :: Function -> Variable -> Alternative -> Gen Alternative
+cpsAlternative origin frameVar (Alternative pattern expr) =
     case pattern of
         NodePat (FunctionName fn n) args ->
             Alternative
                 (NodePat (FunctionName fn (n+1)) args)
-                <$> cpsBlock origin expr
-        _ -> Alternative pattern <$> cpsBlock origin expr
+                <$> cpsBlock origin frameVar expr
+        _ -> Alternative pattern <$> cpsBlock origin frameVar expr
 
 
 
 stdContinuation :: Variable
 stdContinuation = Variable (Name [] "cont" 0) FramePtr
 
-
-
+frameSize :: Block -> Int
+frameSize block =
+    case block of
+        Bind _ (Restore n) rest -> max n (frameSize rest)
+        Bind _ _ rest -> frameSize rest
+        Return{} -> 0
+        Case _scrut _default [] -> 0
+        Case _scrut _default alts -> maximum
+            [ frameSize branch | Alternative _ branch <- alts ]
+        TailCall{} -> 0
+        Exit -> 0
 

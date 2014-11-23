@@ -55,7 +55,7 @@ lowerBlock block =
             --let saveReg (reg, var) = Bind [] (WriteGlobal reg var)
             let restoreReg (reg, var) = Bind [var] (ReadGlobal reg)
             rest' <- lowerBlock rest
-            return $ -- flip (foldr saveReg) allRegs $ 
+            return $ -- flip (foldr saveReg) allRegs $
                 Bind binds (Application fn (regs ++ args)) $
                 foldr restoreReg rest' allRegs
         Bind binds simple rest ->
@@ -68,6 +68,9 @@ lowerBlock block =
         Exit -> return Exit
         Return{} -> return block
         Panic{} -> return block
+        Invoke fn args -> do
+            regs <- asks Map.elems
+            return $ Invoke fn (regs ++ args)
         _ -> error $ "lower registers: " ++ show block
 
 lowerAlternative :: Alternative -> Lower Alternative

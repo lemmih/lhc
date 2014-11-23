@@ -36,6 +36,7 @@ data CType
 	| IWord
 	| CPointer CType
 	| CVoid
+	| CFunction CType [CType]
 	-- CFloat
 	-- CDouble
 	deriving (Show, Eq, Ord)
@@ -103,13 +104,17 @@ data Expression
 	-- Built-in
 	| Alloc Int
 	| Store NodeName [Variable]
+	| BumpHeapPtr Int
 	| Write Variable Int Variable
 	| Address Variable Int
+	| FunctionPointer Name
 
 	| Fetch MemAttributes Variable
 	| Load MemAttributes Variable Int
 	| Add Variable Variable
 	| Undefined
+	| Save Variable Int
+	| Restore Int
 
 	-- Global variables.
 	| ReadRegister String

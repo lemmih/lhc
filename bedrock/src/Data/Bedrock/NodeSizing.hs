@@ -55,6 +55,7 @@ traverseExpression hpt expr =
     case expr of
         Store node vars -> Store node (map (setVariableSize hpt) vars)
         Application fn vars -> Application fn (map (setVariableSize hpt) vars)
+        TypeCast var -> TypeCast (setVariableSize hpt var)
         _ -> expr
 
 traverseAlternative :: HPTResult -> Function -> Alternative -> Gen Alternative

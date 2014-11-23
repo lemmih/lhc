@@ -94,6 +94,7 @@ simplifyExpression expr =
         Application fn vars -> Application fn <$> mapM resolve vars
         Eval var -> Eval <$> resolve var
         MkNode name vars -> MkNode name <$> mapM resolve vars
+        TypeCast var -> TypeCast <$> resolve var
         _ -> pure expr
 
 

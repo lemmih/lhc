@@ -12,14 +12,21 @@ import           Data.Bedrock
 data Env = Env
     { envModule    :: Module
     , envUnique    :: Int
+    , envHelpers   :: [Function]
     , envFunctions :: Map Name Function }
 type Gen a = State Env a
 
 modifyModule :: (Module -> Module) -> Gen ()
 modifyModule fn = modify $ \st -> st{envModule = fn (envModule st)}
 
+pushHelper :: Function -> Gen ()
+pushHelper fn = modify $ \st -> st{envHelpers = fn : envHelpers st}
+
 pushFunction :: Function -> Gen ()
-pushFunction fn = modifyModule $ \m -> m{functions = functions m ++ [fn]}
+pushFunction fn = do
+    helpers <- gets envHelpers
+    modify $ \st -> st{envHelpers = []}
+    modifyModule $ \m -> m{functions = functions m ++ fn:helpers}
 
 pushNode :: NodeDefinition -> Gen ()
 pushNode n = modifyModule $ \m -> m{ nodes = n : nodes m }
@@ -86,6 +93,7 @@ runGen gen initModule =
     m = Env
         { envModule = initModule{functions = []}
         , envUnique = 0
+        , envHelpers = []
         , envFunctions = Map.fromList
             [ (fnName fn, fn) | fn <- functions initModule]
         }
@@ -163,9 +171,13 @@ freeVariablesSimple simple =
             Set.insert ptr
         Add lhs rhs ->
             Set.insert lhs . Set.insert rhs
+        Undefined -> id
+        Save var _n -> Set.insert var
+        Restore{} -> id
         ReadRegister{} -> id
         WriteRegister _reg var -> Set.insert var
         Address var _idx -> Set.insert var
+        FunctionPointer{} -> id
         TypeCast var -> Set.insert var
         Eval var ->
             Set.insert var

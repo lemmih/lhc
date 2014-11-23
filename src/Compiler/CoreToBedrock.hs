@@ -32,11 +32,14 @@ import           Language.Haskell.TypeCheck.Monad (mkBuiltIn)
 --    print (ppModule bedrock)
     --compileWithOpts True True "FromHaskell.rock" bedrock
 
+entrypointName :: Name
+entrypointName = Name ["Main"] "entrypoint" 0
+
 convert :: Core.Module -> Bedrock.Module
 convert m = Bedrock.Module
   { modForeigns  = Core.coreForeigns m
   , nodes        = map convertNodeDefinition (Core.coreNodes m)
-  , entryPoint   = Name ["Main"] "entrypoint" 0
+  , entryPoint   = entrypointName
   , functions    = fns
   , modNamespace = ns }
   where
@@ -152,6 +155,22 @@ convertTcType tcTy =
         TcUndefined -> NodePtr
         _ -> error $ "CoreToBedrock: Unknown type: " ++ show tcTy
 
+setProgramExit :: Block -> Block
+setProgramExit block =
+    case block of
+        Bedrock.Case scrut mbDefault alts ->
+            Bedrock.Case scrut mbDefault
+                [ Alternative pattern (setProgramExit branch)
+                | Alternative pattern branch <- alts ]
+        Bind binds expr rest -> Bind binds expr (setProgramExit rest)
+        Return{} -> Exit
+        Raise{} -> error "setProgramExit"
+        TailCall{} -> error "setProgramExit"
+        Invoke{} -> error "setProgramExit"
+        InvokeHandler{} -> error "setProgramExit"
+        Exit -> Exit
+        Panic msg -> Panic msg
+
 convertDecl :: Core.Decl -> M ()
 convertDecl (Core.Decl _ty name (Lam vars expr)) = do
     vars' <- mapM convertVariable vars
@@ -162,7 +181,9 @@ convertDecl (Core.Decl _ty name (Lam vars expr)) = do
             , fnAttributes = []
             , fnArguments = vars'
             , fnResults = [Node]
-            , fnBody = body
+            , fnBody = if name == entrypointName
+                        then setProgramExit body
+                        else body
             }
     tell [fn]
 convertDecl (Core.Decl _ty name (WithCoercion _ expr)) =
@@ -175,7 +196,9 @@ convertDecl (Core.Decl _ty name expr) = do
             , fnAttributes = []
             , fnArguments = []
             , fnResults = [Node]
-            , fnBody = body
+            , fnBody = if name == entrypointName
+                        then setProgramExit body
+                        else body
             }
     tell [fn]
 

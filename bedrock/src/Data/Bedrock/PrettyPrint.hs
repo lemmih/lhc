@@ -34,6 +34,8 @@ instance Pretty CType where
 	pretty I64 = text "i64"
 	pretty IWord = text "word"
 	pretty (CPointer ty) = pretty ty <> Doc.char '*'
+	pretty (CFunction retTy argTys) =
+		pretty retTy <> Doc.parens (ppList (map pretty argTys))
 	pretty CVoid = text "void"
 
 instance Pretty NodeDefinition where
@@ -90,11 +92,15 @@ ppExpression simple =
 		Store node args ->
 			ppSyntax "@store" <+>
 			Doc.parens (ppNode node (map pretty args))
+		BumpHeapPtr n ->
+			ppSyntax "@bump" <+> Doc.int n
 		Write ptr idx var ->
 			ppSyntax "@write" <+>
 			pretty ptr <> Doc.brackets (Doc.int idx) <+> pretty var
 		Address ptr idx ->
 			ppSyntax "&" <> pretty ptr <> Doc.brackets (Doc.int idx)
+		FunctionPointer fn ->
+			ppSyntax "&" <> pretty fn
 		Fetch attr ptr ->
 			ppSyntax "@fetch" <+> pretty attr <+> pretty ptr
 		Load attr ptr nth ->
@@ -104,6 +110,10 @@ ppExpression simple =
 			ppSyntax "@add" <+> pretty lhs <+> pretty rhs
 		Undefined ->
 			ppSyntax "@undefined"
+		Save var n ->
+			ppSyntax "@save" <> Doc.brackets (Doc.int n) <+> pretty var
+		Restore n ->
+			ppSyntax "@restore" <> Doc.brackets (Doc.int n)
 		Application fn args ->
 			pretty fn <> Doc.parens (ppList $ map pretty args)
 		CCall fn args ->
@@ -165,8 +175,8 @@ ppBlock block =
 			ppSyntax "@tail" <+>
 			pretty fn <> Doc.parens (ppList (map pretty args))
 		Invoke cont args ->
-			ppSyntax "@invoke" <>
-			Doc.parens (ppList (pretty cont : map pretty args))
+			ppSyntax "@invoke" <+> pretty cont <>
+			Doc.parens (ppList (map pretty args))
 		InvokeHandler cont exception ->
 			ppSyntax "@invokeHandler" <>
 			Doc.parens (ppList $ map pretty [cont, exception])

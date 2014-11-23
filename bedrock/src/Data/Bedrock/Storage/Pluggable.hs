@@ -49,7 +49,7 @@ runGC m action =
 --GCAllocate n -> call pluginAllocate(n)
 --GCInit -> call pluginInit
 --GCBegin -> call
---GCEnd -> call 
+--GCEnd -> call
 --GCMark -> call
 --GCMarkNode -> ?
 
@@ -85,6 +85,7 @@ lowerBlock expr =
         TailCall{} -> return expr
         Exit -> return expr
         Panic{} -> return expr
+        Invoke{} -> return expr
         _ -> error $ "Storage.Pluggable: Unhandled: " ++ show expr
 
 lowerAlternative :: Alternative -> StorageManager -> Alternative
@@ -112,7 +113,7 @@ lowerExpression binds simple rest sm =
     ret s = Bind binds s rest
 
 -----------------------------------------------------------
--- 
+--
 
 newName :: String -> GC Name
 newName identifier = do

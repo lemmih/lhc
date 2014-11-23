@@ -16,6 +16,7 @@ import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.RegisterIntroduction
 import           Data.Bedrock.Rename
 import           Data.Bedrock.Simplify
+import qualified Data.Bedrock.StackLayout as StackLayout
 import           Data.Bedrock
 import           Data.Bedrock.NodeSizing
 import           Data.Bedrock.Storage
@@ -96,16 +97,28 @@ compileWithOpts keepIntermediateFiles verbose path m = do
 
 stdPipeline :: Pipeline
 stdPipeline =
-        [ "rename"          :> simplify . unique
+        [ "orig"            :> id
+        , "rename"          :> simplify . unique
         , PerformHPT
         , "no-laziness"     :?> runGen . lowerEvalApply
-        , "no-exceptions"   :> unique . runGen cpsTransformation
-        , PerformHPT
-        , "no-invoke"       :?> runGen . lowerInvoke
         , "no-unknown-size" :?> runGen . lowerNodeSize
-        , "no-nodes"        :> unique . registerIntroduction
+        , "no-nodes"        :> simplify . unique . registerIntroduction
+        , "no-stack"        :> StackLayout.lower
+        , "no-stack"        :> unique . runGen cpsTransformation
+        -- , "no-invoke"       :?> runGen . lowerInvoke
         , "no-allocs"       :> unique . runGen lowerAlloc
         , "no-gc"           :> unique . lowerGC fixedGC
         , "no-globals"      :> unique . lowerGlobalRegisters
         ]
-
+        -- [ "rename"          :> simplify . unique
+        -- , PerformHPT
+        -- , "no-laziness"     :?> runGen . lowerEvalApply
+        -- , "no-exceptions"   :> unique . runGen cpsTransformation
+        -- , PerformHPT
+        -- , "no-invoke"       :?> runGen . lowerInvoke
+        -- , "no-unknown-size" :?> runGen . lowerNodeSize
+        -- , "no-nodes"        :> unique . registerIntroduction
+        -- , "no-allocs"       :> unique . runGen lowerAlloc
+        -- , "no-gc"           :> unique . lowerGC fixedGC
+        -- , "no-globals"      :> unique . lowerGlobalRegisters
+        -- ]

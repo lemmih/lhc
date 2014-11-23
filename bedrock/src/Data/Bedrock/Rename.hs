@@ -184,10 +184,12 @@ uniqSimple simple =
             pure (Alloc n)
         Store nodeName vars ->
             Store <$> resolveNodeName nodeName <*> mapM resolve vars
+        BumpHeapPtr n -> pure $ BumpHeapPtr n
         Write ptr idx var ->
             Write <$> resolve ptr <*> pure idx <*> resolve var
         Address var idx ->
             Address <$> resolve var <*> pure idx
+        FunctionPointer fn -> FunctionPointer <$> resolveName fn
         Fetch constant var ->
             Fetch constant <$> resolve var
         Load constant var idx ->
@@ -195,6 +197,8 @@ uniqSimple simple =
         Add a b ->
             Add <$> resolve a <*> resolve b
         Undefined -> pure Undefined
+        Save var nth -> Save <$> resolve var <*> pure nth
+        Restore nth -> pure $ Restore nth
         Eval var ->
             Eval <$> resolve var
         Apply a b ->
