@@ -97,8 +97,7 @@ compileWithOpts keepIntermediateFiles verbose path m = do
 
 stdPipeline :: Pipeline
 stdPipeline =
-        [ "orig"            :> id
-        , "rename"          :> simplify . unique
+        [ "rename"          :> simplify . unique
         , PerformHPT
         , "no-laziness"     :?> runGen . lowerEvalApply
         , "no-unknown-size" :?> runGen . lowerNodeSize
