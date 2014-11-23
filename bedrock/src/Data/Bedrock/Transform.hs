@@ -163,6 +163,7 @@ freeVariablesSimple simple =
             id
         Store _constructor args ->
             Set.union (Set.fromList args)
+        BumpHeapPtr{} -> id
         Write ptr _idx var ->
             Set.insert ptr . Set.insert var
         Fetch _ ptr ->

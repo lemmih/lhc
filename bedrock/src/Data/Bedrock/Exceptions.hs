@@ -7,13 +7,11 @@ module Data.Bedrock.Exceptions
 
 import           Control.Applicative           (pure, (<$>), (<*>))
 import           Control.Monad.State
-import           Data.List                     ((\\))
-import qualified Data.Set                      as Set
 import qualified Data.Map as Map
 
 import           Data.Bedrock
 import           Data.Bedrock.Transform
-import           Data.Bedrock.Misc (constantMemory, anyMemory)
+import           Data.Bedrock.Misc (anyMemory)
 
 stackFrameName :: Name
 stackFrameName = Name ["bedrock"] "StackFrame" 0
@@ -162,4 +160,5 @@ frameSize block =
             [ frameSize branch | Alternative _ branch <- alts ]
         TailCall{} -> 0
         Exit -> 0
+        _ -> error "Data.Bedrock.Exceptions.frameSize"
 

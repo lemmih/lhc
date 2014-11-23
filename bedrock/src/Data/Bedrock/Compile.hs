@@ -9,7 +9,7 @@ import           Data.Bedrock.EvalApply
 import           Data.Bedrock.Exceptions
 import           Data.Bedrock.GlobalVariables
 import           Data.Bedrock.HPT
-import           Data.Bedrock.Invoke
+-- import           Data.Bedrock.Invoke
 import           Data.Bedrock.LLVM                 as LLVM
 import           Data.Bedrock.Parse
 import           Data.Bedrock.PrettyPrint
