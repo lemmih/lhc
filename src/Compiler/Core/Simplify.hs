@@ -19,17 +19,24 @@ simplify m = m
         App a b -> App (expr a) (expr b)
         Lam a (Lam b rest) -> expr (Lam (a++b) rest)
         Lam vars rest -> Lam vars (expr rest)
-        -- Let (NonRec bind rhs) (Var bind') | bind == bind' ->
-        --     expr rhs
+        Let (NonRec bind rhs) e | (Var bind', apps) <- collectApps e
+                                , varName bind == varName bind' ->
+            foldl App (expr rhs) apps
         Let bind rest -> Let (letBind bind) (expr rest)
+        LetStrict bind e1 e2 -> LetStrict bind (expr e1) (expr e2)
         Case scrut alts -> Case (expr scrut) (map alt alts)
         Cast rest ty -> Cast (expr rest) ty
         Id -> e
         WithCoercion (CoerceAp []) rest -> expr rest
         WithCoercion (CoerceAbs []) rest -> expr rest
+        WithCoercion CoerceId rest -> expr rest
         WithCoercion coercion rest -> WithCoercion coercion (expr rest)
     alt (Alt pattern branch) = Alt pattern (expr branch)
     letBind (NonRec bind rhs) = NonRec bind (expr rhs)
     letBind (Rec binds) = Rec [ (bind, expr rhs) | (bind, rhs) <- binds ]
 
-
+collectApps :: Expr -> (Expr, [Expr])
+collectApps = worker []
+  where
+    worker acc (App a b) = worker (b:acc) a
+    worker acc other = (other, reverse acc)

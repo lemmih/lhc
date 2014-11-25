@@ -154,7 +154,7 @@ compileExecutable deps file = do
     putStrLn "Converting to core..."
     let core = Haskell.convert env m'
         libraryCore = mconcat (map (snd . snd) ifaces)
-        complete = Core.simplify $ NewType.lower $ mappend libraryCore core
+        complete = Core.simplify $ Core.simplify $ NewType.lower $ mappend libraryCore core
     print (pretty complete)
 
     let bedrock = Core.convert complete

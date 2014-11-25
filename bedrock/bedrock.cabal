@@ -30,6 +30,7 @@ library
                        Data.Bedrock.Misc
                        Data.Bedrock.NodeSizing
                        Data.Bedrock.Simplify
+                       Data.Bedrock.StackLayout
                        Data.Bedrock.LLVM
                        Data.Bedrock.LLVMGen
                        Data.Bedrock.GlobalVariables

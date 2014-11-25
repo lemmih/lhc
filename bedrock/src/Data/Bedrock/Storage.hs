@@ -166,13 +166,13 @@ transformExpresion origin binds simple rest =
                     -- gc_evacuate ptrs
                     Bind [] GCEnd $
                     TailCall continueName markedScope
-            pushFunction Function
+            pushHelper Function
                 { fnName = continueName
                 , fnAttributes = []
                 , fnArguments = scope
                 , fnResults = []
                 , fnBody = rest }
-            pushFunction Function
+            pushHelper Function
                 { fnName = divertName
                 , fnAttributes = []
                 , fnArguments = scope

@@ -74,6 +74,7 @@ data Expr
     | App Expr Expr
     | Lam [Variable] Expr
     | Let LetBind Expr
+    | LetStrict Variable Expr Expr
     | Case Expr [Alt]
     | Cast Expr TcType
     | Id
@@ -117,6 +118,9 @@ instance Pretty Expr where
                 pretty cont
             Let (NonRec name e1) e2 ->
                 text "let" <+> ppTypedVariable name <+> equals <+> pretty e1 <$$>
+                pretty e2
+            LetStrict name e1 e2 ->
+                text "let" <+> char '!' <> ppTypedVariable name <+> equals <+> pretty e1 <$$>
                 pretty e2
 
 ppTypedVariable :: Variable -> Doc

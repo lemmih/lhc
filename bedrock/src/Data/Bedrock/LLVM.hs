@@ -18,6 +18,7 @@ import           System.FilePath
 import           LLVM.General
 import           LLVM.General.AST                   as LLVM
 import           LLVM.General.AST.AddrSpace         as LLVM
+import           LLVM.General.AST.Attribute         as LLVM
 import           LLVM.General.AST.CallingConvention as LLVM
 import           LLVM.General.AST.Constant          ()
 import qualified LLVM.General.AST.Constant          as Constant
@@ -86,6 +87,7 @@ toLLVM bedrock = defaultModule
                     , linkage = LLVM.Internal
                     , Global.callingConvention = Fast
                     , basicBlocks = blocks
+                    , Global.functionAttributes = []
                     }
     mainDef = do
         let wordPtrTy = PointerType (IntegerType 64) (AddrSpace 0)

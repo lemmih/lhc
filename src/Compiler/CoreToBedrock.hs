@@ -4,12 +4,8 @@ module Compiler.CoreToBedrock where
 
 import           Compiler.Core hiding (Variable(..),NodeDefinition(..),UnboxedPat)
 import qualified Compiler.Core                   as Core
-import qualified Compiler.HaskellToCore          as Haskell
 import           Data.Bedrock                    as Bedrock
 import           Data.Bedrock.Misc
-import           Data.Bedrock.PrettyPrint
-import qualified Language.Haskell.Exts.Annotated as HS
-import           Language.Haskell.Scope          (resolve)
 
 import           Control.Applicative
 import           Control.Monad.Reader
@@ -18,19 +14,8 @@ import           Control.Monad.RWS
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 
-import Data.Bedrock.Compile
 import Language.Haskell.TypeCheck.Types (TcType(..))
 import           Language.Haskell.TypeCheck.Monad (mkBuiltIn)
-
---test :: IO ()
---test = do
---    HS.ParseOk m <- HS.parseFile "BedrockIO.hs"
---    let (errs, m') = resolve m
---    mapM_ print errs
---    let core = Haskell.convert m'
---    let bedrock = convert core
---    print (ppModule bedrock)
-    --compileWithOpts True True "FromHaskell.rock" bedrock
 
 entrypointName :: Name
 entrypointName = Name ["Main"] "entrypoint" 0
@@ -224,7 +209,8 @@ collectApps = worker []
     worker acc expr =
         case expr of
             App a b -> worker (b:acc) a
-            _ -> (expr, reverse acc)
+            WithCoercion _ e -> worker acc e
+            _ -> (expr, acc)
 
 convertExpr :: Bool -> Core.Expr -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
 convertExpr lazy expr rest =
@@ -265,19 +251,62 @@ convertExpr lazy expr rest =
                     tmp <- newVariable [] "thunk" NodePtr
                     Bind [tmp] (Store (FunctionName fn arity) [])
                         <$> rest [tmp]
-        Var v | not lazy -> do
-            v' <- convertVariable v
-            let fn = variableName v'
-            mbArity <- lookupArity fn
-            case mbArity of
-                Nothing -> do
-                    tmp <- deriveVariable v' "eval" Node
-                    Bind [tmp] (Eval v')
-                        <$> rest [tmp]
-                Just arity -> do
-                    tmp <- newVariable [] "thunk" Node
-                    Bind [tmp] (MkNode (FunctionName fn arity) [])
-                        <$> rest [tmp]
+        _ | (Var v, args) <- collectApps expr, lazy ->
+            convertExprs args $ \args' -> do
+                v' <- convertVariable v
+                let fn = variableName v'
+                mbArity <- lookupArity fn
+                case mbArity of
+                    Just arity | arity >= length args' -> do
+                        tmp <- newVariable [] "thunk" NodePtr
+                        Bind [tmp] (Store (FunctionName fn (arity-length args')) args')
+                            <$> rest [tmp]
+                    -- Just arity | arity < length args' -> do
+                    Nothing -> do
+                        body <- do
+                            tmp <- deriveVariable v' "eval" Node
+                            Bind [tmp] (Eval v')
+                                <$> applyMany tmp args' (\next -> pure $ Return [next])
+                        scope <- asks envScope
+                        node <- pushFunction (Left "ap") body
+                        tmp <- newVariable [] "ap" NodePtr
+                        Bind [tmp] (Store (FunctionName node 0) scope)
+                            <$> rest [tmp]
+        _ | (Var v, args) <- collectApps expr, not lazy ->
+            convertExprs args $ \args' -> do
+                v' <- convertVariable v
+                let fn = variableName v'
+                mbArity <- lookupArity fn
+                case mbArity of
+                    Nothing -> do
+                        tmp <- deriveVariable v' "eval" Node
+                        Bind [tmp] (Eval v')
+                            <$> rest [tmp]
+                    Just arity | arity == length args' -> do
+                        tmp <- newVariable [] "thunk" Node
+                        Bind [tmp] (Application fn args')
+                            <$> rest [tmp]
+                    Just arity | arity < length args' -> do
+                        tmp <- newVariable [] "thunk" Node
+                        Bind [tmp] (Application fn (take arity args'))
+                            <$> applyMany tmp (drop arity args') (\next -> rest [next])
+                    Just arity -> do
+                        tmp <- newVariable [] "thunk" Node
+                        Bind [tmp] (MkNode (FunctionName fn (arity-length args')) args')
+                            <$> rest [tmp]
+        -- Var v | not lazy -> do
+        --     v' <- convertVariable v
+        --     let fn = variableName v'
+        --     mbArity <- lookupArity fn
+        --     case mbArity of
+        --         Nothing -> do
+        --             tmp <- deriveVariable v' "eval" Node
+        --             Bind [tmp] (Eval v')
+        --                 <$> rest [tmp]
+        --         Just arity -> do
+        --             tmp <- newVariable [] "thunk" Node
+        --             Bind [tmp] (MkNode (FunctionName fn arity) [])
+        --                 <$> rest [tmp]
         Core.Lit (Core.LitString str) -> do
             tmp <- newVariable [] "lit" (Primitive (CPointer I8))
             Bind [tmp] (Bedrock.Literal (LiteralString str))
@@ -343,6 +372,10 @@ convertExpr lazy expr rest =
                 name' <- convertVariable name
                 Bind [name'] (TypeCast val) <$> convertExpr lazy e2 rest
 
+        LetStrict name e1 e2 ->
+            convertExpr False e1 $ \[val] -> do
+                name' <- convertVariable name
+                Bind [name'] (TypeCast val) <$> convertExpr lazy e2 rest
 
 
 
@@ -359,6 +392,13 @@ convertExprs (x:xs) fn =
     convertExpr True x $ \v ->
     convertExprs xs $ \vs ->
     fn (v ++ vs)
+
+applyMany :: Variable -> [Variable] -> (Variable -> M Block) -> M Block
+applyMany node [] fn = fn node
+applyMany node (x:xs) fn = do
+    ret <- deriveVariable node "apply" Node
+    Bind [ret] (Apply node x)
+        <$> applyMany ret xs fn
 
 deriveVariable :: Variable -> String -> Type -> M Variable
 deriveVariable (Variable (Name orig ident _) _) tag ty = do
