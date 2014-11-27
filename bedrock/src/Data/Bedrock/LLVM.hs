@@ -72,6 +72,12 @@ toLLVM bedrock = defaultModule
   where
     dataLayout = defaultDataLayout
     defs = execGenModule (mkEnv bedrock) $ do
+            newDefinition $ GlobalDefinition functionDefaults
+                    { name = LLVM.Name "exit"
+                    , returnType = VoidType
+                    , parameters = ([ Parameter (IntegerType 32) (UnName 0) []], False)
+                    }
+
             mainDef
             forM_ (functions bedrock) $ \Bedrock.Function{..} -> do
                 blocks <- genBlocks $ blockToLLVM fnBody
@@ -233,11 +239,6 @@ blockToLLVM = worker
                     , metadata = [] }
                 return $ Ret Nothing []
             Exit -> do
-                newDefinition $ GlobalDefinition functionDefaults
-                    { name = LLVM.Name "exit"
-                    , returnType = VoidType
-                    , parameters = ([ Parameter (IntegerType 32) (UnName 0) []], False)
-                    }
                 doInst $ Call
                     { isTailCall = False
                     , callingConvention = C
@@ -275,6 +276,16 @@ blockToLLVM = worker
                 return $ Unreachable []
             _ -> do
                 traceLLVM $ "Bedrock: Unreachable"
+                doInst $ Call
+                    { isTailCall = False
+                    , callingConvention = C
+                    , returnAttributes = []
+                    , function = Right $ ConstantOperand $ Constant.GlobalReference
+                                    VoidType
+                                    (LLVM.Name "exit")
+                    , arguments = [ (ConstantOperand $ Constant.Int 32 1, []) ]
+                    , functionAttributes = []
+                    , metadata = [] }
                 return $ Unreachable []
 
     -- mkInst retTy expr | trace ("Expr: " ++ show expr) False = undefined
