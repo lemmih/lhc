@@ -37,25 +37,6 @@ import           Distribution.Simple.Compiler
 
 import           Paths_lhc
 
--- testInfer :: IO ()
--- testInfer = do
---     ParseOk m <- parseFile "src/Test.hs"
---     let (resolveEnv, errs, m') = resolve emptyResolveEnv m
---     mapM_ print errs
---     _env <- runTI (tiModule m')
---     return ()
-
---testCompile :: IO ()
---testCompile = do
---    ParseOk m <- parseFile "src/BedrockIO.hs"
---    let (errs, m') = resolve m
---    mapM_ print errs
---    env <- runTI (tiModule m')
---    let core = Haskell.convert env m'
---    let bedrock = Core.convert core
---    print (ppModule bedrock)
---    --compileWithOpts True True "FromHaskell.rock" bedrock
-
 main :: IO ()
 main = Compiler.customMain customCommands lhcCompiler
 
@@ -135,7 +116,9 @@ loadLibrary pkgInfo =
 compileExecutable :: [InstalledPackageId] -> FilePath -> IO ()
 compileExecutable deps file = do
     putStrLn $ "Loading deps: " ++ show deps
-    pkgs <- readPackagesInfo (Proxy :: Proxy (StandardDB LHC)) [GlobalPackageDB, UserPackageDB] deps
+    pkgs <- readPackagesInfo
+                (Proxy :: Proxy (StandardDB LHC))
+                [GlobalPackageDB, UserPackageDB] deps
     ifaces <- concat <$> mapM loadLibrary pkgs
     let scope =
             [ (modName, toScopeInterface iface)
@@ -146,7 +129,7 @@ compileExecutable deps file = do
     ParseOk m <- parseFile file
     putStrLn "Origin analysis..."
     let (resolveEnv, errs, m') = resolve scopeEnv m
-        Just scopeIface = lookupInterface (getModuleName m) resolveEnv
+        Just _scopeIface = lookupInterface (getModuleName m) resolveEnv
     mapM_ print errs
     putStrLn "Typechecking..."
     let env = addAllToTcEnv (map (fst . snd) ifaces) emptyTcEnv
