@@ -1,4 +1,4 @@
-# The Luxurious Haskell Compiler.
+# The LLVM Haskell Compiler.
 
 LHC is an optimizing Haskell compiler.
 
@@ -22,7 +22,7 @@ The wish list is ordered by priority.
 - MultiParamTypeClasses.
 - TypeFamilies.
 - OverloadedStrings.
-- Superoptimization.
+- Supercompilation.
 - User-friendly type-checking.
 - Whole-program optimization.
 - Immix GC.
@@ -35,7 +35,8 @@ LHC uses haskell-packages (part of the Haskell Suite) to seemlessly integrate wi
 
 ### Exceptions.
 
-For reasons of simplicity, exception handling is not implemented through stack inspection. Rather, exceptional values are passed through the call stack like regular values. The overhead of checking for exceptional values after each function call should be minimal since returned values are not placed on the heap.
+Exceptions are handled by walking the list of stack frames until a handler
+is found.
 
 ### IO Manager.
 
@@ -47,7 +48,16 @@ TBD.
 
 ### Garbage collection.
 
-TBD.
+Garbage collection is handled in ordinary LLVM core. If an allocation fails,
+we then mark the nodes (ie. objects that live in registers or on the stack)
+and heap pointers. After the GC has completed, we call the current continuation
+with the updated nodes and heap pointers.
+
+GC strategies are built as plugins.
+
+#### Fixed GC
+
+This GC strategy allocates a block of memory at program start and never reclaims it.
 
 ### Arbitrary precision integers.
 
