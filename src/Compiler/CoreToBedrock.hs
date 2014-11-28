@@ -225,22 +225,12 @@ convertExpr lazy expr rest =
         --    convertExpr False scrut $ \vars ->
         _ | (Con name, args) <- collectApps expr ->
             convertExprs args $ \args' -> do
-                tmp <- newVariable [] "con" NodePtr
+                let ty = if lazy then NodePtr else Node
+                    con = if lazy then Store else MkNode
+                tmp <- newVariable [] "con" ty
                 Just arity <- lookupArity name
-                Bind [tmp] (Store (ConstructorName name (arity-length args)) args')
+                Bind [tmp] (con (ConstructorName name (arity-length args)) args')
                     <$> rest [tmp]
-        Con name | lazy -> do
-            tmp <- newVariable [] "con" NodePtr
-            -- args' <- mapM convertVariable args
-            Just arity <- lookupArity name
-            Bind [tmp] (Store (ConstructorName name arity) [])
-                <$> rest [tmp]
-        Con name | not lazy -> do
-            tmp <- newVariable [] "con" Node
-            -- args' <- mapM convertVariable args
-            Just arity <- lookupArity name
-            Bind [tmp] (MkNode (ConstructorName name arity) [])
-                <$> rest [tmp]
         Var v | lazy -> do
             v' <- convertVariable v
             let fn = variableName v'
