@@ -111,6 +111,8 @@ tiPat pat =
         PTuple _ Unboxed pats -> do
             patTys <- mapM tiPat pats
             return $ TcUnboxedTuple patTys
+        PLit _ _sign literal ->
+            tiLit literal
         _ -> error $ "tiPat: " ++ show pat
 
 tiRhs :: Rhs Origin -> TI TcType

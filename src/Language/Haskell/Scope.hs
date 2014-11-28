@@ -514,6 +514,12 @@ resolveQualConDecl (QualConDecl src mbTyVarBinds ctx conDecl) =
         <*> resolveMaybe resolveContext ctx
         <*> resolveConDecl conDecl
 
+resolveSign :: Resolve Sign
+resolveSign sign = pure $
+    case sign of
+        Signless src -> Signless (Origin None src)
+        Negative src -> Negative (Origin None src)
+
 resolvePat :: Resolve Pat
 resolvePat pat =
     case pat of
@@ -532,6 +538,10 @@ resolvePat pat =
         PTuple src boxed pats ->
             PTuple (Origin None src) boxed
                 <$> mapM resolvePat pats
+        PLit src sign lit ->
+            PLit (Origin None src)
+                <$> resolveSign sign
+                <*> resolveLiteral lit
         _ -> error $ "resolvePat: " ++ show pat
 
 -- resolveGuardedAlts :: Resolve GuardedAlts
