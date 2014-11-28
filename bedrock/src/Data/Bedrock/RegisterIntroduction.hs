@@ -192,7 +192,7 @@ uniqAlternative args (Alternative pattern branch) =
             flatVars <- resolveMany vars
             Alternative
                 <$> pure (NodePat nodeName [])
-                <*> (bindMany (zip flatVars args)
+                <*> (bindMany (zip flatVars (args ++ repeat undefinedVariable))
                         <$> uniqBlock branch)
 
 
