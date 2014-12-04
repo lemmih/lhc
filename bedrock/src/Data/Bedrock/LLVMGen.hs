@@ -59,7 +59,7 @@ anonGlobal :: Monad m => Global -> GenT m Name
 anonGlobal global = do
   n <- get
   put $ n+1
-  let name = UnName n
+  let name = Name ("global_"++show n)
   newDefinition $ GlobalDefinition global{ name = name }
   return name
 
