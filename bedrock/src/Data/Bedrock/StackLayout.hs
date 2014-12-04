@@ -47,7 +47,7 @@ lowerBlock :: Block -> M Block
 lowerBlock block =
     case block of
       Bind binds expr@Application{} rest -> do
-        let free = Set.toList (freeVariables block)
+        let free = Set.toList (freeVariables rest) \\ binds
         trimStackMap free $
           allotStackPositions free $ \mapped ->
           saveVariables mapped $

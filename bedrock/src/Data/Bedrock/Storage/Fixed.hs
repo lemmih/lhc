@@ -20,12 +20,12 @@ fixedGC = do
     pushForeign $ Foreign
         { foreignName = "calloc"
         , foreignReturn = CPointer I8
-        , foreignArguments = [I64, I64] }
+        , foreignArguments = [I32, I32] }
     initName <- newName "fixed_gc_init"
     rawPtr <- newVariable "ptr" (Primitive (CPointer I8))
     hp <- newVariable "hp" NodePtr
-    wordSize <- newVariable "size" (Primitive IWord)
-    heapSize <- newVariable "heapSize" (Primitive IWord)
+    wordSize <- newVariable "size" (Primitive I32)
+    heapSize <- newVariable "heapSize" (Primitive I32)
     beginName <- newName "fixed_gc_begin"
     endName <- newName "fixed_gc_end"
     markName <- newName "fixed_gc_mark"
@@ -33,7 +33,7 @@ fixedGC = do
     let initFn = Function initName [] [] [] $
             Bind [wordSize] (Literal (LiteralInt 8)) $
             Bind [heapSize] (Literal (LiteralInt 1024)) $
-            Bind [rawPtr] (CCall "calloc" [wordSize, heapSize]) $
+            Bind [rawPtr] (CCall "calloc" [heapSize, wordSize]) $
             Bind [hp] (TypeCast rawPtr) $
             Bind [] (WriteGlobal "hp" hp) $
             Return []

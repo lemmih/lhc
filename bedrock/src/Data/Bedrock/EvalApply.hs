@@ -59,9 +59,13 @@ mkEvalBody hpt var = do
     let body =
             Case preEvalObject Nothing (map mkAlt (Map.keys objects))
         mkAlt name@(FunctionName fn 0) =
-            let args = hptFnArgs hpt Map.! fn in
+            let args = hptFnArgs hpt Map.! fn
+                [retVar] = hptFnRets hpt Map.! fn
+                ret = Variable evalRet (StaticNode $ sizeOfVariable hpt retVar) in
             Alternative (NodePat name args) $
-            TailCall fn args
+            -- TailCall fn args
+            Bind [ret] (Application fn args) $
+            Return [ret]
         mkAlt name@(FunctionName fn n) =
             let args = reverse . drop n . reverse $ hptFnArgs hpt Map.! fn
                 ret = Variable evalRet (StaticNode (length args+1)) in

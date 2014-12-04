@@ -65,7 +65,7 @@ toLLVM bedrock = defaultModule
             , type' = PointerType (IntegerType 64) (AddrSpace 0)
             , initializer = Just $ Constant.Null $ PointerType (IntegerType 64) (AddrSpace 0)
             , section = Nothing
-            , alignment = 64 }
+            , alignment = 1 }
         | reg <- Set.toList $ allRegisters bedrock ] ++
         defs
     }
@@ -301,7 +301,7 @@ blockToLLVM = worker
                             (typeToLLVM variableType)
                             (nameToLLVM variableName)
             , maybeAtomicity = Nothing
-            , alignment = 8
+            , alignment = 1
             , metadata = [] }
     mkInst retTy (CCall "cast" [Variable{..}]) = return $
         castReference (typeToLLVM variableType) (nameToLLVM variableName) retTy
@@ -354,7 +354,7 @@ blockToLLVM = worker
                             (LLVM.Name $ "bedrock:" ++ reg)
             , value = LocalReference (typeToLLVM variableType) (nameToLLVM variableName)
             , maybeAtomicity = Nothing
-            , alignment = 64
+            , alignment = 1
             , metadata = []
             }
     mkInst retTy (ReadGlobal reg) = return LLVM.Load
@@ -363,7 +363,7 @@ blockToLLVM = worker
                             (PointerType retTy (AddrSpace 0))
                             (LLVM.Name $ "bedrock:" ++ reg)
             , maybeAtomicity = Nothing
-            , alignment = 64
+            , alignment = 1
             , metadata = [] }
     mkInst retTy (Bedrock.Load attrs Variable{..} offset) = do
         offsetPtr <- anonInst $ GetElementPtr
@@ -380,7 +380,7 @@ blockToLLVM = worker
                             (typeToLLVM variableType)
                             offsetPtr
             , maybeAtomicity = Nothing
-            , alignment = 64
+            , alignment = 1
             , metadata =
                 if memConstant attrs
                     then [("invariant.load", MetadataNode [])]
@@ -407,7 +407,7 @@ blockToLLVM = worker
                             (IntegerType 64)
                             casted
             , maybeAtomicity = Nothing
-            , alignment = 64
+            , alignment = 1
             , metadata = [] }
     mkInst retTy (Address ptr offset) =
         return $ GetElementPtr

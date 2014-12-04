@@ -48,9 +48,14 @@ cpsBlock origin frameVar block =
             cpsExpresion origin frameVar binds simple rest
         Return args -> do
             node <- newVariable "contNode" (Primitive IWord)
+            let size = case fnResults origin of
+                        [StaticNode n] -> n
+                        _ -> length args
+            -- We need to invoke with at least 1+'size' arguments.
+            -- 'node' is repeated here. Could be Undefined as well. Doesn't matter.
             return $
                 Bind [node] (Load anyMemory stdContinuation 1) $
-                Invoke node (stdContinuation : args)
+                Invoke node (stdContinuation : take size (args ++ repeat node))
         Case scrut defaultBranch alternatives ->
             Case scrut
                 <$> maybe (return Nothing) (fmap Just . cpsBlock origin frameVar) defaultBranch
@@ -152,6 +157,7 @@ stdContinuation = Variable (Name [] "cont" 0) FramePtr
 frameSize :: Block -> Int
 frameSize block =
     case block of
+        Bind _ Application{} rest -> max 2 (frameSize rest)
         Bind _ (Restore n) rest -> max n (frameSize rest)
         Bind _ _ rest -> frameSize rest
         Return{} -> 0
