@@ -25,6 +25,9 @@ lowerNodeSize hpt = do
             , fnResults = typedRets }
     return ()
 
+traverseMaybe :: (a -> Gen a) -> Maybe a -> Gen (Maybe a)
+traverseMaybe _ Nothing = return Nothing
+traverseMaybe fn (Just val) = Just <$> fn val
 
 traverseBlock :: HPTResult -> Function -> Block -> Gen Block
 traverseBlock hpt origin block =
@@ -36,7 +39,7 @@ traverseBlock hpt origin block =
                 <$> traverseBlock hpt origin rest
         Case scrut defaultBranch alternatives ->
             Case (setVariableSize hpt scrut)
-                <$> pure defaultBranch
+                <$> traverseMaybe (traverseBlock hpt origin) defaultBranch
                 <*> mapM (traverseAlternative hpt origin) alternatives
         Return vars ->
             pure $ Return (map (setVariableSize hpt) vars)
@@ -70,5 +73,6 @@ traversePattern hpt pattern =
     case pattern of
         NodePat node vars -> NodePat node (map (setVariableSize hpt) vars)
         LitPat{} -> pattern
+        -- VarPat var -> VarPat (setVariableSize hpt var)
 
 

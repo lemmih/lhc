@@ -34,7 +34,7 @@ traverseBlock hpt origin expr =
                 traverseBlock hpt origin rest
         Case scrut defaultBranch alternatives ->
             Case scrut
-                <$> pure defaultBranch
+                <$> maybe (return Nothing) (fmap Just . traverseBlock hpt origin) defaultBranch
                 <*> mapM (traverseAlternative hpt origin) alternatives
         other -> return other
 
@@ -127,7 +127,7 @@ mkApplyBody hpt obj arg = do
             Alternative (NodePat name args) $
             Bind [applyRet] (MkNode (ConstructorName fn (n-1)) (args++[applyArg])) $
             Return [applyRet]
-        mkAlt _ = error "mkApply"
+        mkAlt name = error $ "mkApply: " ++ show name
     return (applyObj, applyArg, body)
 
 mkApply :: HPTResult -> Function -> Variable -> Variable -> Variable

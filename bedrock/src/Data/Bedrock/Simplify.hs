@@ -72,10 +72,15 @@ simplifyBlock block =
             Bind <$> mapM resolve binds
                 <*> simplifyExpression simple
                 <*> simplifyBlock rest
-        Case scrut defaultBranch alts ->
+        Case scrut Nothing alts ->
             Case
                 <$> resolve scrut
-                <*> pure defaultBranch
+                <*> pure Nothing
+                <*> mapM simplifyAlternative alts
+        Case scrut (Just defaultBranch) alts ->
+            Case
+                <$> resolve scrut
+                <*> (Just <$> simplifyBlock defaultBranch)
                 <*> mapM simplifyAlternative alts
         Return vars -> Return <$> mapM resolve vars
         TailCall fnName vars -> TailCall fnName <$> mapM resolve vars

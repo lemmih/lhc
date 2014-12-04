@@ -40,7 +40,7 @@ transformBlock origin block =
     case block of
         Case scrut defaultBranch alternatives ->
             Case scrut
-                <$> pure defaultBranch
+                <$> transformMaybe (transformBlock origin) defaultBranch
                 <*> mapM (transformAlternative origin) alternatives
         Bind binds simple rest ->
             transformExpresion origin binds simple =<<

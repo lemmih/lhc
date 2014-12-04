@@ -156,6 +156,11 @@ uniqAlternative (Alternative pattern branch) =
                         <$> resolveNodeName nodeName
                         <*> mapM resolve vars)
                     <*> uniqBlock branch
+        -- VarPat var ->
+        --     renameVariables [var] $
+        --         Alternative
+        --             <$> (VarPat <$> resolve var)
+        --             <*> uniqBlock branch
         -- UnboxedPat vars ->
         --     renameVariables vars $
         --         Alternative

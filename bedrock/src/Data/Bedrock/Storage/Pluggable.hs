@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Bedrock.Storage.Pluggable where
 
-import Control.Applicative ( Applicative, (<$>) )
+import Control.Applicative ( Applicative, (<$>), (<*>) )
 import Control.Monad.State
 import Control.Monad.Reader
 
@@ -79,8 +79,10 @@ lowerBlock expr =
     case expr of
         Bind binds simple rest ->
             lowerExpression binds simple =<< lowerBlock rest
-        Case scrut defaultBranch alts ->
-            Case scrut defaultBranch <$> mapM lowerAlternative alts
+        Case scrut Nothing alts ->
+            Case scrut Nothing <$> mapM lowerAlternative alts
+        Case scrut (Just branch) alts ->
+            Case scrut <$> (Just <$> lowerBlock branch) <*> mapM lowerAlternative alts
         Return{} -> return expr
         TailCall{} -> return expr
         Exit -> return expr

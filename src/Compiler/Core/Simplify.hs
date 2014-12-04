@@ -16,6 +16,7 @@ simplify m = m
         UnboxedTuple{} -> e
         Lit{} -> e
         WithExternal{} -> e
+        ExternalPure{} -> e
         App a b -> App (expr a) (expr b)
         Lam a (Lam b rest) -> expr (Lam (a++b) rest)
         Lam vars rest -> Lam vars (expr rest)
@@ -24,7 +25,10 @@ simplify m = m
             foldl App (expr rhs) apps
         Let bind rest -> Let (letBind bind) (expr rest)
         LetStrict bind e1 e2 -> LetStrict bind (expr e1) (expr e2)
-        Case scrut alts -> Case (expr scrut) (map alt alts)
+        Case scrut var (Just (Case (Var scrut') var' mbDef alts')) alts | varName var == varName scrut' ->
+            expr $ Case scrut var mbDef (alts ++ alts')
+        Case scrut var defaultBranch alts ->
+            Case (expr scrut) var (fmap expr defaultBranch) (map alt alts)
         Cast rest ty -> Cast (expr rest) ty
         Id -> e
         WithCoercion (CoerceAp []) rest -> expr rest

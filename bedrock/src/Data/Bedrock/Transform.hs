@@ -16,6 +16,10 @@ data Env = Env
     , envFunctions :: Map Name Function }
 type Gen a = State Env a
 
+transformMaybe :: (a -> Gen a) -> Maybe a -> Gen (Maybe a)
+transformMaybe _ Nothing  = return Nothing
+transformMaybe f (Just a) = Just `fmap` f a
+
 modifyModule :: (Module -> Module) -> Gen ()
 modifyModule fn = modify $ \st -> st{envModule = fn (envModule st)}
 
@@ -118,11 +122,14 @@ freeVariables block = freeVariables' block Set.empty
 freeVariables' :: Block -> Set Variable -> Set Variable
 freeVariables' block =
     case block of
-        Case scrut _defaultBranch alternatives ->
+        Case scrut defaultBranch alternatives ->
             foldr (.) (Set.insert scrut)
             [ flip Set.difference (freeVariablesPattern pattern Set.empty) .
               freeVariables' branch
-            | Alternative pattern branch <- alternatives ]
+            | Alternative pattern branch <- alternatives ] .
+            case defaultBranch of
+                Nothing -> id
+                Just branch -> freeVariables' branch
         Bind binds simple rest ->
             freeVariablesSimple simple .
             flip Set.difference (Set.fromList binds) .
@@ -147,6 +154,7 @@ freeVariablesPattern pattern =
     case pattern of
         NodePat _ vars -> Set.union (Set.fromList vars)
         LitPat{}       -> id
+        -- VarPat var     -> Set.insert var
 
 freeVariablesSimple :: Expression -> Set Variable -> Set Variable
 freeVariablesSimple simple =

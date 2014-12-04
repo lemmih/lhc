@@ -258,7 +258,8 @@ countStores = getSum . execWriter . mapM_ countFn . functions
     countFn = countExpr . fnBody
     countExpr expr =
         case expr of
-            Case _scrut _mbDefaultBranch alts ->
+            Case _scrut defaultBranch alts -> do
+                maybe (return ()) countExpr defaultBranch
                 mapM_ countAlt alts
             Bind _binds simple rest ->
                 countSimple simple >> countExpr rest
@@ -510,6 +511,9 @@ hptAlternative origin scrut (Alternative pattern branch) = do
                             setNodeScope arg =<< getNodeScope' var
                     StaticNode{} ->
                         error "HPT: Static node found during analysis."
+        -- VarPat var -> do
+        --     -- setNodeScope var =<< getNodeScope scrut
+        --     return ()
     hptBlock origin branch
 
 hptModule :: Module -> HPT s ()
@@ -522,9 +526,7 @@ hptBlock :: Function -> Block -> HPT s ()
 hptBlock origin block =
     case block of
         Case scrut defaultBranch alternatives -> do
-            case defaultBranch of
-                Nothing -> return ()
-                Just branch -> hptBlock origin branch
+            maybe (return ()) (hptBlock origin) defaultBranch
             mapM_ (hptAlternative origin scrut) alternatives
         Bind binds simple rest -> do
             hptExpression origin binds simple
@@ -763,9 +765,10 @@ analyseUsage m =
     analyseFunction = analyseBlock . fnBody
     analyseBlock block =
         case block of
-            Case scrut _defaultBranch alts -> do
+            Case scrut defaultBranch alts -> do
                 push scrut
                 mapM_ analyseAlternative alts
+                maybe (return ()) analyseBlock defaultBranch
             Bind _binds expr rest -> do
                 analyseExpression expr
                 analyseBlock rest

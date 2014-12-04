@@ -18,14 +18,15 @@ lower m = m
         UnboxedTuple{} -> e
         Lit{} -> e
         WithExternal{} -> e
+        ExternalPure{} -> e
         App (Con con) b | isNewtype con -> expr b
         App a b -> App (expr a) (expr b)
         Lam vars rest -> Lam vars (expr rest)
         Let bind rest -> Let (letBind bind) (expr rest)
         LetStrict bind e1 e2 -> LetStrict bind (expr e1) (expr e2)
-        Case scrut [Alt (ConPat con [arg]) branch]
+        Case scrut _ _def [Alt (ConPat con [arg]) branch]
           | isNewtype con -> Let (NonRec arg scrut) (expr branch)
-        Case scrut alts -> Case (expr scrut) (map alt alts)
+        Case scrut var defaultBranch alts -> Case (expr scrut) var (fmap expr defaultBranch) (map alt alts)
         Cast rest ty -> Cast (expr rest) ty
         Id -> e
         WithCoercion coercion rest -> WithCoercion coercion (expr rest)

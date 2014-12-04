@@ -194,6 +194,10 @@ uniqAlternative args (Alternative pattern branch) =
                 <$> pure (NodePat nodeName [])
                 <*> (bindMany (zip flatVars (args ++ repeat undefinedVariable))
                         <$> uniqBlock branch)
+        -- VarPat var ->
+        --     Alternative
+        --         <$> pure (VarPat var)
+        --         <*> uniqBlock branch
 
 
 uniqMaybe :: (a -> Uniq a) -> Maybe a -> Uniq (Maybe a)

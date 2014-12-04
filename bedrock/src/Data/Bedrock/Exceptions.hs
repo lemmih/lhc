@@ -53,7 +53,7 @@ cpsBlock origin frameVar block =
                 Invoke node (stdContinuation : args)
         Case scrut defaultBranch alternatives ->
             Case scrut
-                <$> pure defaultBranch
+                <$> maybe (return Nothing) (fmap Just . cpsBlock origin frameVar) defaultBranch
                 <*> mapM (cpsAlternative origin frameVar) alternatives
         Raise exception -> do
             node <- newVariable "contNode" Node
@@ -155,9 +155,11 @@ frameSize block =
         Bind _ (Restore n) rest -> max n (frameSize rest)
         Bind _ _ rest -> frameSize rest
         Return{} -> 0
-        Case _scrut _default [] -> 0
-        Case _scrut _default alts -> maximum
-            [ frameSize branch | Alternative _ branch <- alts ]
+        Case _scrut defaultBranch alts -> maximum
+            ((case defaultBranch of
+                Nothing -> 0
+                Just branch -> frameSize branch) :
+            [ frameSize branch | Alternative _ branch <- alts ])
         TailCall{} -> 0
         Exit -> 0
         _ -> error "Data.Bedrock.Exceptions.frameSize"

@@ -4,7 +4,7 @@ module Data.Bedrock.GlobalVariables
     ( lowerGlobalRegisters
     , allRegisters ) where
 
-import           Control.Applicative    (Applicative, (<$>))
+import           Control.Applicative    (Applicative, (<$>), (<*>))
 import           Control.Monad.Reader
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
@@ -61,7 +61,9 @@ lowerBlock block =
         Bind binds simple rest ->
             Bind binds simple <$> lowerBlock rest
         Case scrut defaultBranch alts ->
-            Case scrut defaultBranch <$> mapM lowerAlternative alts
+            Case scrut
+                <$> maybe (return Nothing) (fmap Just . lowerBlock) defaultBranch
+                <*> mapM lowerAlternative alts
         TailCall fn args -> do
             regs <- asks Map.elems
             return $ TailCall fn (regs ++ args)
@@ -95,8 +97,9 @@ allRegisters m = foldr (.) id (map byFn (functions m)) Set.empty
                 Set.insert reg . byExpression rest
             Bind _ _ rest ->
                 byExpression rest
-            Case _scrut _defaultBranch alts ->
-                foldr (.) id (map byAlt alts)
+            Case _scrut defaultBranch alts ->
+                foldr (.) id (map byAlt alts) .
+                maybe id byExpression defaultBranch
             _ -> id
     byAlt (Alternative _pattern branch) = byExpression branch
 

@@ -325,6 +325,9 @@ toCType ty =
             | qname == mkBuiltIn "LHC.Prim" "Int32" ->
                 I32
         TcCon qname
+            | qname == mkBuiltIn "LHC.Prim" "I64" ->
+                I64
+        TcCon qname
             | qname == mkBuiltIn "LHC.Prim" "Unit" ->
                 CVoid
         TcApp (TcCon qname) ty'
@@ -374,49 +377,57 @@ convertType ty =
 -- \cint -> WithExternal cfun [cint] boxed
 convertExternal :: String -> TcType -> M Expr
 convertExternal "realWorld" _ty = return (Lit (LitInt 0))
-convertExternal cName ty = do
-    args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
-    primArgs <- return args
-    primOut <- Variable <$> newName "primOut" <*> pure i32
-    s <- Variable <$> newName "s" <*> pure (TcCon $ mkBuiltIn "LHC.Prim" "RealWorld")
-    boxed <- Variable <$> newName "boxed" <*> pure retType
-
-    io <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IO"
-    -- ioUnit <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IOUnit"
-    cint <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "Int32"
-
-    return $
-        Lam args $
-        let action = Lam [s] $
-                WithExternal primOut cName primArgs s $
-                Let (NonRec boxed $ App (Con cint) (Var primOut)) $
-                UnboxedTuple [s, boxed]
-        in (App (Con io) action)
-  where
-    (argTypes, isIO@True, retType) = ffiTypes ty
-    i32 = TcCon $ mkBuiltIn "LHC.Prim" "I32"
 convertExternal cName ty
-    | isIO      = do
-        out <- newName "out"
-        boxed <- newName "boxed"
-        let outV = Variable out retType
-            boxedV = Variable boxed retType
+    | isIO = do
+        args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
+        primArgs <- return args
+        primOut <- Variable <$> newName "primOut" <*> pure i32
+        s <- Variable <$> newName "s" <*> pure (TcCon $ mkBuiltIn "LHC.Prim" "RealWorld")
+        boxed <- Variable <$> newName "boxed" <*> pure retType
+
         io <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IO"
-        unit <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IOUnit"
+        -- ioUnit <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IOUnit"
         cint <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "Int32"
-        pure $ Lam args $ App (Lam [tmp] (App (Con io) (Var tmp)))
-                (Lam [s]
-            (WithExternal outV cName args s
-                (Let (NonRec boxedV $ App (Con cint) (Var outV)) $
-                    App (App (Con unit) (Var boxedV)) (Var s))))
-    -- | otherwise = pure $ Lam args (ExternalPure cName retType args)
+
+        return $
+            Lam args $
+            let action = Lam [s] $
+                    WithExternal primOut cName primArgs s $
+                    Let (NonRec boxed $ App (Con cint) (Var primOut)) $
+                    UnboxedTuple [s, boxed]
+            in (App (Con io) action)
+    | otherwise = do -- not isIO
+        args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
+        primOut <- Variable <$> newName "primOut" <*> pure retType
+        return $
+            Lam args $
+            ExternalPure primOut cName args $
+            Var primOut
   where
-    tmp = Variable (Name [] "tmp" 0) TcUndefined
-    s = Variable (Name [] "s" 0) TcUndefined -- NodePtr
     (argTypes, isIO, retType) = ffiTypes ty
-    args =
-        [ Variable (Name [] "arg" 0) t -- (Primitive t)
-        | t <- argTypes ]
+    i32 = TcCon $ mkBuiltIn "LHC.Prim" "I32"
+-- convertExternal cName ty
+--     | isIO      = do
+--         out <- newName "out"
+--         boxed <- newName "boxed"
+--         let outV = Variable out retType
+--             boxedV = Variable boxed retType
+--         io <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IO"
+--         unit <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IOUnit"
+--         cint <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "Int32"
+--         pure $ Lam args $ App (Lam [tmp] (App (Con io) (Var tmp)))
+--                 (Lam [s]
+--             (WithExternal outV cName args s
+--                 (Let (NonRec boxedV $ App (Con cint) (Var outV)) $
+--                     App (App (Con unit) (Var boxedV)) (Var s))))
+--     -- | otherwise = pure $ Lam args (ExternalPure cName retType args)
+--   where
+--     tmp = Variable (Name [] "tmp" 0) TcUndefined
+--     s = Variable (Name [] "s" 0) TcUndefined -- NodePtr
+--     (argTypes, isIO, retType) = ffiTypes ty
+--     args =
+--         [ Variable (Name [] "arg" 0) t -- (Primitive t)
+--         | t <- argTypes ]
 
 --packCType :: CType -> Expr -> M Expr
 --packCType
@@ -474,10 +485,15 @@ convertExp expr =
                 <$> sequence [ bindVariable name
                         | HS.PVar _ name <- pats ]
                 <*> convertExp sub
-        HS.Case _ scrut alts ->
-            Case
-                <$> convertExp scrut
-                <*> mapM convertAlt alts
+        HS.Case _ scrut alts -> do
+            scrut' <- convertExp scrut
+            scrutVar <- Variable <$> newName "scrut" <*> exprType scrut'
+            def <- convertAlts scrutVar alts
+            return $ Case scrut' scrutVar (Just def) []
+            -- Case
+            --     <$> convertExp scrut
+            --     <*> pure Nothing
+            --     <*> mapM convertAlt alts
         HS.Lit _ lit -> pure $ Lit (convertLiteral lit)
         HS.Tuple  _ HS.Unboxed exprs -> do
             vars <- forM exprs $ \(HS.Var _ name) -> do
@@ -486,6 +502,54 @@ convertExp expr =
                 return $ Variable n ty
             return $ UnboxedTuple vars
         _ -> error $ "convertExp: " ++ show expr
+
+convertAlts :: Variable -> [HS.Alt Origin] -> M Expr
+convertAlts scrut [] = pure $ Case (Var scrut) scrut Nothing []
+convertAlts scrut [HS.Alt _ pat rhs Nothing] =
+    convertAltPat scrut Nothing pat =<< convertRhs rhs
+convertAlts scrut (HS.Alt _ pat rhs Nothing:alts) = do
+    rest <- convertAlts scrut alts
+    restBranch <- Variable <$> newName "branch" <*> exprType rest
+    if isSimplePat pat
+        then
+            convertAltPat scrut (Just rest) pat =<< convertRhs rhs
+        else do
+            e <- convertAltPat scrut (Just $ Var restBranch) pat =<< convertRhs rhs
+            return $ Let (NonRec restBranch rest) e
+
+isSimplePat :: HS.Pat Origin -> Bool
+isSimplePat pat =
+    case pat of
+        HS.PApp _ name pats -> all isPVar pats
+        HS.PVar{} -> True
+        HS.PLit{} -> True
+        _ -> False
+  where
+    isPVar HS.PVar{} = True
+    isPVar _ = False
+
+convertAltPat :: Variable -> Maybe Expr -> HS.Pat Origin -> Expr -> M Expr
+convertAltPat scrut failBranch pat successBranch =
+    case pat of
+        HS.PApp _ name pats -> do
+            args <- sequence [ Variable <$> bindName var <*> lookupType var
+                             | HS.PVar _ var <- pats ]
+            alt <- Alt <$> (ConPat <$> resolveQGlobalName name <*> pure args)
+                <*> pure successBranch
+            return $ Case (Var scrut) scrut failBranch [alt]
+        HS.PTuple _ HS.Unboxed pats -> do
+            args <- sequence [ Variable <$> bindName var <*> lookupType var
+                             | HS.PVar _ var <- pats ]
+            alt <- Alt (UnboxedPat args)
+                <$> pure successBranch
+            return $ Case (Var scrut) scrut failBranch [alt]
+        HS.PVar _ var -> do
+            var' <- Variable <$> bindName var <*> lookupType var
+            return $ Let (NonRec var' (Var scrut)) successBranch
+        HS.PLit _ _sign lit -> do
+            alt <- Alt (LitPat $ convertLiteral lit)
+                <$> pure successBranch
+            return $ Case (Var scrut) scrut failBranch [alt]
 
 convertAlt :: HS.Alt Origin -> M Alt
 convertAlt alt =
@@ -500,7 +564,13 @@ convertAlt alt =
                              | HS.PVar _ var <- pats ]
             Alt (UnboxedPat args)
                 <$> convertRhs rhs
-        _ -> error "convertAlt"
+        HS.Alt _ (HS.PLit _ _sign lit) rhs Nothing ->
+            Alt (LitPat $ convertLiteral lit)
+                <$> convertRhs rhs
+        -- HS.Alt _ (HS.PVar _ var) rhs Nothing ->
+        --     Alt <$> (VarPat <$> (Variable <$> bindName var <*> lookupType var))
+        --         <*> convertRhs rhs
+        _ -> error $ "convertAlt: " ++ show alt
 
 
 convertLiteral :: HS.Literal Origin -> Literal
@@ -518,3 +588,19 @@ toGlobalName qname =
   where
     Origin info _ = HS.ann qname
 
+exprType :: Expr -> M TcType
+exprType expr =
+    case expr of
+        Var v -> return (varType v)
+        App a b -> do
+            aType <- exprType a
+            case aType of
+                TcFun _ ret -> return ret
+                TcForall _ (_ :=> TcFun _ ret) -> return ret
+                _ -> return TcUndefined
+        WithCoercion _ e -> exprType e
+        Let _ e -> exprType e
+        LetStrict _ _ e -> exprType e
+        Case _ _ (Just e) _ -> exprType e
+        Case _ _ Nothing (Alt _ e:_) -> exprType e
+        _ -> return TcUndefined

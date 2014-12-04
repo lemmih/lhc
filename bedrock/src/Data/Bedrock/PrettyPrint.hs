@@ -68,6 +68,7 @@ ppPattern pattern =
 		NodePat name binds -> ppNode name (map pretty binds)
 		LitPat lit         -> ppLiteral lit
 		-- UnboxedPat binds   -> Doc.text "(#" <+> ppList (map pretty binds) <+> Doc.text "#)"
+		-- VarPat var         -> pretty var
 
 ppList :: [Doc] -> Doc
 ppList = Doc.hsep . Doc.punctuate (Doc.char ',')
@@ -166,9 +167,14 @@ ppBlock block =
 			text "=" <+>
 			ppExpression simple Doc.<$$>
 			ppBlock rest
-		Case scrut _defaultBranch alts ->
+		Case scrut Nothing alts ->
 			ppSyntax "case" <+> pretty scrut <+> ppSyntax "of" Doc.<$$>
 			Doc.indent 2 (Doc.vsep $ map ppAlternative alts)
+		Case scrut (Just branch) alts ->
+			ppSyntax "case" <+> pretty scrut <+> ppSyntax "of" Doc.<$$>
+			Doc.indent 2 (Doc.vsep (map ppAlternative alts ++
+				[text "DEFAULT" <+> text "→" Doc.<$$>
+					Doc.indent 2 (ppBlock branch)]))
 		Raise obj ->
 			ppSyntax "@raise" <+> pretty obj
 		TailCall fn args ->

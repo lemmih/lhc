@@ -70,12 +70,12 @@ data Expr
     | UnboxedTuple [Variable]
     | Lit Literal
     | WithExternal Variable String [Variable] Variable Expr
-    -- | ExternalPure String CType [Variable]
+    | ExternalPure Variable String [Variable] Expr
     | App Expr Expr
     | Lam [Variable] Expr
     | Let LetBind Expr
     | LetStrict Variable Expr Expr
-    | Case Expr [Alt]
+    | Case Expr Variable (Maybe Expr) [Alt]
     | Cast Expr TcType
     | Id
     | WithCoercion Coercion Expr
@@ -103,9 +103,13 @@ instance Pretty Expr where
                 pretty a <+> parens (pretty b)
             Lam vars e ->
                 char 'λ' <+> ppTypedVars vars <+> rarrow <$$> indent 2 (pretty e)
-            Case scrut alts ->
-                text "case" <+> pretty scrut <+> text "of" <$$>
+            Case scrut var Nothing alts ->
+                text "case" <+> pretty scrut <+> text "of" <+> ppTypedVariable var <$$>
                 indent 2 (vsep $ map pretty alts)
+            Case scrut var (Just defaultBranch) alts ->
+                text "case" <+> pretty scrut <+> text "of" <+> ppTypedVariable var <$$>
+                indent 2 (vsep (map pretty alts) <$$>
+                    text "DEFAULT" <+> rarrow <$$> indent 2 (pretty defaultBranch))
             Cast expr ty ->
                 parens (pretty expr <+> text ":::" <+> pretty ty)
             Id -> text "id"
@@ -116,8 +120,12 @@ instance Pretty Expr where
                 ppTypedVariable outV <+> text "←" <+>
                     text "external" <+> pretty cName <+> ppVars args <$$>
                 pretty cont
+            ExternalPure outV cName args cont ->
+                ppTypedVariable outV <+> text "←" <+>
+                    text "external" <+> pretty cName <+> ppVars args <$$>
+                pretty cont
             Let (NonRec name e1) e2 ->
-                text "let" <+> ppTypedVariable name <+> equals <+> pretty e1 <$$>
+                text "let" <+> ppTypedVariable name <+> equals <+> hang 0 (pretty e1) <$$>
                 pretty e2
             LetStrict name e1 e2 ->
                 text "let" <+> char '!' <> ppTypedVariable name <+> equals <+> pretty e1 <$$>
@@ -146,6 +154,7 @@ data Pattern
     = ConPat Name [Variable]
     | LitPat Literal
     | UnboxedPat [Variable]
+    -- | VarPat Variable
     deriving ( Show )
 
 instance Pretty Pattern where
@@ -158,6 +167,8 @@ instance Pretty Pattern where
                 text "(#" <+>
                 (hsep $ punctuate comma $ map pretty vars) <+>
                 text "#)"
+            -- VarPat var ->
+            --     ppTypedVariable var
 
 -- All unlifted.
 data Literal

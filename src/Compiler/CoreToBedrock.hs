@@ -138,6 +138,7 @@ convertTcType tcTy =
         TcCon{} -> NodePtr
         TcApp{} -> NodePtr
         TcUndefined -> NodePtr
+        _ -> NodePtr
         _ -> error $ "CoreToBedrock: Unknown type: " ++ show tcTy
 
 setProgramExit :: Block -> Block
@@ -156,8 +157,33 @@ setProgramExit block =
         Exit -> Exit
         Panic msg -> Panic msg
 
+convertResultType :: TcType -> Type
+convertResultType tcTy =
+    case tcTy of
+        TcApp (TcCon qname) sub
+            | qname == mkBuiltIn "LHC.Prim" "Addr"
+                -> case convertTcType sub of
+                     Primitive prim -> Primitive (CPointer prim)
+                     _ -> error $ "CoreToBedrock: Addr must be primitive: " ++ show sub
+        TcCon qname
+            | qname == mkBuiltIn "LHC.Prim" "I8"
+                 -> Primitive I8
+        TcCon qname
+            | qname == mkBuiltIn "LHC.Prim" "I32"
+                 -> Primitive I32
+        TcCon qname
+            | qname == mkBuiltIn "LHC.Prim" "I64"
+                 -> Primitive I64
+        TcFun _ a -> convertResultType a
+        _ -> Node
+
+-- XXX: Move this function.
+isPrimitive :: Type -> Bool
+isPrimitive Primitive{} = True
+isPrimitive _ = False
+
 convertDecl :: Core.Decl -> M ()
-convertDecl (Core.Decl _ty name (Lam vars expr)) = do
+convertDecl (Core.Decl ty name (Lam vars expr)) = do
     vars' <- mapM convertVariable vars
     body <- local (\env -> env{envRoot = name}) $
             bind vars' $ convertExpr False expr (pure . Return)
@@ -165,7 +191,7 @@ convertDecl (Core.Decl _ty name (Lam vars expr)) = do
             { fnName = name
             , fnAttributes = []
             , fnArguments = vars'
-            , fnResults = [Node]
+            , fnResults = [convertResultType ty]
             , fnBody = if name == entrypointName
                         then setProgramExit body
                         else body
@@ -245,8 +271,13 @@ convertExpr lazy expr rest =
             convertExprs args $ \args' -> do
                 v' <- convertVariable v
                 let fn = variableName v'
+                    fnRetTy = convertResultType (Core.varType v)
                 mbArity <- lookupArity fn
                 case mbArity of
+                    Just arity | arity == length args' && isPrimitive fnRetTy -> do
+                        tmp <- newVariable [] "thunk" fnRetTy
+                        Bind [tmp] (Application fn args')
+                            <$> rest [tmp]
                     Just arity | arity >= length args' -> do
                         tmp <- newVariable [] "thunk" NodePtr
                         Bind [tmp] (Store (FunctionName fn (arity-length args')) args')
@@ -266,14 +297,19 @@ convertExpr lazy expr rest =
             convertExprs args $ \args' -> do
                 v' <- convertVariable v
                 let fn = variableName v'
+                    fnRetTy = convertResultType (Core.varType v)
                 mbArity <- lookupArity fn
                 case mbArity of
-                    Nothing -> do
-                        tmp <- deriveVariable v' "eval" Node
-                        Bind [tmp] (Eval v')
-                            <$> rest [tmp]
+                    Nothing | null args ->
+                        if variableType v' == NodePtr
+                            then do
+                                tmp <- deriveVariable v' "eval" Node
+                                Bind [tmp] (Eval v')
+                                    <$> rest [tmp]
+                            else do
+                                rest [v']
                     Just arity | arity == length args' -> do
-                        tmp <- newVariable [] "thunk" Node
+                        tmp <- newVariable [] "thunk" fnRetTy
                         Bind [tmp] (Application fn args')
                             <$> rest [tmp]
                     Just arity | arity < length args' -> do
@@ -338,10 +374,24 @@ convertExpr lazy expr rest =
         --    let tmp = Variable (Name [] "tmp" 0) Node
         --    Bind [tmp] (MkNode (FunctionName node (length v)) scope)
         --        <$> rest tmp
-        Core.Case scrut alts | not lazy ->
-            convertExpr False scrut $ \[val] ->
-            Bedrock.Case val Nothing <$>
-            mapM convertAlt alts
+        Core.Case scrut var Nothing alts | not lazy ->
+            convertExpr False scrut $ \[val] -> do
+                var' <- convertVariable var
+                -- Bind [var'] (Bedrock.TypeCast val) <$>
+                Bedrock.Case val Nothing <$>
+                        mapM convertAlt alts
+        Core.Case scrut var (Just def) alts | not lazy ->
+            convertExpr False scrut $ \[val] -> do
+                var' <- convertVariable var
+                defExpr <- convertExpr False def (pure . Return)
+                if isPrimitive (variableType var')
+                    then
+                        Bind [var'] (Bedrock.TypeCast val) <$>
+                            Bedrock.Case val (Just defExpr) <$>
+                                mapM convertAlt alts
+                    else
+                        Bedrock.Case val (Just defExpr) <$>
+                            mapM convertAlt alts
         --External external CVoid args st | not lazy -> do
         --    let tmp = Variable (Name [] "tmp" 0) NodePtr
         --        ret = Variable (Name [] "ret" 0) Node
@@ -352,6 +402,12 @@ convertExpr lazy expr rest =
         --     Bind [ret] (MkNode unit [tmp, st]))
         --        <$> rest ret
         WithExternal binder external args st scoped | not lazy -> do
+            binder' <- convertVariable binder
+            args' <- mapM convertVariable args
+            bind [binder'] $ Bind [binder'] (CCall external args')
+                <$> convertExpr False scoped rest
+
+        ExternalPure binder external args scoped | not lazy -> do
             binder' <- convertVariable binder
             args' <- mapM convertVariable args
             bind [binder'] $ Bind [binder'] (CCall external args')
@@ -404,10 +460,27 @@ convertAlt (Alt pattern branch) =
             bind args' $
               Alternative (NodePat (ConstructorName name 0) args')
                 <$> convertExpr False branch (pure . Return)
-        Core.LitPat{} -> error "convertAlt"
+        Core.LitPat lit ->
+            Alternative
+                <$> (Bedrock.LitPat <$> convertLiteral lit)
+                <*> convertExpr False branch (pure . Return)
         Core.UnboxedPat args -> do
             args' <- mapM convertVariable args
             bind args' $
                 Alternative (NodePat UnboxedTupleName args')
                     <$> convertExpr False branch (pure . Return)
+        -- Core.VarPat var -> do
+        --     var' <- convertVariable var
+        --     bind [var'] $
+        --         Alternative (Bedrock.VarPat var')
+        --             <$> convertExpr False branch (pure . Return)
 
+convertLiteral :: Core.Literal -> M Bedrock.Literal
+convertLiteral lit = pure $
+    case lit of
+        -- LitChar Char
+        LitString s -> LiteralString s
+        LitInt i -> LiteralInt i
+        -- LitWord Integer
+        -- LitFloat Rational
+        -- LitDouble Rational

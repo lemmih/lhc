@@ -93,7 +93,7 @@ toLLVM bedrock = defaultModule
                     , linkage = LLVM.Internal
                     , Global.callingConvention = Fast
                     , basicBlocks = blocks
-                    , Global.functionAttributes = []
+                    , Global.functionAttributes = [NoUnwind]
                     }
     mainDef = do
         let wordPtrTy = PointerType (IntegerType 64) (AddrSpace 0)
@@ -107,7 +107,7 @@ toLLVM bedrock = defaultModule
                 , arguments =
                     [ (ConstantOperand $ Constant.Null wordPtrTy, [])
                     , (ConstantOperand $ Constant.Null wordPtrTy, []) ]
-                , functionAttributes = []
+                , functionAttributes = [NoUnwind]
                 , metadata = [] }
         newDefinition $ GlobalDefinition functionDefaults
             { name = LLVM.Name "main"
@@ -190,7 +190,7 @@ blockToLLVM = worker
   where
     worker block = do
         case block of
-            Case Variable{..} Nothing alts -> do
+            Case Variable{..} mbDefault alts -> do
                 branches <- forM alts $ \(Alternative pattern branch) -> do
                     branchName <- newBlock $ worker branch
                     case pattern of
@@ -205,7 +205,10 @@ blockToLLVM = worker
                                    , branchName)
                         LitPat LiteralString{} ->
                             error "Data.Bedrock.LLVM: Case over unboxed strings not supported."
-                defaultName <- newBlock $ return $ Unreachable []
+                defaultName <- newBlock $
+                    case mbDefault of
+                        Nothing -> return $ Unreachable []
+                        Just branch -> worker branch
                 return $ Switch
                     { operand0' = LocalReference
                                         (typeToLLVM variableType)
@@ -235,7 +238,7 @@ blockToLLVM = worker
                             (typeToLLVM variableType)
                             (nameToLLVM variableName), [])
                         | Variable{..} <- args ]
-                    , functionAttributes = []
+                    , functionAttributes = [NoUnwind]
                     , metadata = [] }
                 return $ Ret Nothing []
             Exit -> do
@@ -271,11 +274,11 @@ blockToLLVM = worker
                             (typeToLLVM variableType)
                             (nameToLLVM variableName), [])
                         | Variable{..} <- args ]
-                    , functionAttributes = []
+                    , functionAttributes = [NoUnwind]
                     , metadata = [] }
                 return $ Unreachable []
             _ -> do
-                traceLLVM $ "Bedrock: Unreachable"
+                traceLLVM $ "Bedrock: Internal error: Unhandled construct"
                 doInst $ Call
                     { isTailCall = False
                     , callingConvention = C
@@ -289,6 +292,30 @@ blockToLLVM = worker
                 return $ Unreachable []
 
     -- mkInst retTy expr | trace ("Expr: " ++ show expr) False = undefined
+
+    -- Prim-ops
+    mkInst retTy (CCall "indexI8#" [Variable{..}]) =
+        return LLVM.Load
+            { volatile = False
+            , address = LocalReference
+                            (typeToLLVM variableType)
+                            (nameToLLVM variableName)
+            , maybeAtomicity = Nothing
+            , alignment = 8
+            , metadata = [] }
+    mkInst retTy (CCall "cast" [Variable{..}]) = return $
+        castReference (typeToLLVM variableType) (nameToLLVM variableName) retTy
+    mkInst retTy (CCall "addrAdd#" [ptr, offset]) =
+        return $ GetElementPtr
+            { inBounds = True
+            , address = LocalReference
+                            (typeToLLVM $ variableType ptr)
+                            (nameToLLVM $ variableName ptr)
+            , indices = [LocalReference
+                            (typeToLLVM $ variableType offset)
+                            (nameToLLVM $ variableName offset)]
+            , metadata = []
+            }
 
     mkInst retTy (CCall fName args) = do
         return Call

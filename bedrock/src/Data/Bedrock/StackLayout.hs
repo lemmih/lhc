@@ -57,9 +57,10 @@ lowerBlock block =
       Bind binds expr rest ->
         Bind binds expr <$> lowerBlock rest
 
-      Case scrut mbDefault alts ->
-        Case scrut mbDefault
-          <$> mapM lowerAlternative alts
+      Case scrut defaultBranch alts ->
+        Case scrut
+          <$> maybe (return Nothing) (fmap Just . lowerBlock) defaultBranch
+          <*> mapM lowerAlternative alts
       TailCall fn args -> pure $ TailCall fn args
       Exit -> pure Exit
       Panic msg -> pure $ Panic msg

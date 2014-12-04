@@ -87,9 +87,11 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps [file] = do
     putStrLn "Converting to core..."
     let core = Haskell.convert env m'
         coreFile = buildDir </> moduleFile m' <.> "core"
-    encodeFile coreFile core
-    writeFile (coreFile <.> "pretty") (show $ pretty core)
-    let bedrock = Core.convert core
+        complete = Core.simplify $ Core.simplify $ core
+    print (pretty complete)
+    encodeFile coreFile complete
+    writeFile (coreFile <.> "pretty") (show $ pretty complete)
+    let bedrock = Core.convert complete
     print (ppModule bedrock)
     let bedrockFile = replaceExtension file "bedrock"
     writeFile bedrockFile (show $ ppModule bedrock)
