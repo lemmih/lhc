@@ -43,7 +43,7 @@ simplifyBlock :: Block -> M Block
 simplifyBlock block =
     case block of
         Bind vars (Application fn args) (Return rets) | vars == rets ->
-            pure $ TailCall fn args
+            simplifyBlock $ TailCall fn args
         {-Case scrut _mbDefaultBranch
                 [Alternative (NodePat node []) branch] -> do
             clone <- cloneVariable scrut
@@ -64,11 +64,14 @@ simplifyBlock block =
                 Just (FunctionName fnName n, args) | n > 1 ->
                     simplifyBlock $
                         Bind [ret] (MkNode (FunctionName fnName (n-1)) (args ++ [arg])) rest
-                _Nothing -> Bind [ret] (Apply node arg) <$> simplifyBlock rest
+                _Nothing ->
+                    Bind [ret]
+                        <$> (Apply <$> resolve node <*> resolve arg)
+                        <*> simplifyBlock rest
         Bind [] TypeCast{} rest ->
             simplifyBlock rest
         Bind [dst] (TypeCast src) rest | variableType dst == variableType src ->
-            Bind [dst] (TypeCast src) <$>
+            -- Bind [dst] (TypeCast src) <$>
               bindVariable dst src (simplifyBlock rest)
         Bind binds simple rest ->
             Bind <$> mapM resolve binds
@@ -100,8 +103,11 @@ simplifyExpression expr =
     case expr of
         Application fn vars -> Application fn <$> mapM resolve vars
         Eval var -> Eval <$> resolve var
+        Apply a b -> Apply <$> resolve a <*> resolve b
         MkNode name vars -> MkNode name <$> mapM resolve vars
         TypeCast var -> TypeCast <$> resolve var
+        CCall fn vars -> CCall fn <$> mapM resolve vars
+        Store node vars -> Store node <$> mapM resolve vars
         _ -> pure expr
 
 
@@ -121,7 +127,10 @@ mergeAllocs block0 = applyAlloc 0 n block'
   where
     applyAlloc slob allocs block =
         case slob `compare` allocs of
-            GT -> Bind [] (BumpHeapPtr (negate (slob-allocs))) block
+            -- XXX: No need to decrement the heap pointer since allocs only
+            --      make sure there's available space but don't actually
+            --      increment the pointer.
+            GT -> block -- Bind [] (BumpHeapPtr (negate (slob-allocs))) block
             EQ -> block
             LT -> Bind [] (Alloc (allocs-slob)) block
     (n, block') = worker 0 block0
@@ -172,8 +181,11 @@ resolve var = do
     return $ Map.findWithDefault var var m
 
 bindVariable :: Variable -> Variable -> M a -> M a
-bindVariable old new = local $ \env ->
-    env{ envRenaming = Map.insert old new (envRenaming env) }
+bindVariable old new fn = do
+    new' <- resolve new
+    local
+        (\env -> env{ envRenaming = Map.insert old new' (envRenaming env) })
+        fn
 
 lookupConstant :: Variable -> M (Maybe (NodeName, [Variable]))
 lookupConstant var = do

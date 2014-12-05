@@ -12,6 +12,7 @@ import           Data.Bedrock.HPT
 -- import           Data.Bedrock.Invoke
 import           Data.Bedrock.LLVM                 as LLVM
 import           Data.Bedrock.Parse
+import           Data.Bedrock.InlineByCost
 import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.RegisterIntroduction
 import           Data.Bedrock.Rename
@@ -51,11 +52,12 @@ runPipeline keepIntermediateFiles verbose title m0 =
                 m' <- runAction n m tag (action hpt)
                 worker hpt (n+1) m' steps
             PerformHPT -> do
+                let m' = unique m
                 when verbose $
                     printf "** HPT Analysis\n"
-                let hpt' = runHPT m
+                let hpt' = runHPT m'
                 when verbose $ ppHPTResult hpt'
-                worker hpt' n m steps
+                worker hpt' n m' steps
     runAction n m tag action = do
         when verbose $
             printf "[%d] Running step %s\n" (n::Int) (show tag)
@@ -98,6 +100,7 @@ compileWithOpts keepIntermediateFiles verbose path m = do
 stdPipeline :: Pipeline
 stdPipeline =
         [ "rename"          :> simplify . unique
+        , "inlined"         :> simplify . unique . inline
         , PerformHPT
         , "no-laziness"     :?> runGen . lowerEvalApply
         , "no-unknown-size" :?> runGen . lowerNodeSize
