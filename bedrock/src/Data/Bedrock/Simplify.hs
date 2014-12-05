@@ -42,6 +42,8 @@ simplifyFunction fn = do
 simplifyBlock :: Block -> M Block
 simplifyBlock block =
     case block of
+        Bind vars (Application fn args) (Return rets) | vars == rets ->
+            pure $ TailCall fn args
         {-Case scrut _mbDefaultBranch
                 [Alternative (NodePat node []) branch] -> do
             clone <- cloneVariable scrut
