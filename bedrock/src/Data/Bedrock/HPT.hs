@@ -50,7 +50,8 @@ vector !!! idx = \ident ->
     else vector Vector.! idx
 
 data HPTResult = HPTResult
-    { hptFnArgs              :: FnArgs
+    { hptIterations          :: Int
+    , hptFnArgs              :: FnArgs
     , hptFnRets              :: FnRets
     , hptNodeArgs            :: NodeArgs
     , hptPtrScope            :: Vector HeapLocationSet
@@ -155,7 +156,8 @@ runHPT mOrigin = runST (do
     initSharedHeap <- Vector.freeze (envSharedHeapLocations env)
     let iter = appEndo iterEndo (return ())
         hptResults = HPTResult
-                { hptFnArgs = fnArgs
+                { hptIterations = 0
+                , hptFnArgs = fnArgs
                 , hptFnRets = fnRets
                 , hptNodeArgs = nodeArgs
                 , hptPtrScope = initPtrScope
@@ -174,7 +176,8 @@ runHPTLoop oldResult env iter = do
     newSharedVars <- Vector.freeze (envSharedVariables env)
     newSharedHeap <- Vector.freeze (envSharedHeapLocations env)
     let newResult = HPTResult
-                { hptFnArgs = envFnArgs env
+                { hptIterations = hptIterations oldResult
+                , hptFnArgs = envFnArgs env
                 , hptFnRets = envFnRets env
                 , hptNodeArgs = envNodeArgs env
                 , hptPtrScope = newPtrScope
@@ -186,10 +189,11 @@ runHPTLoop oldResult env iter = do
     -- a bit silly.
     if oldResult == newResult
         then return newResult
-        else runHPTLoop newResult env iter
+        else runHPTLoop newResult{hptIterations=hptIterations oldResult+1} env iter
 
 ppHPTResult :: HPTResult -> IO ()
 ppHPTResult hpt = do
+    printf "Iterations: %d\n" (hptIterations hpt)
     forM_ (zip [0..] (Vector.toList heap)) $ \(hp, hpValue) ->
         printf "HP[%d]: %s %s\n" (hp::Int) (ppObjects hpValue) (isSharedHP hp)
     forM_ (zip [0..] (Vector.toList ptrScope)) $ \(idx, HeapLocationSet ptrs) ->
