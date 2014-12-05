@@ -47,8 +47,8 @@ traverseExpression hpt origin binds simple rest =
         _                               -> return $ Bind binds simple rest
 
 
-mkEvalBody :: HPTResult -> Variable -> Gen (Variable, Variable, Block)
-mkEvalBody hpt var = do
+mkEvalBody :: HPTResult -> Int -> Variable -> Gen (Variable, Variable, Block)
+mkEvalBody hpt retSize var = do
     arg <- tagVariable "ptr" var
 
     let HeapLocationSet ptrs = hptPtrScope hpt Vector.! variableIndex var
@@ -61,11 +61,12 @@ mkEvalBody hpt var = do
         mkAlt name@(FunctionName fn 0) =
             let args = hptFnArgs hpt Map.! fn
                 [retVar] = hptFnRets hpt Map.! fn
-                ret = Variable evalRet (StaticNode $ sizeOfVariable hpt retVar) in
+                branchRetSize = sizeOfVariable hpt retVar
+                ret = Variable evalRet (StaticNode branchRetSize) in
             Alternative (NodePat name args) $
-            -- TailCall fn args
-            Bind [ret] (Application fn args) $
-            Return [ret]
+            if branchRetSize == retSize
+                then TailCall fn args
+                else Bind [ret] (Application fn args) (Return [ret])
         mkAlt name@(FunctionName fn n) =
             let args = reverse . drop n . reverse $ hptFnArgs hpt Map.! fn
                 ret = Variable evalRet (StaticNode (length args+1)) in
@@ -85,7 +86,7 @@ mkEvalBody hpt var = do
 mkEval :: HPTResult -> Function -> Variable -> Variable -> Block -> Gen Block
 mkEval hpt origin bind var rest = do
     evalName <- tagName "eval" (fnName origin)
-    (arg, preEvalObject, body) <- mkEvalBody hpt var
+    (arg, preEvalObject, body) <- mkEvalBody hpt (sizeOfVariable hpt bind) var
 
     pushFunction Function
         { fnName = evalName
@@ -100,7 +101,7 @@ mkEval hpt origin bind var rest = do
 
 mkInlineEval :: HPTResult -> Variable -> Gen Block
 mkInlineEval hpt var = do
-    (arg, preEvalObject, body) <- mkEvalBody hpt var
+    (arg, preEvalObject, body) <- mkEvalBody hpt 0 var
     return $
         Bind [arg] (TypeCast var) $
         Bind [preEvalObject] (Fetch anyMemory var) $
