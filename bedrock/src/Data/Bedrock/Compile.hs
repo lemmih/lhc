@@ -103,7 +103,7 @@ stdPipeline =
         , "no-unknown-size" :?> runGen . lowerNodeSize
         , "no-nodes"        :> simplify . unique . registerIntroduction
         , "no-stack"        :> StackLayout.lower
-        , "no-stack"        :> unique . runGen cpsTransformation
+        , "no-stack"        :> mergeAllocsModule . unique . runGen cpsTransformation
         -- , "no-invoke"       :?> runGen . lowerInvoke
         , "no-allocs"       :> unique . runGen lowerAlloc
         , "no-gc"           :> unique . lowerGC fixedGC

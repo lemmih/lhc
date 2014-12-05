@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Data.Bedrock.Simplify ( simplify ) where
+module Data.Bedrock.Simplify ( simplify, mergeAllocsModule ) where
 
 import           Control.Applicative ( Applicative, (<$>), (<*>), pure)
 import           Control.Monad.Reader
@@ -86,7 +86,7 @@ simplifyBlock block =
         TailCall fnName vars -> TailCall fnName <$> mapM resolve vars
         Exit -> pure Exit
         Panic msg -> pure $ Panic msg
-        -- _ -> return block
+        _ -> return block
 
 simplifyAlternative :: Alternative -> M Alternative
 simplifyAlternative (Alternative pattern branch) =
@@ -101,6 +101,56 @@ simplifyExpression expr =
         MkNode name vars -> MkNode name <$> mapM resolve vars
         TypeCast var -> TypeCast <$> resolve var
         _ -> pure expr
+
+
+
+
+
+
+
+-- Note: This optimisation is only valid after the CPS transformation.
+mergeAllocsModule :: Module -> Module
+mergeAllocsModule m =
+    m{ functions = [ fn{ fnBody = mergeAllocs (fnBody fn) }
+                   | fn <- functions m] }
+
+mergeAllocs :: Block -> Block
+mergeAllocs block0 = applyAlloc 0 n block'
+  where
+    applyAlloc slob allocs block =
+        case slob `compare` allocs of
+            GT -> Bind [] (BumpHeapPtr (negate (slob-allocs))) block
+            EQ -> block
+            LT -> Bind [] (Alloc (allocs-slob)) block
+    (n, block') = worker 0 block0
+    worker n block =
+        case block of
+            -- Hoist allocs out of case alternatives iff:
+            --  1. There are allocs before the Case statement, or
+            --  2. There are allocs in all of the Case branches.
+            -- Otherwise treat the branches on their own.
+            Case scrut defaultBranch alts ->
+                let hoist = n > 0 || all (>0) branches
+                    slob = blockAlloc - n
+                    maxBranchAlloc = maximum (0:branches)
+                    branches = maybe id (:) (fmap fst def) (map fst alts')
+                    def = fmap (worker 0) defaultBranch
+                    alts' = [ (branchAlloc, Alternative pattern branch'')
+                            | Alternative pattern branch <- alts
+                            , let (branchAlloc, branch') = worker 0 branch
+                            , let branch'' = applyAlloc slob branchAlloc branch' ]
+                    blockAlloc
+                        | hoist = n + maxBranchAlloc
+                        | otherwise = n
+                in (blockAlloc, Case scrut (fmap snd def) (map snd alts'))
+            Bind [] (Alloc size) rest ->
+                worker (n+size) rest
+            Bind binds expr rest ->
+                let (n', rest') = worker n rest
+                in (n', Bind binds expr rest')
+            _ -> (n, block)
+
+
 
 
 --------------------------------------------------------
