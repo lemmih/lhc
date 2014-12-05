@@ -47,6 +47,15 @@ traverseExpression hpt origin binds simple rest =
         _                               -> return $ Bind binds simple rest
 
 
+isSimpleEval :: HPTResult -> Variable -> Bool
+isSimpleEval hpt var =
+    all isWhnf (Map.keys objects)
+  where
+    HeapLocationSet ptrs = hptPtrScope hpt Vector.! variableIndex var
+    objects = mergeObjectList $ map (hptHeap hpt Vector.!) (IntSet.toList ptrs)
+    isWhnf (FunctionName _ 0) = False
+    isWhnf _ = True
+
 mkEvalBody :: HPTResult -> Int -> Variable -> Gen (Variable, Variable, Block)
 mkEvalBody hpt retSize var = do
     arg <- tagVariable "ptr" var
@@ -56,8 +65,7 @@ mkEvalBody hpt retSize var = do
         maxArgs = foldr max 0 (map Vector.length (Map.elems objects))
     preEvalObject <- newVariable "node" (StaticNode (maxArgs+1))
     evalRet <- newName "ret"
-    let body =
-            Case preEvalObject Nothing (map mkAlt (Map.keys objects))
+    let body = Case preEvalObject Nothing (map mkAlt (Map.keys objects))
         mkAlt name@(FunctionName fn 0) =
             let args = hptFnArgs hpt Map.! fn
                 [retVar] = hptFnRets hpt Map.! fn
@@ -84,6 +92,11 @@ mkEvalBody hpt retSize var = do
     return (arg, preEvalObject, body)
 
 mkEval :: HPTResult -> Function -> Variable -> Variable -> Block -> Gen Block
+mkEval hpt origin bind var rest | isSimpleEval hpt var = do
+    return $
+        Bind [bind{variableType = StaticNode (sizeOfVariable hpt bind)}]
+            (Fetch constantMemory var)
+            rest
 mkEval hpt origin bind var rest = do
     evalName <- tagName "eval" (fnName origin)
     (arg, preEvalObject, body) <- mkEvalBody hpt (sizeOfVariable hpt bind) var
