@@ -16,8 +16,10 @@ import qualified Compiler.Core.NewType              as NewType
 import qualified Compiler.Core.Simplify as Core
 import qualified Compiler.CoreToBedrock             as Core
 import qualified Compiler.HaskellToCore             as Haskell
+import qualified Compiler.Core.DCE as Core
 import           Compiler.Interface
 import qualified Data.Bedrock.Compile               as Bedrock
+import Data.Bedrock (Name(..))
 import           Control.Monad
 import           Data.Bedrock.PrettyPrint
 import           Data.Binary
@@ -139,7 +141,11 @@ compileExecutable deps file = do
     putStrLn "Converting to core..."
     let core = Haskell.convert env m'
         libraryCore = mconcat (map (snd . snd) ifaces)
-        complete = Core.simplify $ Core.simplify $ NewType.lower $ mappend libraryCore core
+        entrypoint = Name ["Main"] "entrypoint" 0
+        complete =
+            Core.simplify $ Core.simplify $
+            Core.deadCodeElimination entrypoint $
+            NewType.lower $ mappend libraryCore core
     print (pretty complete)
 
     let bedrock = Core.convert complete
