@@ -12,7 +12,7 @@ module LHC.Prim
     , return
     , unsafePerformIO
     , List(Nil,Cons)
-    , sequence_
+    -- , sequence_
     , unpackString#
     , putStr
     , Char
