@@ -17,6 +17,7 @@ import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.RegisterIntroduction
 import           Data.Bedrock.Rename
 import           Data.Bedrock.Simplify
+import           Data.Bedrock.VoidElimination
 import qualified Data.Bedrock.StackLayout as StackLayout
 import           Data.Bedrock
 import           Data.Bedrock.NodeSizing
@@ -103,6 +104,7 @@ stdPipeline =
         , "inlined"         :> simplify . unique . inline
         , PerformHPT
         , "no-laziness"     :?> runGen . lowerEvalApply
+        -- , "no-void"         :> voidEliminate
         , "no-unknown-size" :?> runGen . lowerNodeSize
         , "no-nodes"        :> simplify . unique . registerIntroduction
         , "no-stack"        :> StackLayout.lower

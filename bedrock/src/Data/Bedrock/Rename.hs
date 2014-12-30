@@ -10,7 +10,7 @@ import qualified Data.Map             as Map
 import           Data.Bedrock
 import           Data.Bedrock.Misc
 
-type Env = Map Name Name
+type Env = Map (Maybe Type, Name) Name
 
 newtype Uniq a = Uniq { unUniq :: ReaderT Env (State AvailableNamespace) a }
     deriving ( Monad, MonadReader Env, MonadState AvailableNamespace
@@ -45,7 +45,7 @@ newName mbTy name = do
 rename :: Maybe Type -> Name -> Uniq a -> Uniq a
 rename mbTy old action = do
     new <- newName mbTy old
-    local (Map.insert old new) action
+    local (Map.insert (mbTy, old) new) action
 
 renameAll :: [Name] -> Uniq a -> Uniq a
 renameAll xs action = foldr (rename Nothing) action xs
@@ -59,7 +59,7 @@ renameVariables (v:vs) action =
 resolveName :: Name -> Uniq Name
 resolveName name = do
     m <- ask
-    case Map.lookup name m of
+    case Map.lookup (Nothing, name) m of
         Nothing  -> return $ Name [] "unresolved" 0
             --error $ "Unresolved identifier: " ++ show (name, Map.keys m)
         Just new -> return new
@@ -77,8 +77,12 @@ resolveNodeName nodeName =
 
 resolve :: Variable -> Uniq Variable
 resolve var = do
-    name <- resolveName (variableName var)
-    return var{ variableName = name }
+    m <- ask
+    let name = case Map.lookup (Just (variableType var), variableName var) m of
+            Nothing  -> Name [] "unresolved" 0
+            --error $ "Unresolved identifier: " ++ show (name, Map.keys m)
+            Just new -> new
+    return $ var{ variableName = name }
 
 --resolveArgument :: Argument -> Uniq Argument
 --resolveArgument arg =

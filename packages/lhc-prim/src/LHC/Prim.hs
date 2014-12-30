@@ -29,16 +29,18 @@ data Int32 = Int32 I32
 
 data Char = C# I64
 
-data RealWorld = RealWorld
+data RealWorld#
+
+foreign import ccall realworld# :: RealWorld#
 
 -- data IOUnit a = IOUnit a RealWorld
 --newtype IO a = IO { unIO :: RealWorld -> IOUnit a }
-newtype IO a = IO (RealWorld -> (# RealWorld, a #))
+newtype IO a = IO (RealWorld# -> (# RealWorld#, a #))
 
 data Unit = Unit
 data List a = Nil | Cons a (List a)
 
-unIO :: IO a -> RealWorld -> (# RealWorld, a #)
+unIO :: IO a -> RealWorld# -> (# RealWorld#, a #)
 unIO action =
   case action of
     IO unit -> unit
@@ -56,7 +58,7 @@ return a = IO (\s -> (# s, a #))
 
 unsafePerformIO :: IO a -> a
 unsafePerformIO action =
-    case unIO action RealWorld of
+    case unIO action realworld# of
         (# st, val #) -> val
 
 foreign import ccall unsafe "puts" puts :: Addr I8 -> IO Int32

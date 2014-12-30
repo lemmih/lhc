@@ -133,6 +133,9 @@ convertTcType tcTy =
         TcCon qname
             | qname == mkBuiltIn "LHC.Prim" "I64"
                  -> Primitive I64
+        TcCon qname
+            | qname == mkBuiltIn "LHC.Prim" "RealWorld#"
+             -> Primitive I64
         TcFun{} -> NodePtr
         TcRef{} -> NodePtr
         TcCon{} -> NodePtr
@@ -174,6 +177,9 @@ convertResultType tcTy =
         TcCon qname
             | qname == mkBuiltIn "LHC.Prim" "I64"
                  -> Primitive I64
+        TcCon qname
+            | qname == mkBuiltIn "LHC.Prim" "RealWorld#"
+                 -> Primitive I64
         TcFun _ a -> convertResultType a
         _ -> Node
 
@@ -199,14 +205,14 @@ convertDecl (Core.Decl ty name (Lam vars expr)) = do
     tell [fn]
 convertDecl (Core.Decl _ty name (WithCoercion _ expr)) =
     convertDecl (Core.Decl _ty name expr)
-convertDecl (Core.Decl _ty name expr) = do
+convertDecl (Core.Decl ty name expr) = do
     body <- local (\env -> env{envRoot = name}) $
             convertExpr False expr (pure . Return)
     let fn = Function
             { fnName = name
             , fnAttributes = []
             , fnArguments = []
-            , fnResults = [Node]
+            , fnResults = [convertResultType ty]
             , fnBody = if name == entrypointName
                         then setProgramExit body
                         else body
@@ -257,16 +263,16 @@ convertExpr lazy expr rest =
                 Just arity <- lookupArity name
                 Bind [tmp] (con (ConstructorName name (arity-length args)) args')
                     <$> rest [tmp]
-        Var v | lazy -> do
-            v' <- convertVariable v
-            let fn = variableName v'
-            mbArity <- lookupArity fn
-            case mbArity of
-                Nothing -> rest [v']
-                Just arity -> do
-                    tmp <- newVariable [] "thunk" NodePtr
-                    Bind [tmp] (Store (FunctionName fn arity) [])
-                        <$> rest [tmp]
+        --Var v | lazy -> do
+        --    v' <- convertVariable v
+        --    let fn = variableName v'
+        --    mbArity <- lookupArity fn
+        --    case mbArity of
+        --        Nothing -> rest [v']
+        --        Just arity -> do
+        --            tmp <- newVariable [] "thunk" NodePtr
+        --            Bind [tmp] (Store (FunctionName fn arity) [])
+        --                <$> rest [tmp]
         _ | (Var v, args) <- collectApps expr, lazy ->
             convertExprs args $ \args' -> do
                 v' <- convertVariable v
@@ -279,10 +285,12 @@ convertExpr lazy expr rest =
                         Bind [tmp] (Application fn args')
                             <$> rest [tmp]
                     Just arity | arity >= length args' -> do
-                        tmp <- newVariable [] "thunk" NodePtr
+                        tmp <- newVariable [] "susp" NodePtr
                         Bind [tmp] (Store (FunctionName fn (arity-length args')) args')
                             <$> rest [tmp]
                     -- Just arity | arity < length args' -> do
+                    Nothing | null args -> do
+                        rest [v']
                     Nothing -> do
                         body <- do
                             tmp <- deriveVariable v' "eval" Node

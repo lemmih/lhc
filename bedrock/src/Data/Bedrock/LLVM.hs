@@ -195,7 +195,7 @@ blockToLLVM = worker
                     branchName <- newBlock $ worker branch
                     case pattern of
                         NodePat nodeName [] -> do
-                            -- traceLLVM $ "Branch taken: " ++ show nodeName
+                            --traceLLVM $ "Branch taken: " ++ show nodeName
                             ident <- resolveNodeName nodeName
                             return (Constant.Int 64 ident, branchName)
                         NodePat{} ->
@@ -225,7 +225,7 @@ blockToLLVM = worker
                 doInst =<< mkInst VoidType expr
                 worker next
             TailCall fName args -> do
-                -- traceLLVM $ "TailCall: " ++ show fName
+                --traceLLVM $ "TailCall: " ++ show fName
                 doInst $ Call
                     { isTailCall = True
                     , callingConvention = Fast
@@ -255,7 +255,7 @@ blockToLLVM = worker
                 return $ Unreachable []
             Return [] -> return $ Ret Nothing []
             Bedrock.Invoke cont args -> do
-                -- traceLLVM $ "Bedrock: Invoke"
+                --traceLLVM $ "Bedrock: Invoke"
                 fnPtr <- anonInst $ castReference
                             (typeToLLVM $ variableType cont)
                             (nameToLLVM $ variableName cont)

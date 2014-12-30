@@ -318,21 +318,20 @@ toCType ty =
         TcCon qname
             | qname == mkBuiltIn "LHC.Prim" "I8" ->
                 I8
-        TcCon qname
             | qname == mkBuiltIn "LHC.Prim" "I32" ->
                 I32
-        TcCon qname
             | qname == mkBuiltIn "LHC.Prim" "Int32" ->
                 I32
-        TcCon qname
             | qname == mkBuiltIn "LHC.Prim" "I64" ->
                 I64
-        TcCon qname
             | qname == mkBuiltIn "LHC.Prim" "Unit" ->
                 CVoid
         TcApp (TcCon qname) ty'
             | qname == mkBuiltIn "LHC.Prim" "IO" ->
                 toCType ty'
+        TcCon qname
+            | qname == mkBuiltIn "LHC.Prim" "RealWorld#" ->
+                I64
         _ -> error $ "toCType: " ++ show ty
 
 -- convertBangType :: HS.BangType Origin -> M Type
@@ -376,13 +375,15 @@ convertType ty =
 -- cfun :: CInt -> CInt
 -- \cint -> WithExternal cfun [cint] boxed
 convertExternal :: String -> TcType -> M Expr
-convertExternal "realWorld" _ty = return (Lit (LitInt 0))
+convertExternal "realworld#" _ty = return (Lit (LitInt 0))
 convertExternal cName ty
     | isIO = do
         args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
         primArgs <- return args
         primOut <- Variable <$> newName "primOut" <*> pure i32
-        s <- Variable <$> newName "s" <*> pure (TcCon $ mkBuiltIn "LHC.Prim" "RealWorld")
+        s <- Variable
+                <$> newName "s"
+                <*> pure (TcCon $ mkBuiltIn "LHC.Prim" "RealWorld#")
         boxed <- Variable <$> newName "boxed" <*> pure retType
 
         io <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IO"

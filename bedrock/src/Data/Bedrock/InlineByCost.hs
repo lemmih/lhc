@@ -52,6 +52,7 @@ blockCost block =
       case expr of
         Eval{} -> 0
         Apply{} -> 0
+        Literal{} -> 0
         CCall fn _ -> ccallCost fn
         _ -> 1
     ccallCost _ = 0

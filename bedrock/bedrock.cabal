@@ -30,6 +30,7 @@ library
                        Data.Bedrock.Misc
                        Data.Bedrock.NodeSizing
                        Data.Bedrock.Simplify
+                       Data.Bedrock.VoidElimination
                        Data.Bedrock.StackLayout
                        Data.Bedrock.LLVM
                        Data.Bedrock.LLVMGen
@@ -38,6 +39,7 @@ library
                        Data.Bedrock.Storage.Fixed
                        Data.Bedrock.RegisterIntroduction
                        Data.Bedrock.Rename
+                       Data.Bedrock.InlineByCost
   -- other-modules:
   build-depends:       base ==4.*, ansi-wl-pprint,
                        parsec, containers, mtl >= 2.2.1, vector,
