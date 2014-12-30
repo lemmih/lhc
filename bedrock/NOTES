@@ -23,7 +23,7 @@ Performance improvements over GHC:
       to be some immutability somewhere). LLVM loves this kind of information.
       Probably a large win in a very few situtations (loops and such),
       irrelevant in most others.
-    * Interprocedural register allocation. 
+    * Interprocedural register allocation.
       Likely to be a decent win.
   Garbage collector:
     * Eliminate two memory reads per live object. In GHC, info tables and block
@@ -128,7 +128,7 @@ Optimizations possible in bedrock which are not possible in LLVM:
      that objects are only accessed by their reference. If this reference
      is dead, the store can be omitted. I wish this information could be
      conveyed to LLVM but I don't see how.
-  3. Node inlining and specialization. 
+  3. Node inlining and specialization.
 
 Using libuv
   We want one event loop per core with N heaps per event loop. Finding
@@ -198,6 +198,40 @@ Garbage collection:
     it to use a non-temporal store when we have evacuated many more objects
     than we have scavenged. That is, when the to-pointer is far from the
     scavenge-pointer. In this case, by-passing the cache might be best.
+
+  Random thoughts:
+    Don't use 3+1 generations. Use one copying generation and one mark/sweep
+    generation. Have per-object stepping the in copying generation.
+    Now we can use card marking instead of having a list of remembered objects.
+    Also, we only need one bit (instead of two) to keep track of the
+    generations. This mean we have use one bit for the generation and one bit
+    for the 'inlineable' property even on 32bit systems. Hm, then on 64 bit
+    systems we're wasting a bit per pointer. Guess that's not too bad.
+    Stepping is kept in the objects themselves, not the pointers to them.
+    The mutator often has to ask which generation a pointer points to but
+    it never has to ask about stepping. Stepping is only inspected during
+    GCing when the objects are being read anyway.
+    Hm, there's a trade-off between good compaction and quick minor GCs. A
+    stepping count set too low would promote objects to the mark/sweep
+    generation before we've had a chance to compact them. A stepping count
+    too high would mean traversing the same objects needlessly over and
+    over again. (Mental model: A generation with a stepping count of 2
+    is like two generations except both gens are always collected at the
+    same time.)
+
+    Okay, okay, new thoughts. Fixed sized nursery with no inbound pointers,
+    One semi-space generation with per-object stepping, one mark/sweep (immix)
+    generation with card marking for tracking pointers to gen 0.
+    Advantages:
+      Small nursery (L1 cache, about 32kb) gives fast enough allocations that
+      we do not need a stack.
+      Per-core nursery allows several mutators to run in parallel.
+      Since we only have two generations, we can tag all pointers with their
+      origin. The write barrier only has to look at the pointers. In GHC, the
+      write barrier has to read the block header for both objects.
+      Card marking makes many smaller mutable arrays nearly as cheap as a
+      single large mutable array.
+
 
 Whole program alias analysis:
   Alias analysis is import for allowing LLVM to optimize properly. In
@@ -315,6 +349,13 @@ Targeting LLVM for a functional language:
   the context of a suspended function as a linked list seems more appropriate.
   Moving allocations from the heap onto the system stack is then an
   optimization like any other.
+  One paper argued that heap allocations are cheaper than stack allocations
+  given enough available memory. Another paper counter argued that, since
+  stack allocation do not need to write a frame pointer, heap allocations
+  can never be cheaper. FIXME: Add links to the papers.
+  It should be noted that stack allocations have a major problem besides green
+  threads: During GC, the entire stack has to be scanned for live objects. Heap
+  obviously do not have this problem.
 
 Foreign Function Interface:
   unsafe calls
@@ -374,7 +415,7 @@ GRIN optimizations:
       P1 -> x
       P2 -> y
     v = node (Int n)
-    Done by LLVM? 
+    Done by LLVM?
   Update elimination:
     Not done by LLVM. Requires HPT analysis results.
   Late inlining:
@@ -398,7 +439,7 @@ Graph compression:
   explosion.
   Inlining nodes. Gets in the way of tail pointer elimination.
   Unpacking nodes. Destroys sharing.
-  
+
   If we annotated the graph with sharing information, destructive optimizations
   would become safe. When moving an object, we replace it with an Indirection.
   When we find a pointer to an Indirection, we set the shared bit for the
@@ -423,6 +464,8 @@ Graph compression:
   nodes such as Nil or Nothing are exempt, though. For those objects, we do not
   care about duplication.
 
+Cheap node specialization with subtyping:
+  (:) (C# 'c') Nil -> (:C#) 'c' Nil
 
 GHC GC Notes:
   Evacuate: (p is the address of a root pointer)
@@ -451,6 +494,8 @@ Pointer and node tagging:
   Tagging gen_no should make the GC slightly faster since it doesn't have to
   touch nodes from other generations than it is currently GCing. Maybe this is
   not very significant.
+  Oh wait, for mutable variables we do not overwrite the tag. Tagging with
+  gen_no should be a win here.
 
   Nodes are of course tagged with their ID number. They're tagged with
   a stepping counter, 3 or 4 bits should be enough, maybe 2. They're tagged with
@@ -564,7 +609,7 @@ Block allocator and the GC:
   allocateLarge :: Arena -> Size -> IO Ptr
 
 Type checking:
-  
+
   Polymorphic types cannot be inferred. Instead, monotypes are inferred and
   then generalized.
 
