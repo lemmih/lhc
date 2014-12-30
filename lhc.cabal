@@ -37,7 +37,8 @@ Executable lhc
                      derive,
                      directory,
 
-                     bedrock
+                     bedrock,
+                     haskell-scope
 
 
 
