@@ -114,13 +114,20 @@ toLLVM bedrock = defaultModule
             , returnType = IntegerType 32
             , basicBlocks = [BasicBlock (UnName 0) [Do entryCall] (Do $ Unreachable [])] }
 
+runE :: ExceptT String IO a -> IO a
+runE action = do
+    ret <- runExceptT action
+    case ret of
+        Left msg  -> error msg
+        Right val -> return val
+
 compile :: Bedrock.Module -> FilePath -> IO ()
 compile bedrock dst =
     withContext $ \ctx -> do
     let m = toLLVM bedrock
     writeFile (replaceExtension dst "pretty") (showPretty m)
-    runExceptT $ withModuleFromAST ctx (toLLVM bedrock) $ \llvmModule -> do
-        runExceptT (writeLLVMAssemblyToFile (File dst) llvmModule)
+    runE $ withModuleFromAST ctx (toLLVM bedrock) $ \llvmModule -> do
+        runE (writeLLVMAssemblyToFile (File dst) llvmModule)
     return ()
 
 
