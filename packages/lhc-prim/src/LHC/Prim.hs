@@ -6,7 +6,6 @@ module LHC.Prim
     , I8
     , I64
     , Addr
-    , puts
     , bindIO
     , thenIO
     , return
@@ -61,7 +60,6 @@ unsafePerformIO action =
     case unIO action realworld# of
         (# st, val #) -> val
 
-foreign import ccall unsafe "puts" puts :: Addr I8 -> IO Int32
 foreign import ccall unsafe "putchar" putchar :: I32 -> IO Int32
 
 -- sequence_ :: List (IO Unit) -> IO Unit

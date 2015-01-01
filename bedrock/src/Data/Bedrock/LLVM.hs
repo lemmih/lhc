@@ -77,6 +77,11 @@ toLLVM bedrock = defaultModule
                     , returnType = VoidType
                     , parameters = ([ Parameter (IntegerType 32) (UnName 0) []], False)
                     }
+            newDefinition $ GlobalDefinition functionDefaults
+                    { name = LLVM.Name "puts"
+                    , returnType = IntegerType 32
+                    , parameters = ([ Parameter (PointerType (IntegerType 8) (AddrSpace 0)) (UnName 0) []], False)
+                    }
 
             mainDef
             forM_ (functions bedrock) $ \Bedrock.Function{..} -> do
