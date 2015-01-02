@@ -32,7 +32,7 @@ fixedGC = do
     markPtr  <- newVariable "root" NodePtr
     let initFn = Function initName [] [] [] $
             Bind [wordSize] (Literal (LiteralInt 8)) $
-            Bind [heapSize] (Literal (LiteralInt 1024)) $
+            Bind [heapSize] (Literal (LiteralInt 10240)) $
             Bind [rawPtr] (CCall "calloc" [heapSize, wordSize]) $
             Bind [hp] (TypeCast rawPtr) $
             Bind [] (WriteGlobal "hp" hp) $
