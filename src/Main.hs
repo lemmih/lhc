@@ -93,10 +93,10 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps [file] = do
     print (pretty complete)
     encodeFile coreFile complete
     writeFile (coreFile <.> "pretty") (show $ pretty complete)
-    let bedrock = Core.convert complete
-    print (ppModule bedrock)
-    let bedrockFile = replaceExtension file "bedrock"
-    writeFile bedrockFile (show $ ppModule bedrock)
+    --let bedrock = Core.convert complete
+    --print (ppModule bedrock)
+    --let bedrockFile = replaceExtension file "bedrock"
+    --writeFile bedrockFile (show $ ppModule bedrock)
     -- Bedrock.compileModule bedrock file
     return ()
 
