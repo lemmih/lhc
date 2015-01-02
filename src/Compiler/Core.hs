@@ -183,7 +183,7 @@ data Literal
 instance Pretty Literal where
     pretty lit =
         case lit of
-            LitChar c     -> pretty c
+            LitChar c     -> pretty $ show c
             LitInt i      -> pretty i
             LitString str -> pretty str
 
