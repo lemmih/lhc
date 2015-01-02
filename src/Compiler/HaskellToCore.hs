@@ -544,6 +544,8 @@ convertAltPat scrut failBranch pat successBranch =
             alt <- Alt (UnboxedPat args)
                 <$> pure successBranch
             return $ Case (Var scrut) scrut failBranch [alt]
+        HS.PWildCard _ ->
+            return successBranch
         HS.PVar _ var -> do
             var' <- Variable <$> bindName var <*> lookupType var
             return $ Let (NonRec var' (Var scrut)) successBranch
