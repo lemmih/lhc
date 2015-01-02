@@ -38,7 +38,8 @@ Executable lhc
                      directory,
 
                      bedrock,
-                     haskell-scope
+                     haskell-scope,
+                     haskell-tc
 
 
 
