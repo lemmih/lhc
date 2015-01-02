@@ -281,6 +281,7 @@ sizeOfVariable hpt var =
         FramePtr     -> 1
         Node         -> sizeOfObjects hpt objects
         StaticNode n -> n
+        Primitive CVoid -> 0
         Primitive{}  -> 1
   where
     objects = (hptNodeScope hpt !!! variableIndex var) "objects"
