@@ -13,6 +13,7 @@ import           Control.Monad.Writer
 import           Control.Monad.RWS
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
+import           Data.Char (ord)
 
 import Language.Haskell.TypeCheck.Types (TcType(..))
 import           Language.Haskell.TypeCheck.Monad (mkBuiltIn)
@@ -486,7 +487,7 @@ convertAlt (Alt pattern branch) =
 convertLiteral :: Core.Literal -> M Bedrock.Literal
 convertLiteral lit = pure $
     case lit of
-        -- LitChar Char
+        LitChar c -> LiteralInt (fromIntegral $ ord c)
         LitString s -> LiteralString s
         LitInt i -> LiteralInt i
         -- LitWord Integer

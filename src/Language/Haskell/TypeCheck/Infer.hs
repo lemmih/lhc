@@ -31,6 +31,7 @@ tiLit lit =
         PrimString{} -> return $ TcApp
             (TcCon (mkBuiltIn "LHC.Prim" "Addr"))
             (TcCon (mkBuiltIn "LHC.Prim" "I8"))
+        PrimChar{} -> return $ TcCon (mkBuiltIn "LHC.Prim" "I32")
         _ -> error $ "tiLit: " ++ show lit
 
 tiQOp :: QOp Origin -> TI TcType

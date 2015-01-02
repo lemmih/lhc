@@ -579,6 +579,7 @@ convertLiteral lit =
     case lit of
         HS.PrimString _ str _ -> LitString str
         HS.PrimInt _ int _    -> LitInt int
+        HS.PrimChar _ char _  -> LitChar char
         _ -> error "convertLiteral"
 
 toGlobalName :: HS.QName Origin -> GlobalName
