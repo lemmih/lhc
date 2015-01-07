@@ -197,111 +197,130 @@ traceLLVM msg = do
         , functionAttributes = []
         , metadata = [] }
 
+patternTag :: Pattern -> String
+patternTag pat =
+  case pat of
+    NodePat nodeName [] ->
+      case nodeName of
+        ConstructorName name missing -> ppPartial name missing
+        FunctionName name missing -> ppPartial name missing
+        UnboxedTupleName -> "(# #)"
+    LitPat (LiteralInt i) -> "literal " ++ show i
+    _ -> ""
+  where
+    ppPartial name missing =
+      unwords (ppName name : replicate missing "_")
+    ppName (Bedrock.Name ns ident unique) =
+      case unique of
+        0 -> intercalate "." (ns++[ident])
+        _ -> intercalate "." (ns++[ident]) ++ "_" ++ show unique
+
 blockToLLVM :: Block -> GenBlocks Terminator
 blockToLLVM = worker
   where
     worker block = do
-        case block of
-            Case Variable{..} mbDefault alts -> do
-                branches <- forM alts $ \(Alternative pattern branch) -> do
-                    branchName <- newBlock $ worker branch
-                    case pattern of
-                        NodePat nodeName [] -> do
-                            --traceLLVM $ "Branch taken: " ++ show nodeName
-                            ident <- resolveNodeName nodeName
-                            return (Constant.Int 64 ident, branchName)
-                        NodePat{} ->
-                            error "Data.Bedrock.LLVM: Invalid input. Arguments must be lowered."
-                        LitPat (LiteralInt i) ->
-                            return ( Constant.Int (bitSize $ typeToLLVM variableType) i
-                                   , branchName)
-                        LitPat LiteralString{} ->
-                            error "Data.Bedrock.LLVM: Case over unboxed strings not supported."
-                defaultName <- newBlock $
-                    case mbDefault of
-                        Nothing -> return $ Unreachable []
-                        Just branch -> worker branch
-                return $ Switch
-                    { operand0' = LocalReference
-                                        (typeToLLVM variableType)
-                                        (nameToLLVM variableName)
-                    , defaultDest = defaultName
-                    , dests = branches
-                    , metadata' = [] }
-            Bind [Variable{..}] expr next -> do
-                let name = nameToLLVM variableName
-                inst <- mkInst (typeToLLVM variableType) expr
-                pushInst (name := inst)
-                worker next
-            Bind [] expr next -> do
-                doInst =<< mkInst VoidType expr
-                worker next
-            TailCall fName args -> do
-                --traceLLVM $ "TailCall: " ++ show fName
-                doInst $ Call
-                    { isTailCall = True
-                    , callingConvention = Fast
-                    , returnAttributes = []
-                    , function = Right $ ConstantOperand $ Constant.GlobalReference
-                                    VoidType
-                                    (nameToLLVM fName)
-                    , arguments =
-                        [ (LocalReference
-                            (typeToLLVM variableType)
-                            (nameToLLVM variableName), [])
-                        | Variable{..} <- args ]
-                    , functionAttributes = [NoUnwind]
-                    , metadata = [] }
-                return $ Ret Nothing []
-            Exit -> do
-                doInst $ Call
-                    { isTailCall = False
-                    , callingConvention = C
-                    , returnAttributes = []
-                    , function = Right $ ConstantOperand $ Constant.GlobalReference
-                                    VoidType
-                                    (LLVM.Name "exit")
-                    , arguments = [ (ConstantOperand $ Constant.Int 32 0, []) ]
-                    , functionAttributes = []
-                    , metadata = [] }
-                return $ Unreachable []
-            Return [] -> return $ Ret Nothing []
-            Bedrock.Invoke cont args -> do
-                --traceLLVM $ "Bedrock: Invoke"
-                fnPtr <- anonInst $ castReference
-                            (typeToLLVM $ variableType cont)
-                            (nameToLLVM $ variableName cont)
-                            (PointerType (FunctionType VoidType
-                                (map (typeToLLVM . variableType) args)
-                                False) (AddrSpace 0))
-                doInst $ Call
-                    { isTailCall = True
-                    , callingConvention = Fast
-                    , returnAttributes = []
-                    , function = Right $ LocalReference
-                                    VoidType
-                                    fnPtr
-                    , arguments =
-                        [ (LocalReference
-                            (typeToLLVM variableType)
-                            (nameToLLVM variableName), [])
-                        | Variable{..} <- args ]
-                    , functionAttributes = [NoUnwind]
-                    , metadata = [] }
-                return $ Unreachable []
-            _ -> do
-                traceLLVM $ "Bedrock: Internal error: Unhandled construct"
-                doInst $ Call
-                    { isTailCall = False
-                    , callingConvention = C
-                    , returnAttributes = []
-                    , function = Right $ ConstantOperand $ Constant.GlobalReference
-                                    VoidType
-                                    (LLVM.Name "exit")
-                    , arguments = [ (ConstantOperand $ Constant.Int 32 1, []) ]
-                    , functionAttributes = []
-                    , metadata = [] }
-                return $ Unreachable []
+      case block of
+        Case Variable{..} mbDefault alts -> do
+          branches <- forM alts $ \(Alternative pattern branch) -> do
+            branchName <- newTaggedBlock (patternTag pattern) $
+                            worker branch
+            case pattern of
+              NodePat nodeName [] -> do
+                --traceLLVM $ "Branch taken: " ++ show nodeName
+                ident <- resolveNodeName nodeName
+                return (Constant.Int 64 ident, branchName)
+              NodePat{} ->
+                error "Data.Bedrock.LLVM: Invalid input. Arguments must be lowered."
+              LitPat (LiteralInt i) -> do
+                return ( Constant.Int (bitSize $ typeToLLVM variableType) i
+                       , branchName)
+              LitPat LiteralString{} ->
+                error "Data.Bedrock.LLVM: Case over unboxed strings not supported."
+          defaultName <- newBlock $
+            case mbDefault of
+              Nothing -> return $ Unreachable []
+              Just branch -> worker branch
+          return $ Switch
+              { operand0' = LocalReference
+                                  (typeToLLVM variableType)
+                                  (nameToLLVM variableName)
+              , defaultDest = defaultName
+              , dests = branches
+              , metadata' = [] }
+        Bind [Variable{..}] expr next -> do
+            let name = nameToLLVM variableName
+            inst <- mkInst (typeToLLVM variableType) expr
+            pushInst (name := inst)
+            worker next
+        Bind [] expr next -> do
+            doInst =<< mkInst VoidType expr
+            worker next
+        TailCall fName args -> do
+            --traceLLVM $ "TailCall: " ++ show fName
+            doInst $ Call
+                { isTailCall = True
+                , callingConvention = Fast
+                , returnAttributes = []
+                , function = Right $ ConstantOperand $ Constant.GlobalReference
+                                VoidType
+                                (nameToLLVM fName)
+                , arguments =
+                    [ (LocalReference
+                        (typeToLLVM variableType)
+                        (nameToLLVM variableName), [])
+                    | Variable{..} <- args ]
+                , functionAttributes = [NoUnwind]
+                , metadata = [] }
+            return $ Ret Nothing []
+        Exit -> do
+            doInst $ Call
+                { isTailCall = False
+                , callingConvention = C
+                , returnAttributes = []
+                , function = Right $ ConstantOperand $ Constant.GlobalReference
+                                VoidType
+                                (LLVM.Name "exit")
+                , arguments = [ (ConstantOperand $ Constant.Int 32 0, []) ]
+                , functionAttributes = []
+                , metadata = [] }
+            return $ Unreachable []
+        Return [] -> return $ Ret Nothing []
+        Bedrock.Invoke cont args -> do
+            --traceLLVM $ "Bedrock: Invoke"
+            fnPtr <- anonInst $ castReference
+                        (typeToLLVM $ variableType cont)
+                        (nameToLLVM $ variableName cont)
+                        (PointerType (FunctionType VoidType
+                            (map (typeToLLVM . variableType) args)
+                            False) (AddrSpace 0))
+            doInst $ Call
+                { isTailCall = True
+                , callingConvention = Fast
+                , returnAttributes = []
+                , function = Right $ LocalReference
+                                VoidType
+                                fnPtr
+                , arguments =
+                    [ (LocalReference
+                        (typeToLLVM variableType)
+                        (nameToLLVM variableName), [])
+                    | Variable{..} <- args ]
+                , functionAttributes = [NoUnwind]
+                , metadata = [] }
+            return $ Unreachable []
+        _ -> do
+            traceLLVM $ "Bedrock: Internal error: Unhandled construct"
+            doInst $ Call
+                { isTailCall = False
+                , callingConvention = C
+                , returnAttributes = []
+                , function = Right $ ConstantOperand $ Constant.GlobalReference
+                                VoidType
+                                (LLVM.Name "exit")
+                , arguments = [ (ConstantOperand $ Constant.Int 32 1, []) ]
+                , functionAttributes = []
+                , metadata = [] }
+            return $ Unreachable []
 
     -- mkInst retTy expr | trace ("Expr: " ++ show expr) False = undefined
 
