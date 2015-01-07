@@ -425,7 +425,8 @@ convertExpr lazy expr rest =
         Let (NonRec name e1) e2 ->
             convertExpr True e1 $ \[val] -> do
                 name' <- convertVariable name
-                Bind [name'] (TypeCast val) <$> convertExpr lazy e2 rest
+                bind [name'] $
+                    Bind [name'] (TypeCast val) <$> convertExpr lazy e2 rest
 
         LetStrict name e1 e2 ->
             convertExpr False e1 $ \[val] -> do
