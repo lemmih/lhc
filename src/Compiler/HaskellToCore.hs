@@ -8,6 +8,7 @@ import           Control.Monad.Reader
 import           Control.Monad.RWS
 import           Control.Monad.State
 import           Control.Monad.Writer
+import           Data.List                        (transpose)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
 import           Data.Maybe
@@ -16,8 +17,7 @@ import qualified Language.Haskell.Exts.Annotated  as HS
 import           Compiler.Core
 import           Data.Bedrock                     (AvailableNamespace (..),
                                                    CType (..), Foreign (..),
-                                                   Name (..),
-                                                   Type (..))
+                                                   Name (..), Type (..))
 import           Data.Bedrock.Misc
 import           Language.Haskell.Scope           (GlobalName (..),
                                                    NameInfo (..), Origin (..),
@@ -25,7 +25,8 @@ import           Language.Haskell.Scope           (GlobalName (..),
                                                    getNameIdentifier)
 import qualified Language.Haskell.Scope           as Scope
 import           Language.Haskell.TypeCheck.Monad (TcEnv (..), mkBuiltIn)
-import           Language.Haskell.TypeCheck.Types (Coercion (..),TcType(..),Qual(..))
+import           Language.Haskell.TypeCheck.Types (Coercion (..), Qual (..),
+                                                   TcType (..))
 
 import           Debug.Trace
 
@@ -236,14 +237,43 @@ convert tcEnv (HS.Module _ _ _ _ decls) = Module
         mapM_ convertDecl decls
 convert _ _ = error "HaskellToCore.convert"
 
--- Return function name and arity.
-matchInfo :: [HS.Match Origin] -> (HS.Name Origin, Int)
+-- Return function name.
+matchInfo :: [HS.Match Origin] -> HS.Name Origin
 matchInfo [] =
     error "Compiler.HaskellToCore.matchInfo"
-matchInfo (HS.Match _ name pats _ _:_) =
-    (name, length pats)
-matchInfo (HS.InfixMatch _ _ name pats rhs _:_) =
-    (name, 1 + length pats)
+matchInfo (HS.Match _ name pats _ _:_) = name
+matchInfo (HS.InfixMatch _ _ name pats rhs _:_) = name
+
+{-
+Sometimes we have introduce new arguments:
+fn (Just val) = ...
+=>
+fn arg = case arg of Just val -> ...
+
+In the above case we cannot find a good name but in many cases we can do
+better. Consider:
+fn x@(Just val) = ...
+=>
+fn x = case x of Just val -> ...
+
+fn [] = ...
+fn lst = ...
+=>
+fn lst = case lst of [] -> ...; _ -> ...
+
+matchArgNames uses heuristics to figure out which user variable names can be
+reused.
+-}
+matchArgNames :: [HS.Match Origin] -> [Maybe (HS.Name Origin)]
+matchArgNames = map collapse . transpose . map worker
+  where
+    collapse = listToMaybe . catMaybes
+    worker (HS.Match _ _ pats _ _) = map fromPat pats
+    worker (HS.InfixMatch _ pat _ pats _ _) = map fromPat (pat:pats)
+    fromPat (HS.PVar _ name) = Just name
+    fromPat (HS.PAsPat _ name _) = Just name
+    fromPat (HS.PParen _ pat) = fromPat pat
+    fromPat _ = Nothing
 
 convertDecl :: HS.Decl Origin -> M ()
 convertDecl decl =
@@ -253,12 +283,17 @@ convertDecl' :: HS.Decl Origin -> M [Decl]
 convertDecl' decl =
     case decl of
         HS.FunBind _ matches -> do
-            let (name, arity) = matchInfo matches
+            let name = matchInfo matches
+                fnArgNames = matchArgNames matches
+                arity = length fnArgNames
             let Origin _ src = HS.ann name
             coercion <- findCoercion src
             ty <- lookupType name
             let argTys = splitTy ty
-            argNames <- replicateM arity (newName "arg")
+            argNames <- forM fnArgNames $ \mbName ->
+              case mbName of
+                Nothing -> newName "arg"
+                Just name -> bindName name
             let args = zipWith Variable argNames argTys
             decl <- Decl
                 <$> pure ty
@@ -625,7 +660,10 @@ convertAltPat scrut failBranch pat successBranch =
             return successBranch
         HS.PVar _ var -> do
             var' <- Variable <$> bindName var <*> lookupType var
-            return $ Let (NonRec var' (Var scrut)) successBranch
+            -- XXX: Very hacky. We cannot compare on types yet.
+            if varName var' == varName scrut
+              then return successBranch
+              else return $ Let (NonRec var' (Var scrut)) successBranch
         HS.PLit _ _sign lit -> do
             alt <- Alt (LitPat $ convertLiteral lit)
                 <$> pure successBranch
