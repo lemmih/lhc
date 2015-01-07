@@ -236,26 +236,63 @@ convert tcEnv (HS.Module _ _ _ _ decls) = Module
         mapM_ convertDecl decls
 convert _ _ = error "HaskellToCore.convert"
 
+-- Return function name and arity.
+matchInfo :: [HS.Match Origin] -> (HS.Name Origin, Int)
+matchInfo [] =
+    error "Compiler.HaskellToCore.matchInfo"
+matchInfo (HS.Match _ name pats _ _:_) =
+    (name, length pats)
+matchInfo (HS.InfixMatch _ _ name pats rhs _:_) =
+    (name, 1 + length pats)
+
 convertDecl :: HS.Decl Origin -> M ()
 convertDecl decl =
+    mapM_ pushDecl =<< convertDecl' decl
+
+convertDecl' :: HS.Decl Origin -> M [Decl]
+convertDecl' decl =
     case decl of
+        HS.FunBind _ matches -> do
+            let (name, arity) = matchInfo matches
+            let Origin _ src = HS.ann name
+            coercion <- findCoercion src
+            ty <- lookupType name
+            let argTys = splitTy ty
+            argNames <- replicateM arity (newName "arg")
+            let args = zipWith Variable argNames argTys
+            decl <- Decl
+                <$> pure ty
+                <*> bindName name
+                <*> (WithCoercion coercion . Lam args
+                        <$> convertMatches args matches)
+            return [decl]
         HS.FunBind _ [HS.Match _ name pats rhs _] -> do
             let Origin _ src = HS.ann name
             coercion <- findCoercion src
-            pushDecl =<< Decl
+            decl <- Decl
                 <$> lookupType name
                 <*> bindName name
                 <*> (WithCoercion coercion <$> convertPats pats rhs)
-            -- (convertName name, convertPats pats rhs)
-        HS.PatBind _ (HS.PVar _ name) rhs _binds ->
-            pushDecl =<< Decl
+            return [decl]
+        HS.FunBind _ [HS.InfixMatch _ leftPat name rightPats rhs _] -> do
+            let Origin _ src = HS.ann name
+            coercion <- findCoercion src
+            decl <- Decl
+                <$> lookupType name
+                <*> bindName name
+                <*> (WithCoercion coercion
+                        <$> convertPats (leftPat:rightPats) rhs)
+            return [decl]
+        HS.PatBind _ (HS.PVar _ name) rhs _binds -> do
+            decl <- Decl
                 <$> lookupType name
                 <*> bindName name
                 <*> convertRhs rhs
+            return [decl]
         HS.ForImp _ _conv _safety mbExternal name ty -> do
             let external = fromMaybe (getNameIdentifier name) mbExternal
             foreignTy <- lookupType name
-            pushDecl =<< Decl
+            decl <- Decl
                 <$> lookupType name
                 <*> bindName name
                 <*> convertExternal external foreignTy
@@ -267,14 +304,52 @@ convertDecl decl =
                     , foreignReturn = toCType retType
                     , foreignArguments = map toCType argTypes }
 
-        HS.DataDecl _ HS.DataType{} _ctx _dhead qualCons _deriving ->
+            return [decl]
+
+        HS.DataDecl _ HS.DataType{} _ctx _dhead qualCons _deriving -> do
             mapM_ (convertQualCon False) qualCons
-        HS.DataDecl _ HS.NewType{} _ctx _dhead qualCons _deriving ->
+            return []
+        HS.DataDecl _ HS.NewType{} _ctx _dhead qualCons _deriving -> do
             mapM_ (convertQualCon True) qualCons
-        _ -> return ()
+            return []
+        HS.TypeSig{} -> return []
+        _ -> error $ "Compiler.HaskellToCore.convertDecl: " ++ show decl
 
 isPrimitive "realWorld" = True
 isPrimitive _ = False
+
+convertMatches :: [Variable] -> [HS.Match Origin] -> M Expr
+convertMatches args [] = error "Compiler.HaskellToCore.convertMatches"
+convertMatches args [HS.InfixMatch _ pat _ pats rhs mbBinds] =
+    convertAltPats (zip args (pat:pats)) Nothing =<< convertRhs rhs
+convertMatches args [HS.Match _ _ pats rhs mbBinds] =
+    convertAltPats (zip args pats) Nothing =<< convertRhs rhs
+convertMatches args (HS.Match _ _ pats rhs mbBinds:xs)
+    | all isSimplePat pats = do
+        rest <- convertMatches args xs
+        convertAltPats (zip args pats) (Just rest) =<<
+                convertRhs rhs
+    | otherwise = do
+        rest <- convertMatches args xs
+        restBranch <- Variable <$> newName "branch" <*> exprType rest
+        e <- convertAltPats (zip args pats) (Just $ Var restBranch) =<<
+                convertRhs rhs
+        return $ Let (NonRec restBranch rest) e
+
+convertAltPats :: [(Variable, HS.Pat Origin)] -> Maybe Expr -> Expr -> M Expr
+convertAltPats conds failBranch successBranch =
+    case conds of
+        [] -> pure successBranch
+        ((scrut,pat) : more)
+            | isSimplePat pat -> do
+                convertAltPat scrut failBranch pat =<<
+                    convertAltPats more failBranch successBranch
+            | otherwise -> do
+                rest <- convertAltPats more failBranch successBranch
+                restBranch <- Variable <$> newName "branch" <*> exprType rest
+                e <- convertAltPat scrut failBranch pat (Var restBranch)
+                return $ Let (NonRec restBranch rest) e
+
 
 -- XXX: Don't use Bool for isNewtype
 convertQualCon :: Bool -> HS.QualConDecl Origin -> M ()
@@ -303,11 +378,11 @@ convertConDecl isNewtype con =
                 else pushNode $ NodeDefinition conName (init $ splitTy ty)
         --HS.RecDecl _ name fieldDecls -> do
         _ -> error "convertCon"
-  where
-    -- XXX: Temporary measure. 2014-07-11
-    splitTy (TcForall _ (_ :=> ty)) = splitTy ty
-    splitTy (TcFun a b) = a : splitTy b
-    splitTy ty = [ty]
+
+-- XXX: Temporary measure. 2014-07-11
+splitTy (TcForall _ (_ :=> ty)) = splitTy ty
+splitTy (TcFun a b) = a : splitTy b
+splitTy ty = [ty]
 
 toCType :: TcType -> CType
 toCType ty =
@@ -491,10 +566,6 @@ convertExp expr =
             scrutVar <- Variable <$> newName "scrut" <*> exprType scrut'
             def <- convertAlts scrutVar alts
             return $ Case scrut' scrutVar (Just def) []
-            -- Case
-            --     <$> convertExp scrut
-            --     <*> pure Nothing
-            --     <*> mapM convertAlt alts
         HS.Lit _ lit -> pure $ Lit (convertLiteral lit)
         HS.Tuple  _ HS.Unboxed exprs -> do
             vars <- forM exprs $ \(HS.Var _ name) -> do
@@ -502,6 +573,11 @@ convertExp expr =
                 ty <- lookupType $ unQName name
                 return $ Variable n ty
             return $ UnboxedTuple vars
+        HS.Let _ (HS.BDecls _ binds) expr -> do
+            decls <- mapM convertDecl' binds
+            Let (Rec [ (Variable name ty, body)
+                     | Decl ty name body <- concat decls ])
+                <$> convertExp expr
         _ -> error $ "convertExp: " ++ show expr
 
 convertAlts :: Variable -> [HS.Alt Origin] -> M Expr
@@ -524,6 +600,7 @@ isSimplePat pat =
         HS.PApp _ name pats -> all isPVar pats
         HS.PVar{} -> True
         HS.PLit{} -> True
+        HS.PParen _ pat' -> isSimplePat pat'
         _ -> False
   where
     isPVar HS.PVar{} = True
@@ -553,6 +630,9 @@ convertAltPat scrut failBranch pat successBranch =
             alt <- Alt (LitPat $ convertLiteral lit)
                 <$> pure successBranch
             return $ Case (Var scrut) scrut failBranch [alt]
+        HS.PParen _ pat' ->
+            convertAltPat scrut failBranch pat' successBranch
+        _ -> error $ "Compiler.HaskellToCore.convertAltPat: " ++ show pat
 
 convertAlt :: HS.Alt Origin -> M Alt
 convertAlt alt =

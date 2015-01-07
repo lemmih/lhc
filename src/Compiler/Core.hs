@@ -127,6 +127,14 @@ instance Pretty Expr where
             Let (NonRec name e1) e2 ->
                 text "let" <+> ppTypedVariable name <+> equals <+> hang 0 (pretty e1) <$$>
                 pretty e2
+            Let (Rec binds) e2 ->
+                text "let" <$$>
+                indent 2 (vsep [ ppTypedVariable var <+>
+                                 equals <+>
+                                 hang 0 (pretty body)
+                               | (var,body) <- binds ]) <$$>
+                text "in" <$$>
+                indent 2 (pretty e2)
             LetStrict name e1 e2 ->
                 text "let" <+> char '!' <> ppTypedVariable name <+> equals <+> pretty e1 <$$>
                 pretty e2
