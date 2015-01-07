@@ -20,6 +20,8 @@ simplify m = m
         App a b -> App (expr a) (expr b)
         Lam a (Lam b rest) -> expr (Lam (a++b) rest)
         Lam vars rest -> Lam vars (expr rest)
+        Let bind@(NonRec _ Var{}) (Lam a b) ->
+            expr $ Lam a (Let bind b)
         Let (NonRec bind rhs) e | (Var bind', apps) <- collectApps e
                                 , varName bind == varName bind' ->
             foldl App (expr rhs) apps

@@ -143,7 +143,7 @@ compileExecutable deps file = do
         libraryCore = mconcat (map (snd . snd) ifaces)
         entrypoint = Name ["Main"] "entrypoint" 0
         complete =
-            Core.simplify $ Core.simplify $
+            Core.simplify $ Core.simplify $ Core.simplify $
             Core.deadCodeElimination entrypoint $
             NewType.lower $ mappend libraryCore core
     print (pretty complete)

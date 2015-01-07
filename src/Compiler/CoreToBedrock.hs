@@ -2,21 +2,26 @@
 module Compiler.CoreToBedrock where
 
 
-import           Compiler.Core hiding (Variable(..),NodeDefinition(..),UnboxedPat)
-import qualified Compiler.Core                   as Core
-import           Data.Bedrock                    as Bedrock
+import           Compiler.Core                    hiding (NodeDefinition (..),
+                                                   UnboxedPat, Variable (..))
+import qualified Compiler.Core                    as Core
+import           Data.Bedrock                     as Bedrock
 import           Data.Bedrock.Misc
+import           Data.Bedrock.Transform           (freeVariables)
 
 import           Control.Applicative
 import           Control.Monad.Reader
-import           Control.Monad.Writer
 import           Control.Monad.RWS
-import           Data.Map                        (Map)
-import qualified Data.Map                        as Map
-import           Data.Char (ord)
+import           Control.Monad.Writer
+import           Data.Char                        (ord)
+import           Data.Map                         (Map)
+import qualified Data.Map                         as Map
+import           Data.Set                         (Set)
+import qualified Data.Set                         as Set
+import Data.List (nub)
 
-import Language.Haskell.TypeCheck.Types (TcType(..))
 import           Language.Haskell.TypeCheck.Monad (mkBuiltIn)
+import           Language.Haskell.TypeCheck.Types (TcType (..))
 
 entrypointName :: Name
 entrypointName = Name ["Main"] "entrypoint" 0
@@ -52,9 +57,8 @@ convertModule m = setArities arities $ do
         | Core.NewType con <- coreNewTypes m ]
 
 data Env = Env
-    { envScope :: [Variable]
-    , envArity :: Map Name Int
-    , envRoot  :: Name
+    { envArity    :: Map Name Int
+    , envRoot     :: Name
     , envLocation :: [String]
     }
 newtype M a = M { unM :: RWS Env [Function] AvailableNamespace a }
@@ -67,8 +71,7 @@ runM action ns = (fns, ns')
   where
     (ns',fns) = execRWS (unM action) env ns
     env = Env
-        { envScope    = []
-        , envArity    = Map.empty
+        { envArity    = Map.empty
         , envRoot     = error "envRoot"
         , envLocation = []
         }
@@ -96,9 +99,11 @@ newVariable orig ident ty = do
     name <- newName orig ident
     return $ Variable name ty
 
-pushFunction :: Either String Name -> Bedrock.Block -> M Name
-pushFunction origin body = do
-    scope <- asks envScope
+pushFunction :: [Variable] -> Either String Name -> Bedrock.Block -> M (Name, [Variable])
+pushFunction regArgs origin body = do
+    let free = freeVariables body Set.\\ Set.fromList regArgs
+        args = Set.toList free ++ regArgs
+
     Name orig ident _ <- asks envRoot
     name <- case origin of
                 Left tag -> newName (orig++[ident]) tag
@@ -106,11 +111,11 @@ pushFunction origin body = do
     let fn = Function
             { fnName = name
             , fnAttributes = []
-            , fnArguments = scope
+            , fnArguments = args
             , fnResults = [Node]
             , fnBody = body }
     tell [fn]
-    return name
+    return (name, Set.toList free)
 
 -- XXX: Lookup the kind to find the bedrock type.
 convertVariable :: Core.Variable -> M Variable
@@ -193,7 +198,7 @@ convertDecl :: Core.Decl -> M ()
 convertDecl (Core.Decl ty name (Lam vars expr)) = do
     vars' <- mapM convertVariable vars
     body <- local (\env -> env{envRoot = name}) $
-            bind vars' $ convertExpr False expr (pure . Return)
+            convertExpr False expr (pure . Return)
     let fn = Function
             { fnName = name
             , fnAttributes = []
@@ -227,9 +232,6 @@ convertDecl (Core.Decl ty name expr) = do
 --        attrs = MemAttributes False Nothing
 --    Bind [tmp] (Eval val)
 --        <$> rest tmp
-
-bind :: [Variable] -> M a -> M a
-bind vs = local $ \env -> env{ envScope = envScope env ++ vs }
 
 setOrigin :: M a -> M a
 setOrigin = local $ \env ->
@@ -286,7 +288,7 @@ convertExpr lazy expr rest =
                         Bind [tmp] (Application fn args')
                             <$> rest [tmp]
                     Just arity | arity >= length args' -> do
-                        tmp <- newVariable [] "susp" NodePtr
+                        tmp <- newVariable [] "thunk" NodePtr
                         Bind [tmp] (Store (FunctionName fn (arity-length args')) args')
                             <$> rest [tmp]
                     -- Just arity | arity < length args' -> do
@@ -297,10 +299,9 @@ convertExpr lazy expr rest =
                             tmp <- deriveVariable v' "eval" Node
                             Bind [tmp] (Eval v')
                                 <$> applyMany tmp args' (\next -> pure $ Return [next])
-                        scope <- asks envScope
-                        node <- pushFunction (Left "ap") body
+                        (node, nodeArgs) <- pushFunction [] (Left "ap") body
                         tmp <- newVariable [] "ap" NodePtr
-                        Bind [tmp] (Store (FunctionName node 0) scope)
+                        Bind [tmp] (Store (FunctionName node 0) nodeArgs)
                             <$> rest [tmp]
         _ | (Var v, args) <- collectApps expr, not lazy ->
             convertExprs args $ \args' -> do
@@ -357,10 +358,9 @@ convertExpr lazy expr rest =
                 ret <- deriveVariable aVal "apply" Node
                 Bind [ret] (Apply aVal bVal)
                     <$> pure (Return [ret])
-            scope <- asks envScope
-            node <- pushFunction (Left "ap") body
+            (node, nodeArgs) <- pushFunction [] (Left "ap") body
             tmp <- newVariable [] "ap" NodePtr
-            Bind [tmp] (Store (FunctionName node 0) scope)
+            Bind [tmp] (Store (FunctionName node 0) nodeArgs)
                 <$> rest [tmp]
         App a b | not lazy ->
             convertExpr False a $ \[aVal] -> -- node
@@ -369,20 +369,13 @@ convertExpr lazy expr rest =
             Bind [ret] (Apply aVal bVal)
                     <$> rest [ret]
         Lam v sub | lazy -> do
-            scope <- asks envScope
             v' <- mapM convertVariable v
-            body <- bind v' $ convertExpr False sub (pure . Return)
-            node <- bind v' $ pushFunction (Left "lambda") body
-            tmp <- newVariable [] "tmp" NodePtr
-            Bind [tmp] (Store (FunctionName node (length v)) scope)
+            (node,nodeArgs) <- do
+                body <- convertExpr False sub (pure . Return)
+                pushFunction v' (Left "lambda") body
+            tmp <- newVariable [] "thunk" NodePtr
+            Bind [tmp] (Store (FunctionName node (length v)) nodeArgs)
                 <$> rest [tmp]
-        --Lam v sub | not lazy -> do
-        --    scope <- asks envScope
-        --    body <- bind v $ convertExpr True sub (\val -> pure $ Return [val])
-        --    node <- bind v $ pushFunction (Left "lam") body
-        --    let tmp = Variable (Name [] "tmp" 0) Node
-        --    Bind [tmp] (MkNode (FunctionName node (length v)) scope)
-        --        <$> rest tmp
         Core.Case scrut var Nothing alts | not lazy ->
             convertExpr False scrut $ \[val] -> do
                 var' <- convertVariable var
@@ -413,20 +406,19 @@ convertExpr lazy expr rest =
         WithExternal binder external args st scoped | not lazy -> do
             binder' <- convertVariable binder
             args' <- mapM convertVariable args
-            bind [binder'] $ Bind [binder'] (CCall external args')
+            Bind [binder'] (CCall external args')
                 <$> convertExpr False scoped rest
 
         ExternalPure binder external args scoped | not lazy -> do
             binder' <- convertVariable binder
             args' <- mapM convertVariable args
-            bind [binder'] $ Bind [binder'] (CCall external args')
+            Bind [binder'] (CCall external args')
                 <$> convertExpr False scoped rest
 
         Let (NonRec name e1) e2 ->
             convertExpr True e1 $ \[val] -> do
                 name' <- convertVariable name
-                bind [name'] $
-                    Bind [name'] (TypeCast val) <$> convertExpr lazy e2 rest
+                Bind [name'] (TypeCast val) <$> convertExpr lazy e2 rest
 
         LetStrict name e1 e2 ->
             convertExpr False e1 $ \[val] -> do
@@ -467,8 +459,7 @@ convertAlt (Alt pattern branch) =
     case pattern of
         ConPat name args -> do
             args' <- mapM convertVariable args
-            bind args' $
-              Alternative (NodePat (ConstructorName name 0) args')
+            Alternative (NodePat (ConstructorName name 0) args')
                 <$> convertExpr False branch (pure . Return)
         Core.LitPat lit ->
             Alternative
@@ -476,8 +467,7 @@ convertAlt (Alt pattern branch) =
                 <*> convertExpr False branch (pure . Return)
         Core.UnboxedPat args -> do
             args' <- mapM convertVariable args
-            bind args' $
-                Alternative (NodePat UnboxedTupleName args')
+            Alternative (NodePat UnboxedTupleName args')
                     <$> convertExpr False branch (pure . Return)
         -- Core.VarPat var -> do
         --     var' <- convertVariable var
