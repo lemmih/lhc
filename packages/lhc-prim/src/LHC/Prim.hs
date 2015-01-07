@@ -14,11 +14,19 @@ module LHC.Prim
     -- , sequence_
     , unpackString#
     , putStr
+    , putStrLn
     , getChar
     , getLine
     , Char
     , Bool(True,False)
-    --, not
+    , Int
+    , not
+    , otherwise
+    , (+), (-), (*)
+    , mapM_
+    , le
+    , max
+    , append
     ) where
 
 -- XXX: These have kind # but it is not checked anywhere.
@@ -122,6 +130,9 @@ putStr lst =
         C# char ->
           putchar char `thenIO` putStr tail
 
+putStrLn :: List Char -> IO Unit
+putStrLn msg = putStr msg `thenIO` putStr (unpackString# "\n"#)
+
 data Bool = False | True
 
 not :: Bool -> Bool
@@ -132,14 +143,29 @@ not x = case x of
 otherwise :: Bool
 otherwise = True
 
---intAdd :: Int -> Int -> Int
---intAdd = intAdd
+foreign import ccall unsafe (+#) :: I32 -> I32 -> I32
 
---intSub :: Int -> Int -> Int
---intSub = intSub
+foreign import ccall unsafe (-#) :: I32 -> I32 -> I32
 
---intMul :: Int -> Int -> Int
---intMul = intMul
+foreign import ccall unsafe (*#) :: I32 -> I32 -> I32
+
+(+) :: Int -> Int -> Int
+a + b =
+  case a of
+    I# a# -> case b of
+      I# b# -> I# (a# +# b#)
+
+(-) :: Int -> Int -> Int
+a - b =
+  case a of
+    I# a# -> case b of
+      I# b# -> I# (a# -# b#)
+
+(*) :: Int -> Int -> Int
+a * b =
+  case a of
+    I# a# -> case b of
+      I# b# -> I# (a# *# b#)
 
 --seq :: a -> b -> b
 --seq a b = b
@@ -154,16 +180,29 @@ mapM_ fn lst =
     Nil -> return Unit
     Cons x xs -> fn x `thenIO` mapM_ fn xs
 
--- <=
---le :: Int -> Int -> Bool
---le = le
+foreign import ccall unsafe le# :: I32 -> I32 -> I32
 
---max :: Int -> Int -> Int
-max = max
+-- <=
+(<=) :: Int -> Int -> Bool
+-- le (I# a#) (I# b#) =
+--   case le# a# b# of
+--     '\0'# -> False
+--     _     -> True
+I# a# <= I# b# =
+  case le# a# b# of
+    '\0'# -> False
+    _     -> True
+
+max :: Int -> Int -> Int
+max a b =
+  case a <= b of
+    True -> b
+    False -> a
 
 append :: List a -> List a -> List a
-append a b =
-  case a of
-    Nil       -> b
-    Cons x xs -> Cons x (append xs b)
+append Nil b         = b
+append (Cons x xs) b = Cons x (append xs b)
+  -- case a of
+  --   Nil       -> b
+  --   Cons x xs -> Cons x (append xs b)
 
