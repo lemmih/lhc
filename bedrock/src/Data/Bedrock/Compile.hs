@@ -113,6 +113,7 @@ stdPipeline =
         , "no-allocs"       :> unique . runGen lowerAlloc
         , "no-gc"           :> unique . lowerGC fixedGC
         , "no-globals"      :> unique . lowerGlobalRegisters
+        , "pretty"          :> locallyUnique
         ]
         -- [ "rename"          :> simplify . unique
         -- , PerformHPT

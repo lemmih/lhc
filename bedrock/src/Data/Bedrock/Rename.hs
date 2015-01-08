@@ -1,11 +1,13 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Data.Bedrock.Rename (unique) where
+module Data.Bedrock.Rename (unique, locallyUnique) where
 
 import           Control.Applicative  (Applicative, pure, (<$>), (<*>))
 import           Control.Monad.Reader
 import           Control.Monad.State
+import           Data.List            (elemIndex)
 import           Data.Map             (Map)
 import qualified Data.Map             as Map
+import           Data.Monoid
 
 import           Data.Bedrock
 import           Data.Bedrock.Misc
@@ -234,3 +236,215 @@ uniqSimple simple =
             GCMarkNode <$> resolve var
 
 
+
+
+
+
+
+
+---------------------------------------------------------
+-- Locally Unique
+
+type Scope = Map Name [Name]
+data LUniq a = LUniq {unLUniq :: Scope -> (a, Scope)}
+
+instance Monad LUniq where
+    return x = LUniq $ \scope -> (x,mempty)
+    f >>= g = LUniq $ \scope ->
+        let (a, scope') = unLUniq f scope
+            (b, scope'') = unLUniq (g a) scope
+        in (b, Map.unionWith (++) scope' scope'')
+
+instance Functor LUniq where
+  fmap fn action = action >>= (return . fn)
+
+instance Applicative LUniq where
+  pure = return
+  fn <*> action = do
+    fn' <- fn
+    a <- action
+    return (fn' a)
+
+locallyAsk :: LUniq Scope
+locallyAsk = LUniq $ \scope -> (scope, mempty)
+
+locallyBind :: Name -> LUniq Name
+locallyBind name = do
+  LUniq $ \_ -> ((), Map.singleton name{nameUnique=0} [name])
+  locallyResolve name
+
+runLUniq :: LUniq a -> a
+runLUniq action = a
+  where
+    (a, scope) = unLUniq action scope
+
+limitScope :: LUniq a -> LUniq a
+limitScope action = LUniq $ \scope ->
+  let (a, defs) = unLUniq action (Map.unionWith (++) scope defs)
+  in (a, mempty)
+
+locallyUnique :: Module -> Module
+locallyUnique m = runLUniq $ do
+  ns <- mapM locallyNode (nodes m)
+  entry <- locallyResolve (entryPoint m)
+  fns <- mapM locallyFunction (functions m)
+  return m
+    { nodes = ns
+    , entryPoint = entry
+    , functions = fns }
+
+locallyNode :: NodeDefinition -> LUniq NodeDefinition
+locallyNode (NodeDefinition name ty) =
+  NodeDefinition <$> locallyBind name <*> pure ty
+
+locallyResolve :: Name -> LUniq Name
+locallyResolve name = do
+  scope <- locallyAsk
+  return $
+    case elemIndex name =<< Map.lookup name{nameUnique=0} scope of
+      Nothing  -> error $ "Data.Bedrock.Rename.locallyResolve: " ++ show name
+      Just nth -> name{nameUnique=nth}
+
+locallyResolveVariable :: Variable -> LUniq Variable
+locallyResolveVariable (Variable name ty) =
+  Variable <$> locallyResolve name <*> pure ty
+
+locallyBindVariable :: Variable -> LUniq Variable
+locallyBindVariable (Variable name ty) =
+  Variable <$> locallyBind name <*> pure ty
+
+locallyFunction :: Function -> LUniq Function
+locallyFunction fn = do
+  name <- locallyBind (fnName fn)
+  limitScope $ do
+    args <- mapM locallyBindVariable (fnArguments fn)
+    body <- locallyBlock (fnBody fn)
+    return $ fn
+      { fnName = name
+      , fnArguments = args
+      , fnBody = body }
+
+locallyMaybe :: (a -> LUniq a) -> Maybe a -> LUniq (Maybe a)
+locallyMaybe _ Nothing = return Nothing
+locallyMaybe fn (Just a) = Just <$> fn a
+
+
+locallyBlock :: Block -> LUniq Block
+locallyBlock block =
+  case block of
+    Case scrut mbDefault alts ->
+      Case
+        <$> locallyResolveVariable scrut
+        <*> locallyMaybe locallyBlock mbDefault
+        <*> mapM locallyAlternative alts
+    Bind binds expr rest ->
+      Bind
+        <$> mapM locallyBindVariable binds
+        <*> locallyExpression expr
+        <*> locallyBlock rest
+    Return args ->
+      Return <$> mapM locallyResolveVariable args
+    Raise exception ->
+      Raise <$> locallyResolveVariable exception
+    TailCall fn args ->
+      TailCall
+        <$> locallyResolve fn
+        <*> mapM locallyResolveVariable args
+    Invoke fn args ->
+      Invoke
+        <$> locallyResolveVariable fn
+        <*> mapM locallyResolveVariable args
+    -- InvokeHandler Variable Variable
+    Exit -> return block
+    Panic{} -> return block
+
+locallyAlternative :: Alternative -> LUniq Alternative
+locallyAlternative (Alternative pattern branch) = limitScope $
+  Alternative
+    <$> locallyPattern pattern
+    <*> locallyBlock branch
+
+locallyPattern :: Pattern -> LUniq Pattern
+locallyPattern pattern =
+  case pattern of
+    NodePat name args ->
+      NodePat
+        <$> locallyNodeName name
+        <*> mapM locallyBindVariable args
+    LitPat{} -> pure pattern
+
+locallyNodeName :: NodeName -> LUniq NodeName
+locallyNodeName node =
+  case node of
+    ConstructorName name missing ->
+      ConstructorName
+        <$> locallyResolve name
+        <*> pure missing
+    FunctionName name missing ->
+      FunctionName
+        <$> locallyResolve name
+        <*> pure missing
+    UnboxedTupleName -> pure node
+
+locallyExpression :: Expression -> LUniq Expression
+locallyExpression expr =
+  case expr of
+    Application fn args ->
+      Application
+        <$> locallyResolve fn
+        <*> mapM locallyResolveVariable args
+    CCall fn args ->
+      CCall fn
+        <$> mapM locallyResolveVariable args
+    -- Catch Name [Variable] Name [Variable]
+    Alloc{} -> pure expr
+    Store name args ->
+      Store
+        <$> locallyNodeName name
+        <*> mapM locallyResolveVariable args
+    BumpHeapPtr{} -> pure expr
+    Write dst offset src ->
+      Write
+        <$> locallyResolveVariable dst
+        <*> pure offset
+        <*> locallyResolveVariable src
+    Address ptr offset ->
+      Address
+        <$> locallyResolveVariable ptr
+        <*> pure offset
+    FunctionPointer name ->
+      FunctionPointer
+        <$> locallyResolve name
+    Fetch attrs ptr ->
+      Fetch attrs <$> locallyResolveVariable ptr
+    Load attrs ptr offset ->
+      Load attrs <$> locallyResolveVariable ptr <*> pure offset
+    Add a b -> Add <$> locallyResolveVariable a <*> locallyResolveVariable b
+    Undefined -> pure expr
+    Save val offset ->
+      Save
+        <$> locallyResolveVariable val
+        <*> pure offset
+    Restore{} -> pure expr
+    ReadRegister{} -> pure expr
+    WriteRegister reg val ->
+      WriteRegister reg <$> locallyResolveVariable val
+    ReadGlobal{} -> pure expr
+    WriteGlobal reg val ->
+      WriteGlobal reg <$> locallyResolveVariable val
+    TypeCast arg -> TypeCast <$> locallyResolveVariable arg
+    MkNode name args ->
+      MkNode
+        <$> locallyNodeName name
+        <*> mapM locallyResolveVariable args
+    Literal{} -> pure expr
+    Eval arg -> Eval <$> locallyResolveVariable arg
+    Apply fn a ->
+      Apply
+        <$> locallyResolveVariable fn
+        <*> locallyResolveVariable a
+    GCAllocate{} -> pure expr
+    GCBegin -> pure expr
+    GCEnd -> pure expr
+    GCMark arg -> GCMark <$> locallyResolveVariable arg
+    GCMarkNode arg -> GCMarkNode <$> locallyResolveVariable arg

@@ -168,6 +168,8 @@ bitSize (IntegerType n) = n
 bitSize _ = error "Data.Bedrock.LLVM.bitSize"
 
 nameToLLVM :: Bedrock.Name -> LLVM.Name
+nameToLLVM name | nameUnique name == 0 =
+  LLVM.Name $ intercalate "." (nameModule name ++ [nameIdentifier name])
 nameToLLVM name = LLVM.Name $ concat
     [ intercalate "." (nameModule name ++ [nameIdentifier name])
     , "_"
