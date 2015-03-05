@@ -127,7 +127,7 @@ ppExpression simple =
 		TypeCast var ->
 			ppSyntax "@cast" <> Doc.parens (pretty var)
 		MkNode name vars ->
-			ppSyntax "@node" <> Doc.parens (ppNode name (map pretty vars))
+			ppSyntax "@node" <+> Doc.parens (ppNode name (map pretty vars))
 		Literal lit ->
 			ppSyntax "@literal" <+> ppLiteral lit
 		Eval var ->

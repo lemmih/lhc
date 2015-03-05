@@ -13,6 +13,7 @@ import           Data.Bedrock.Misc
 data Env = Env
     { envRenaming  :: Map Variable Variable
     , envConstant  :: Map Variable (NodeName, [Variable])
+    , envStores    :: Map Variable (NodeName, [Variable])
     }
 newtype M a = M { unM :: ReaderT Env (State AvailableNamespace) a }
     deriving
@@ -26,7 +27,8 @@ simplify m = runM (simplifyModule m)
     st = modNamespace m
     env = Env
         { envRenaming = Map.empty
-        , envConstant = Map.empty }
+        , envConstant = Map.empty
+        , envStores   = Map.empty }
 
 simplifyModule :: Module -> M Module
 simplifyModule m = do
@@ -50,6 +52,11 @@ simplifyBlock block =
             bindVariable scrut clone $
                 Bind [clone] (Unit (NodeArg node [])) <$>
                     simplifyBlock branch-}
+        Bind [ptr] expr@(Store name vars) rest ->
+            bindStore ptr name vars $
+            Bind [ptr]
+                <$> simplifyExpression expr
+                <*> simplifyBlock rest
         Bind [node] expr@(MkNode name vars) rest ->
             bindConstant node name vars $
             Bind [node]
@@ -71,7 +78,6 @@ simplifyBlock block =
         Bind [] TypeCast{} rest ->
             simplifyBlock rest
         Bind [dst] (TypeCast src) rest | variableType dst == variableType src ->
-            -- Bind [dst] (TypeCast src) <$>
               bindVariable dst src (simplifyBlock rest)
         Bind binds simple rest ->
             Bind <$> mapM resolve binds
@@ -102,7 +108,18 @@ simplifyExpression :: Expression -> M Expression
 simplifyExpression expr =
     case expr of
         Application fn vars -> Application fn <$> mapM resolve vars
-        Eval var -> Eval <$> resolve var
+        Eval var -> do
+            mbNode <- lookupStore var
+            case mbNode of
+                Nothing -> Eval <$> resolve var
+                -- FIXME: We should update the heap object with
+                --        an indirection to the newly created object.
+                Just (FunctionName fnName 0, args) ->
+                    simplifyExpression $
+                    Application fnName args
+                Just (nodeName, args) ->
+                    simplifyExpression $
+                    MkNode nodeName args
         Apply a b -> Apply <$> resolve a <*> resolve b
         MkNode name vars -> MkNode name <$> mapM resolve vars
         TypeCast var -> TypeCast <$> resolve var
@@ -196,4 +213,14 @@ lookupConstant var = do
 bindConstant :: Variable -> NodeName -> [Variable] -> M a -> M a
 bindConstant var node vars = local $ \env ->
     env{ envConstant = Map.insert var (node, vars) (envConstant env) }
+
+lookupStore :: Variable -> M (Maybe (NodeName, [Variable]))
+lookupStore var = do
+    var' <- resolve var
+    m <- asks envStores
+    return $ Map.lookup var' m
+
+bindStore :: Variable -> NodeName -> [Variable] -> M a -> M a
+bindStore var node vars = local $ \env ->
+    env{ envStores = Map.insert var (node, vars) (envStores env) }
 

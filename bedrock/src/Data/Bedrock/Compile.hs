@@ -101,19 +101,19 @@ compileWithOpts keepIntermediateFiles verbose path m = do
 stdPipeline :: Pipeline
 stdPipeline =
         [ "rename"          :> simplify . unique
-        , "inlined"         :> simplify . unique . inline
+        , "inlined"         :> unique . simplify . inline . simplify . inline
         , PerformHPT
         , "no-laziness"     :?> runGen . lowerEvalApply
         -- , "no-void"         :> voidEliminate
         , "no-unknown-size" :?> runGen . lowerNodeSize
         , "no-nodes"        :> simplify . unique . registerIntroduction
         , "no-stack"        :> StackLayout.lower
-        , "no-stack"        :> mergeAllocsModule . unique . runGen cpsTransformation
+        , "no-stack"        :> mergeAllocsModule . locallyUnique . runGen cpsTransformation
         -- , "no-invoke"       :?> runGen . lowerInvoke
-        , "no-allocs"       :> unique . runGen lowerAlloc
-        , "no-gc"           :> unique . lowerGC fixedGC
-        , "no-globals"      :> unique . lowerGlobalRegisters
-        , "pretty"          :> locallyUnique
+        , "no-allocs"       :> locallyUnique . runGen lowerAlloc
+        , "no-gc"           :> locallyUnique . lowerGC fixedGC
+        , "no-globals"      :> locallyUnique . lowerGlobalRegisters
+        -- , "pretty"          :> locallyUnique
         ]
         -- [ "rename"          :> simplify . unique
         -- , PerformHPT

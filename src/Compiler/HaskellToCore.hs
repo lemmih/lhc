@@ -194,6 +194,8 @@ resolveQName qname =
     case qname of
         HS.Qual _ _ name -> resolveName name
         HS.UnQual _ name -> resolveName name
+        HS.Special _ HS.UnitCon{} ->
+          return $ Name ["LHC","Prim"] "Unit" 0
         _ -> error "HaskellToCore.resolveQName"
 
 unQName :: HS.QName Origin -> HS.Name Origin

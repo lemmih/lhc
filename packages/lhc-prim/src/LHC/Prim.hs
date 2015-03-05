@@ -71,10 +71,10 @@ return a = IO (\s -> (# s, a #))
 
 unsafePerformIO :: IO a -> a
 unsafePerformIO action =
-    case unIO action realworld# of
-        (# st, val #) -> val
+  case unIO action realworld# of
+    (# st, val #) -> val
 
-foreign import ccall unsafe "putchar" putchar :: I32 -> IO Int32
+foreign import ccall unsafe "putchar" c_putchar :: I32 -> IO Int32
 
 -- sequence_ :: List (IO Unit) -> IO Unit
 -- sequence_ lst =
@@ -99,9 +99,9 @@ foreign import ccall "getchar" c_getchar :: IO Int32
 
 getChar :: IO Char
 getChar =
-    c_getchar `bindIO` \c ->
-    case c of
-        Int32 c# -> return (C# c#)
+  c_getchar `bindIO` \c ->
+  case c of
+    Int32 c# -> return (C# c#)
 
 getLine :: IO (List Char)
 getLine =
@@ -128,7 +128,7 @@ putStr lst =
     Cons head tail ->
       case head of
         C# char ->
-          putchar char `thenIO` putStr tail
+          c_putchar char `thenIO` putStr tail
 
 putStrLn :: List Char -> IO Unit
 putStrLn msg = putStr msg `thenIO` putStr (unpackString# "\n"#)
@@ -136,9 +136,8 @@ putStrLn msg = putStr msg `thenIO` putStr (unpackString# "\n"#)
 data Bool = False | True
 
 not :: Bool -> Bool
-not x = case x of
-   False -> True
-   True  -> False
+not False = True
+not True  = False
 
 otherwise :: Bool
 otherwise = True
