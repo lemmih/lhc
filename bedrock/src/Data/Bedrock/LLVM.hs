@@ -54,23 +54,23 @@ toLLVM bedrock = defaultModule
             , parameters = ([ Parameter (cTypeToLLVM ty) (UnName 0) []
                             | ty <- foreignArguments], False) }
         | Foreign{..} <- modForeigns bedrock ] ++
-        [ GlobalDefinition GlobalVariable
+        [ GlobalDefinition globalVariableDefaults
             { name = LLVM.Name ("bedrock:"++reg)
             , linkage = LLVM.Private
             , visibility = Default
-            , isThreadLocal = False
+            , threadLocalMode = Nothing
             , addrSpace = AddrSpace 0
             , hasUnnamedAddr = True
             , isConstant = False
-            , type' = PointerType (IntegerType 64) (AddrSpace 0)
+            , Global.type' = PointerType (IntegerType 64) (AddrSpace 0)
             , initializer = Just $ Constant.Null $ PointerType (IntegerType 64) (AddrSpace 0)
             , section = Nothing
-            , alignment = 1 }
+            , Global.alignment = 1 }
         | reg <- Set.toList $ allRegisters bedrock ] ++
         defs
     }
   where
-    dataLayout = defaultDataLayout
+    dataLayout = defaultDataLayout LittleEndian
     defs = execGenModule (mkEnv bedrock) $ do
             newDefinition $ GlobalDefinition functionDefaults
                     { name = LLVM.Name "exit"
@@ -98,12 +98,12 @@ toLLVM bedrock = defaultModule
                     , linkage = LLVM.Internal
                     , Global.callingConvention = Fast
                     , basicBlocks = blocks
-                    , Global.functionAttributes = [NoUnwind]
+                    , Global.functionAttributes = [Right NoUnwind]
                     }
     mainDef = do
         let wordPtrTy = PointerType (IntegerType 64) (AddrSpace 0)
             entryCall = Call
-                { isTailCall = True
+                { tailCallKind = Nothing
                 , callingConvention = Fast
                 , returnAttributes = []
                 , function = Right $ ConstantOperand $ Constant.GlobalReference
@@ -112,7 +112,7 @@ toLLVM bedrock = defaultModule
                 , arguments =
                     [ (ConstantOperand $ Constant.Null wordPtrTy, [])
                     , (ConstantOperand $ Constant.Null wordPtrTy, []) ]
-                , functionAttributes = [NoUnwind]
+                , functionAttributes = [Right NoUnwind, Right NoReturn]
                 , metadata = [] }
         newDefinition $ GlobalDefinition functionDefaults
             { name = LLVM.Name "main"
@@ -188,7 +188,7 @@ traceLLVM msg = do
         , indices = [ConstantOperand $ Constant.Int 64 0, ConstantOperand $ Constant.Int 64 0]
         , metadata = [] }
     doInst $ Call
-        { isTailCall = False
+        { tailCallKind = Nothing
         , callingConvention = C
         , returnAttributes = []
         , function = Right $ ConstantOperand $ Constant.GlobalReference
@@ -260,7 +260,7 @@ blockToLLVM = worker
         TailCall fName args -> do
             --traceLLVM $ "TailCall: " ++ show fName
             doInst $ Call
-                { isTailCall = True
+                { tailCallKind = Just Tail
                 , callingConvention = Fast
                 , returnAttributes = []
                 , function = Right $ ConstantOperand $ Constant.GlobalReference
@@ -271,12 +271,12 @@ blockToLLVM = worker
                         (typeToLLVM variableType)
                         (nameToLLVM variableName), [])
                     | Variable{..} <- args ]
-                , functionAttributes = [NoUnwind]
+                , functionAttributes = [Right NoUnwind]
                 , metadata = [] }
             return $ Ret Nothing []
         Exit -> do
             doInst $ Call
-                { isTailCall = False
+                { tailCallKind = Nothing
                 , callingConvention = C
                 , returnAttributes = []
                 , function = Right $ ConstantOperand $ Constant.GlobalReference
@@ -296,7 +296,7 @@ blockToLLVM = worker
                             (map (typeToLLVM . variableType) args)
                             False) (AddrSpace 0))
             doInst $ Call
-                { isTailCall = True
+                { tailCallKind = Just Tail
                 , callingConvention = Fast
                 , returnAttributes = []
                 , function = Right $ LocalReference
@@ -307,13 +307,13 @@ blockToLLVM = worker
                         (typeToLLVM variableType)
                         (nameToLLVM variableName), [])
                     | Variable{..} <- args ]
-                , functionAttributes = [NoUnwind]
+                , functionAttributes = [Right NoUnwind]
                 , metadata = [] }
             return $ Unreachable []
         _ -> do
             traceLLVM $ "Bedrock: Internal error: Unhandled construct"
             doInst $ Call
-                { isTailCall = False
+                { tailCallKind = Nothing
                 , callingConvention = C
                 , returnAttributes = []
                 , function = Right $ ConstantOperand $ Constant.GlobalReference
@@ -352,7 +352,7 @@ blockToLLVM = worker
 
     mkInst retTy (CCall fName args) = do
         return Call
-            { isTailCall = False
+            { tailCallKind = Nothing
             , callingConvention = C
             , returnAttributes = []
             , function = Right (ConstantOperand $ Constant.GlobalReference
@@ -365,7 +365,7 @@ blockToLLVM = worker
             , metadata = [] }
     mkInst retTy (Application fName args) = do
         return Call
-            { isTailCall = False
+            { tailCallKind = Nothing
             , callingConvention = Fast
             , returnAttributes = []
             , function = Right (ConstantOperand $ Constant.GlobalReference

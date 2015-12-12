@@ -1,10 +1,12 @@
 module Main where
 
+import           Data.Graph                         (flattenSCC,
+                                                     stronglyConnComp,SCC(..))
 import           Data.Tagged
+import           Language.Haskell.Exts.Annotated
+import           System.Exit
 import           System.FilePath
 import           Text.PrettyPrint.ANSI.Leijen       (pretty)
-
-import           Language.Haskell.Exts.Annotated
 
 import           Language.Haskell.TypeCheck.Infer
 import           Language.Haskell.TypeCheck.Monad
@@ -12,27 +14,29 @@ import           Language.Haskell.TypeCheck.Monad
 import           Language.Haskell.Scope             hiding (Interface)
 
 import qualified Compiler.Core                      as Core
+import qualified Compiler.Core.DCE                  as Core
 import qualified Compiler.Core.NewType              as NewType
-import qualified Compiler.Core.Simplify as Core
+import qualified Compiler.Core.Simplify             as Core
 import qualified Compiler.CoreToBedrock             as Core
 import qualified Compiler.HaskellToCore             as Haskell
-import qualified Compiler.Core.DCE as Core
 import           Compiler.Interface
-import qualified Data.Bedrock.Compile               as Bedrock
-import Data.Bedrock (Name(..))
 import           Control.Monad
+import           Data.Bedrock                       (Name (..))
+import qualified Data.Bedrock.Compile               as Bedrock
 import           Data.Bedrock.PrettyPrint
 import           Data.Binary
 import           Data.List                          (intercalate)
 import           Data.Monoid                        (mconcat)
 import           Data.Proxy
+import Data.IORef
 import qualified Distribution.ModuleName            as Dist
 import           Options.Applicative
 import           System.Directory
 
 import qualified Distribution.HaskellSuite.Compiler as Compiler
 import           Distribution.HaskellSuite.Packages
-import           Distribution.InstalledPackageInfo  (InstalledPackageInfo,
+import           Distribution.InstalledPackageInfo  (ExposedModule (..),
+                                                     InstalledPackageInfo,
                                                      InstalledPackageInfo_ (..))
 import           Distribution.Package
 import           Distribution.Simple.Compiler
@@ -73,41 +77,98 @@ moduleFile m =
   where
     replace a b lst = [ if c == a then b else c | c <- lst ]
 
+moduleDependencies :: Module a -> (String, [String])
+moduleDependencies (Module _ mbHead _pragma imports _decls) =
+  (case mbHead of
+    Nothing -> "Main"
+    Just (ModuleHead _ (ModuleName _ name) _warn _exports) -> name
+  , [ modName
+    | importDecl <- imports
+    , let ModuleName _ modName = importModule importDecl ])
+moduleDependencies _ = error "Main: moduleDependencies: undefined"
+{-
+parse files
+find module dependencies
+name resolution by scc group
+type check by scc group
+save .hi, .code, and .pretty files
+-}
 compileLibrary :: Compiler.CompileFn
-compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps [file] = do
-    putStrLn "Parsing file..."
-    ParseOk m <- parseFile file
-    putStrLn "Origin analysis..."
-    let (resolveEnv, errs, m') = resolve emptyResolveEnv m
-        Just scopeIface = lookupInterface (getModuleName m) resolveEnv
-    mapM_ print errs
-    putStrLn "Typechecking..."
-    env <- runTI emptyTcEnv (tiModule m')
-    let iface = mkInterface scopeIface env
-        ifaceFile = buildDir </> moduleFile m' <.> "hi"
-    writeInterface ifaceFile iface
-    putStrLn "Converting to core..."
-    let core = Haskell.convert env m'
-        coreFile = buildDir </> moduleFile m' <.> "core"
-        complete = Core.simplify $ Core.simplify $ core
-    print (pretty complete)
-    encodeFile coreFile complete
-    writeFile (coreFile <.> "pretty") (show $ pretty complete)
-    --let bedrock = Core.convert complete
-    --print (ppModule bedrock)
-    --let bedrockFile = replaceExtension file "bedrock"
-    --writeFile bedrockFile (show $ ppModule bedrock)
-    -- Bedrock.compileModule bedrock file
-    return ()
+compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
+    ms <- forM files $ \file -> do
+            ret <- parseFile file
+            case ret of
+              ParseOk m -> return m
+              ParseFailed src msg -> do
+                putStrLn (show src ++ ": " ++ msg)
+                exitWith (ExitFailure 1)
+    let graph =
+          [ (m, self, imports)
+          | m <- ms
+          , let (self, imports) = moduleDependencies m ]
+        scc = stronglyConnComp graph
+    resolveEnvRef <- newIORef emptyResolveEnv
+    tiEnvRef <- newIORef emptyTcEnv
+    forM_ scc $ \group -> do
+      case group of
+        AcyclicSCC m -> do
+          resolveEnv <- readIORef resolveEnvRef
+          tiEnv <- readIORef tiEnvRef
+          putStrLn "Origin analysis..."
+          let (resolveEnv', errs, m') = resolve resolveEnv m
+              Just scopeIface = lookupInterface (getModuleName m) resolveEnv'
+          unless (null errs) $ do
+            mapM_ print errs
+            exitWith (ExitFailure 1)
+          putStrLn "Typechecking..."
+          tiEnv' <- runTI tiEnv (tiModule m')
+          let iface = mkInterface scopeIface tiEnv'
+              ifaceFile = buildDir </> moduleFile m' <.> "hi"
+          writeInterface ifaceFile iface
+          putStrLn "Converting to core..."
+          let core = Haskell.convert tiEnv' m'
+              coreFile = buildDir </> moduleFile m' <.> "core"
+              complete = Core.simplify $ Core.simplify $ core
+          print (pretty complete)
+          encodeFile coreFile complete
+          writeFile (coreFile <.> "pretty") (show $ pretty complete)
+          writeIORef resolveEnvRef resolveEnv'
+          writeIORef tiEnvRef tiEnv'
+        CyclicSCC{} -> error "Recursive modules not handled yet."
+-- compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps [file] = do
+--     putStrLn "Parsing file..."
+--     ParseOk m <- parseFile file
+--     putStrLn "Origin analysis..."
+--     let (resolveEnv, errs, m') = resolve emptyResolveEnv m
+--         Just scopeIface = lookupInterface (getModuleName m) resolveEnv
+--     mapM_ print errs
+--     putStrLn "Typechecking..."
+--     env <- runTI emptyTcEnv (tiModule m')
+--     let iface = mkInterface scopeIface env
+--         ifaceFile = buildDir </> moduleFile m' <.> "hi"
+--     writeInterface ifaceFile iface
+--     putStrLn "Converting to core..."
+--     let core = Haskell.convert env m'
+--         coreFile = buildDir </> moduleFile m' <.> "core"
+--         complete = Core.simplify $ Core.simplify $ core
+--     print (pretty complete)
+--     encodeFile coreFile complete
+--     writeFile (coreFile <.> "pretty") (show $ pretty complete)
+--     --let bedrock = Core.convert complete
+--     --print (ppModule bedrock)
+--     --let bedrockFile = replaceExtension file "bedrock"
+--     --writeFile bedrockFile (show $ ppModule bedrock)
+--     -- Bedrock.compileModule bedrock file
+--     return ()
 
 loadLibrary :: InstalledPackageInfo -> IO [(String, (Interface, Core.Module))]
 loadLibrary pkgInfo =
-    forM (exposedModules pkgInfo) $ \modName -> do
-        Just hiFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath modName <.> "hi")
-        Just coreFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath modName <.> "core")
+    forM (exposedModules pkgInfo) $ \exposedModule -> do
+        Just hiFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath (exposedName exposedModule) <.> "hi")
+        Just coreFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath (exposedName exposedModule) <.> "core")
         iface <- readInterface hiFile
         core <- decodeFile coreFile
-        return (intercalate "." (Dist.components modName), (iface, core))
+        return (intercalate "." (Dist.components $ exposedName exposedModule), (iface, core))
 
 -- Load dependencies interface files
 -- convert to scope interfaces

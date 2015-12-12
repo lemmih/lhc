@@ -7,11 +7,12 @@ import           Data.Bedrock.PrettyPrint ()
 import           Language.Haskell.Exts.SrcLoc
 import           Language.Haskell.TypeCheck.Types (Coercion(..), TcType(..), Qual(..),
                                                    Pred(..),TcVar(..))
+import qualified Language.Haskell.TypeCheck.Pretty as P
 import           Data.Binary
 import           Data.Derive.Binary
 import           Data.DeriveTH
 import           Language.Haskell.Scope                 (QualifiedName (..), GlobalName(..))
-import Data.Monoid (Monoid(..))
+-- import Data.Monoid (Monoid(..))
 import Text.PrettyPrint.ANSI.Leijen
 
 data Module = Module
@@ -43,7 +44,7 @@ data Decl = Decl TcType Name Expr
 
 instance Pretty Decl where
     pretty (Decl ty name expr) =
-        pretty name <+> colon <+> pretty ty <$$>
+        pretty name <+> colon <+> P.pretty ty <$$>
         pretty name <+> equals <$$> indent 2 (pretty expr)
 
 data NodeDefinition = NodeDefinition Name [TcType]
@@ -51,7 +52,7 @@ data NodeDefinition = NodeDefinition Name [TcType]
 
 instance Pretty NodeDefinition where
     pretty (NodeDefinition name args) =
-        text "node" <+> pretty name <+> hsep (map pretty args)
+        text "node" <+> pretty name <+> hsep (map P.pretty args)
 
 data NewType = NewType Name
 
@@ -111,11 +112,11 @@ instance Pretty Expr where
                 indent 2 (vsep (map pretty alts) <$$>
                     text "DEFAULT" <+> rarrow <$$> indent 2 (pretty defaultBranch))
             Cast expr ty ->
-                parens (pretty expr <+> text ":::" <+> pretty ty)
+                parens (pretty expr <+> text ":::" <+> P.pretty ty)
             Id -> text "id"
             WithCoercion CoerceId e -> pretty e
             WithCoercion c e ->
-                parens (pretty c) <+> pretty e
+                parens (P.pretty c) <+> pretty e
             WithExternal outV cName args st cont ->
                 ppTypedVariable outV <+> text "←" <+>
                     text "external" <+> pretty cName <+> ppVars args <$$>
@@ -141,7 +142,7 @@ instance Pretty Expr where
 
 ppTypedVariable :: Variable -> Doc
 ppTypedVariable var = parens $
-    pretty (varName var) <> colon <> pretty (varType var)
+    pretty (varName var) <> colon <> P.pretty (varType var)
 
 instance Pretty Variable where
     pretty var = pretty (varName var)

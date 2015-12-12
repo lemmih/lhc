@@ -24,9 +24,8 @@ module LHC.Prim
     , otherwise
     , (+), (-), (*)
     , mapM_
-    , le
+    , (<=)
     , max
-    , append
     ) where
 
 -- XXX: These have kind # but it is not checked anywhere.
@@ -66,6 +65,8 @@ bindIO f g = IO (\s ->
 thenIO :: IO a -> IO b -> IO b
 thenIO a b = bindIO a (\c -> b)
 
+-- infixl 1 `thenIO`
+
 return :: a -> IO a
 return a = IO (\s -> (# s, a #))
 
@@ -89,11 +90,11 @@ foreign import ccall "cast" i8toi64 :: I8 -> I64
 foreign import ccall "cast" i8toi32 :: I8 -> I32
 foreign import ccall "cast" i32to64 :: I32 -> I64
 
-unpackString# :: Addr I8 -> List Char
+unpackString# :: Addr I8 -> [Char]
 unpackString# ptr =
   case i8toi64 (indexI8# ptr) of
-    0#   -> Nil
-    char -> Cons (C# (i64toi32 char)) (unpackString# (addrAdd# ptr 1#))
+    0#   -> []
+    char -> (:) (C# (i64toi32 char)) (unpackString# (addrAdd# ptr 1#))
 
 foreign import ccall "getchar" c_getchar :: IO Int32
 
@@ -103,34 +104,25 @@ getChar =
   case c of
     Int32 c# -> return (C# c#)
 
-getLine :: IO (List Char)
+getLine :: IO [Char]
 getLine =
   getChar `bindIO` \c ->
   case c of
     C# c# ->
       case c# of
-        '\n'# -> return Nil
-        _     -> getLine `bindIO` \cs -> return (Cons c cs)
+        '\n'# -> return []
+        _     -> getLine `bindIO` \cs -> return (c : cs)
 
---reverse :: List a -> List a
---reverse lst = reverse_go Nil lst
-
---reverse_go :: List a -> List a -> List a
---reverse_go acc lst =
---    case lst of
---        Nil -> acc
---        Cons x xs -> reverse_go (Cons x acc) xs
-
-putStr :: List Char -> IO Unit
+putStr :: [Char] -> IO ()
 putStr lst =
   case lst of
-    Nil -> return Unit
-    Cons head tail ->
+    [] -> return ()
+    head : tail ->
       case head of
         C# char ->
           c_putchar char `thenIO` putStr tail
 
-putStrLn :: List Char -> IO Unit
+putStrLn :: [Char] -> IO ()
 putStrLn msg = putStr msg `thenIO` putStr (unpackString# "\n"#)
 
 data Bool = False | True
@@ -173,11 +165,11 @@ a * b =
 --bit = bit
 -- bit n = 1<<n
 
-mapM_ :: (a -> IO Unit) -> List a -> IO Unit
+mapM_ :: (a -> IO ()) -> [a] -> IO ()
 mapM_ fn lst =
   case lst of
-    Nil -> return Unit
-    Cons x xs -> fn x `thenIO` mapM_ fn xs
+    [] -> return ()
+    (:) x xs -> fn x `thenIO` mapM_ fn xs
 
 foreign import ccall unsafe le# :: I32 -> I32 -> I32
 
@@ -198,10 +190,4 @@ max a b =
     True -> b
     False -> a
 
-append :: List a -> List a -> List a
-append Nil b         = b
-append (Cons x xs) b = Cons x (append xs b)
-  -- case a of
-  --   Nil       -> b
-  --   Cons x xs -> Cons x (append xs b)
 

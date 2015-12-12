@@ -269,6 +269,7 @@ countStores = getSum . execWriter . mapM_ countFn . functions
                 countSimple simple >> countExpr rest
             _ -> return ()
     countAlt (Alternative _pattern branch) = countExpr branch
+    countSimple :: Expression -> Writer (Sum Int) ()
     countSimple simple =
         case simple of
             Store{} -> tell (Sum 1)
@@ -764,7 +765,9 @@ analyseUsage :: Module -> Map Variable Int
 analyseUsage m =
     unSumMap (execWriter (analyseModule m))
   where
+    push :: Variable -> Writer SumMap ()
     push var = tell $ SumMap $ Map.singleton var 1
+    pushMany :: [Variable] -> Writer SumMap ()
     pushMany vars = tell $ SumMap $ Map.fromList (zip vars [1,1..])
     analyseModule = mapM_ analyseFunction . functions
     analyseFunction = analyseBlock . fnBody

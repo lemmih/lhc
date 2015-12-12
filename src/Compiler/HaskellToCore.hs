@@ -3,15 +3,15 @@ module Compiler.HaskellToCore
     ( convert
     ) where
 
-import           Control.Applicative
 import           Control.Monad.Reader
-import           Control.Monad.RWS
+import           Control.Monad.RWS                (RWS, execRWS)
 import           Control.Monad.State
-import           Control.Monad.Writer
+import           Control.Monad.Writer             (MonadWriter (..))
 import           Data.List                        (transpose)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
 import           Data.Maybe
+import qualified Data.Set                         as Set
 import qualified Language.Haskell.Exts.Annotated  as HS
 
 import           Compiler.Core
@@ -24,9 +24,9 @@ import           Language.Haskell.Scope           (GlobalName (..),
                                                    QualifiedName (..),
                                                    getNameIdentifier)
 import qualified Language.Haskell.Scope           as Scope
-import           Language.Haskell.TypeCheck.Monad (TcEnv (..), mkBuiltIn)
+import           Language.Haskell.TypeCheck.Monad (TcEnv (..), mkBuiltIn, noSrcSpanInfo)
 import           Language.Haskell.TypeCheck.Types (Coercion (..), Qual (..),
-                                                   TcType (..))
+                                                   TcType (..), TcVar(..))
 
 import           Debug.Trace
 
@@ -47,6 +47,8 @@ instance Monoid Scope where
               tcEnvValues    = Map.empty
             , tcEnvUnique    = 0
             , tcEnvCoercions = Map.empty
+            , tcEnvRecursive = Set.empty
+            , tcEnvKnots     = []
             }
         , scopeArity         = Map.empty
         }
@@ -195,8 +197,12 @@ resolveQName qname =
         HS.Qual _ _ name -> resolveName name
         HS.UnQual _ name -> resolveName name
         HS.Special _ HS.UnitCon{} ->
-          return $ Name ["LHC","Prim"] "Unit" 0
-        _ -> error "HaskellToCore.resolveQName"
+          return $ Name ["LHC.Prim"] "Unit" 0
+        HS.Special _ HS.Cons{} ->
+          return $ Name ["LHC.Prim"] "Cons" 0
+        HS.Special _ HS.ListCon{} ->
+          return $ Name ["LHC.Prim"] "Nil" 0
+        _ -> error $ "HaskellToCore.resolveQName: " ++ show qname
 
 unQName :: HS.QName Origin -> HS.Name Origin
 unQName qname =
@@ -210,6 +216,12 @@ resolveQGlobalName qname =
     case qname of
         HS.Qual _ _ name -> worker name
         HS.UnQual _ name -> worker name
+        HS.Special _ HS.UnitCon{} ->
+          return $ Name ["LHC.Prim"] "Unit" 0
+        HS.Special _ HS.Cons{} ->
+          return $ Name ["LHC.Prim"] "Cons" 0
+        HS.Special _ HS.ListCon{} ->
+          return $ Name ["LHC.Prim"] "Nil" 0
         _ -> error "HaskellToCore.resolveQName"
   where
     worker name =
@@ -570,6 +582,50 @@ convertRhs rhs =
         HS.UnGuardedRhs _ expr -> convertExp expr
         _ -> error "convertRhs"
 
+convertStmts :: [HS.Stmt Origin] -> M Expr
+convertStmts [] = error "convertStmts: Empty list"
+convertStmts [end] =
+    case end of
+        -- HS.Generator _ pat expr
+        HS.Qualifier _ expr -> convertExp expr
+        _ -> error $ "convertStmts: " ++ show end
+convertStmts (x:xs) =
+    case x of
+        HS.Generator (Origin _ src) (HS.PVar _ name) expr -> do
+            var <- bindVariable name
+            expr' <- convertExp expr
+            rest <- convertStmts xs
+            coercion <- findCoercion src
+            return $ WithCoercion coercion primBindIO `App` expr' `App` Lam [var] rest
+        HS.Qualifier (Origin _ src) expr -> do
+            expr' <- convertExp expr
+            rest <- convertStmts xs
+            coercion <- findCoercion src
+            return $ WithCoercion coercion primThenIO `App` expr' `App` rest
+
+primThenIO :: Expr
+primThenIO = Var (Variable name ty)
+  where
+    name = Name ["LHC.Prim"] "thenIO" 0
+    ty = TcForall [aRef, bRef] ([] :=> (ioA `TcFun` ioB `TcFun` ioB))
+    aRef = TcVar "a" noSrcSpanInfo
+    bRef = TcVar "b" noSrcSpanInfo
+    io = TcCon (mkBuiltIn "LHC.Prim" "IO")
+    ioA = io `TcApp` TcRef aRef
+    ioB = io `TcApp` TcRef bRef
+
+primBindIO :: Expr
+primBindIO = Var (Variable name ty)
+  where
+    name = Name ["LHC.Prim"] "bindIO" 0
+    ty = TcForall [aRef, bRef] ([] :=> (ioA `TcFun` ioAB `TcFun` ioB))
+    aRef = TcVar "a" noSrcSpanInfo
+    bRef = TcVar "b" noSrcSpanInfo
+    io = TcCon (mkBuiltIn "LHC.Prim" "IO")
+    ioA = io `TcApp` TcRef aRef
+    ioB = io `TcApp` TcRef bRef
+    ioAB = TcRef aRef `TcFun` ioB
+
 convertExp :: HS.Exp Origin -> M Expr
 convertExp expr =
     case expr of
@@ -586,12 +642,21 @@ convertExp expr =
             App
                 <$> convertExp a
                 <*> convertExp b
+        HS.InfixApp _ a (HS.QConOp _ con) b -> do
+            ae <- convertExp a
+            be <- convertExp b
+            let Origin _ src = HS.ann con
+            coercion <- findCoercion src
+            n <- resolveQName con
+            pure $ App (App (WithCoercion coercion (Con n)) ae) be
         HS.InfixApp _ a (HS.QVarOp _ var) b -> do
             ae <- convertExp a
             be <- convertExp b
+            let Origin _ src = HS.ann var
+            coercion <- findCoercion src
             n <- resolveQName var
             ty <- lookupType $ unQName var
-            pure $ App (App (Var (Variable n ty)) ae) be
+            pure $ App (App (WithCoercion coercion (Var (Variable n ty))) ae) be
         HS.Paren _ sub -> convertExp sub
         HS.Lambda _ pats sub ->
             Lam
@@ -615,7 +680,11 @@ convertExp expr =
             Let (Rec [ (Variable name ty, body)
                      | Decl ty name body <- concat decls ])
                 <$> convertExp expr
-        _ -> error $ "convertExp: " ++ show expr
+        HS.List _ [] -> do
+            return $ Con $ Name ["LHC.Prim"] "Nil" 0
+        HS.Do _ stmts -> do
+            convertStmts stmts
+        _ -> error $ "H->C convertExp: " ++ show expr
 
 convertAlts :: Variable -> [HS.Alt Origin] -> M Expr
 convertAlts scrut [] = pure $ Case (Var scrut) scrut Nothing []
@@ -635,9 +704,11 @@ isSimplePat :: HS.Pat Origin -> Bool
 isSimplePat pat =
     case pat of
         HS.PApp _ name pats -> all isPVar pats
+        HS.PInfixApp _ a name b -> all isPVar [a,b]
         HS.PVar{} -> True
         HS.PLit{} -> True
         HS.PParen _ pat' -> isSimplePat pat'
+        HS.PList _ pats -> all isPVar pats
         _ -> False
   where
     isPVar HS.PVar{} = True
@@ -652,6 +723,7 @@ convertAltPat scrut failBranch pat successBranch =
             alt <- Alt <$> (ConPat <$> resolveQGlobalName name <*> pure args)
                 <*> pure successBranch
             return $ Case (Var scrut) scrut failBranch [alt]
+        HS.PInfixApp src a con b -> convertAltPat scrut failBranch (HS.PApp src con [a,b]) successBranch
         HS.PTuple _ HS.Unboxed pats -> do
             args <- sequence [ Variable <$> bindName var <*> lookupType var
                              | HS.PVar _ var <- pats ]
@@ -672,6 +744,9 @@ convertAltPat scrut failBranch pat successBranch =
             return $ Case (Var scrut) scrut failBranch [alt]
         HS.PParen _ pat' ->
             convertAltPat scrut failBranch pat' successBranch
+        HS.PList _ [] -> do
+            let alt = Alt (ConPat (Name ["LHC.Prim"] "Nil" 0) []) successBranch
+            return $ Case (Var scrut) scrut failBranch [alt]
         _ -> error $ "Compiler.HaskellToCore.convertAltPat: " ++ show pat
 
 convertAlt :: HS.Alt Origin -> M Alt

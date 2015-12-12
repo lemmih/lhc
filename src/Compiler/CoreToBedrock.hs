@@ -9,19 +9,19 @@ import           Data.Bedrock                     as Bedrock
 import           Data.Bedrock.Misc
 import           Data.Bedrock.Transform           (freeVariables)
 
-import           Control.Applicative
 import           Control.Monad.Reader
-import           Control.Monad.RWS
-import           Control.Monad.Writer
+import           Control.Monad.RWS                (MonadState (..), RWS,
+                                                   execRWS)
+import           Control.Monad.Writer             (MonadWriter (..))
 import           Data.Char                        (ord)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
-import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
-import Data.List (nub)
 
 import           Language.Haskell.TypeCheck.Monad (mkBuiltIn)
 import           Language.Haskell.TypeCheck.Types (TcType (..))
+
+import Debug.Trace
 
 entrypointName :: Name
 entrypointName = Name ["Main"] "entrypoint" 0
@@ -427,7 +427,7 @@ convertExpr lazy expr rest =
 
 
 
-        _ | lazy -> error $ "convertExpr: " ++ show (lazy, expr)
+        _ | lazy -> error $ "C->B convertExpr: " ++ show (lazy, expr)
         _ | not lazy ->
             convertExpr True expr $ \[val] -> do
             tmp <- deriveVariable val "eval" Node
