@@ -60,7 +60,7 @@ unIO action =
 bindIO :: IO a -> (a -> IO b) -> IO b
 bindIO f g = IO (\s ->
   case unIO f s of
-    (# s', a #) -> unIO (g a) s)
+    (# s', a #) -> unIO (g a) s')
 
 thenIO :: IO a -> IO b -> IO b
 thenIO a b = bindIO a (\c -> b)

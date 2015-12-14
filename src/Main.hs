@@ -1,12 +1,12 @@
 module Main where
 
-import           Data.Graph                         (flattenSCC,
-                                                     stronglyConnComp,SCC(..))
+import           Data.Graph                         (SCC (..), flattenSCC,
+                                                     stronglyConnComp)
 import           Data.Tagged
 import           Language.Haskell.Exts.Annotated
+import           Language.Haskell.TypeCheck.Pretty  (pretty)
 import           System.Exit
 import           System.FilePath
-import           Text.PrettyPrint.ANSI.Leijen       (pretty)
 
 import           Language.Haskell.TypeCheck.Infer
 import           Language.Haskell.TypeCheck.Monad
@@ -25,10 +25,10 @@ import           Data.Bedrock                       (Name (..))
 import qualified Data.Bedrock.Compile               as Bedrock
 import           Data.Bedrock.PrettyPrint
 import           Data.Binary
+import           Data.IORef
 import           Data.List                          (intercalate)
 import           Data.Monoid                        (mconcat)
 import           Data.Proxy
-import Data.IORef
 import qualified Distribution.ModuleName            as Dist
 import           Options.Applicative
 import           System.Directory

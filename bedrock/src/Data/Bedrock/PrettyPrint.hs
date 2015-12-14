@@ -1,10 +1,11 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Data.Bedrock.PrettyPrint where
 
+import           Data.List
 import           Text.PrettyPrint.ANSI.Leijen (Doc, char, int, text, (<+>),
-                                               (<>), Pretty(..))
+                                               (<>), list, parens)
 import qualified Text.PrettyPrint.ANSI.Leijen as Doc
-import Data.List
+import           Language.Haskell.TypeCheck.Pretty
 
 import           Data.Bedrock
 
@@ -58,7 +59,7 @@ ppNode (ConstructorName constructor blanks) args =
 ppNode (FunctionName fn blanks) args =
   Doc.hsep (Doc.magenta (pretty fn) : args ++ replicate blanks (Doc.char '_'))
 ppNode UnboxedTupleName args =
-  Doc.text "(#" <+> ppList (map pretty args) <+> Doc.text "#)"
+  Doc.text "(#" <+> ppList args <+> Doc.text "#)"
 --ppNode (CatchFrame fn blanks) args =
 --  Doc.hsep (Doc.green (ppName fn) : args ++ replicate blanks (Doc.char '_'))
 

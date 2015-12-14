@@ -1,19 +1,25 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Compiler.Core where
 
-import           Data.Bedrock           (AvailableNamespace(..), CType(..), Foreign,
-                                         Name(..), Foreign(..) )
-import           Data.Bedrock.PrettyPrint ()
-import           Language.Haskell.Exts.SrcLoc
-import           Language.Haskell.TypeCheck.Types (Coercion(..), TcType(..), Qual(..),
-                                                   Pred(..),TcVar(..))
-import qualified Language.Haskell.TypeCheck.Pretty as P
+import           Data.Bedrock                      (AvailableNamespace (..),
+                                                    CType (..), Foreign,
+                                                    Foreign (..), Name (..))
+import           Data.Bedrock.PrettyPrint          ()
 import           Data.Binary
 import           Data.Derive.Binary
 import           Data.DeriveTH
-import           Language.Haskell.Scope                 (QualifiedName (..), GlobalName(..))
+import           Language.Haskell.Exts.SrcLoc
+import           Language.Haskell.Scope            (GlobalName (..),
+                                                    QualifiedName (..))
+import           Language.Haskell.TypeCheck.Pretty
+import           Language.Haskell.TypeCheck.Types  (Coercion (..), Pred (..),
+                                                    Qual (..), TcType (..),
+                                                    TcVar (..))
 -- import Data.Monoid (Monoid(..))
-import Text.PrettyPrint.ANSI.Leijen
+import           Text.PrettyPrint.ANSI.Leijen      (Doc, char, colon, comma,
+                                                    equals, hang, hsep, indent,
+                                                    parens, punctuate, text,
+                                                    vsep, (<$$>), (<+>), (<>), integer)
 
 data Module = Module
     { coreForeigns  :: [Foreign]
@@ -44,7 +50,7 @@ data Decl = Decl TcType Name Expr
 
 instance Pretty Decl where
     pretty (Decl ty name expr) =
-        pretty name <+> colon <+> P.pretty ty <$$>
+        pretty name <+> colon <+> pretty ty <$$>
         pretty name <+> equals <$$> indent 2 (pretty expr)
 
 data NodeDefinition = NodeDefinition Name [TcType]
@@ -52,7 +58,7 @@ data NodeDefinition = NodeDefinition Name [TcType]
 
 instance Pretty NodeDefinition where
     pretty (NodeDefinition name args) =
-        text "node" <+> pretty name <+> hsep (map P.pretty args)
+        text "node" <+> pretty name <+> hsep (map pretty args)
 
 data NewType = NewType Name
 
@@ -90,8 +96,11 @@ ppVars = hsep . map pretty
 ppTypedVars :: [Variable] -> Doc
 ppTypedVars = hsep . map ppTypedVariable
 
+appPrecedence :: Int
+appPrecedence = 1
+
 instance Pretty Expr where
-    pretty expr =
+    prettyPrec p expr =
         case expr of
             Var var -> pretty var
             Con name -> pretty name -- <+> ppVars vars
@@ -100,9 +109,9 @@ instance Pretty Expr where
                 (hsep $ punctuate comma $ map pretty vars) <+>
                 text "#)"
             Lit lit -> pretty lit
-            App a b ->
-                pretty a <+> parens (pretty b)
-            Lam vars e ->
+            App a b -> parensIf (p > 0) $
+                pretty a <+> prettyPrec appPrecedence b
+            Lam vars e -> parensIf (p > 0) $
                 char 'λ' <+> ppTypedVars vars <+> rarrow <$$> indent 2 (pretty e)
             Case scrut var Nothing alts ->
                 text "case" <+> pretty scrut <+> text "of" <+> ppTypedVariable var <$$>
@@ -112,18 +121,18 @@ instance Pretty Expr where
                 indent 2 (vsep (map pretty alts) <$$>
                     text "DEFAULT" <+> rarrow <$$> indent 2 (pretty defaultBranch))
             Cast expr ty ->
-                parens (pretty expr <+> text ":::" <+> P.pretty ty)
+                parens (pretty expr <+> text ":::" <+> pretty ty)
             Id -> text "id"
             WithCoercion CoerceId e -> pretty e
-            WithCoercion c e ->
-                parens (P.pretty c) <+> pretty e
+            WithCoercion c e -> parensIf (p > 0) $
+                pretty c <+> pretty e
             WithExternal outV cName args st cont ->
                 ppTypedVariable outV <+> text "←" <+>
-                    text "external" <+> pretty cName <+> ppVars args <$$>
+                    text "external" <+> text cName <+> ppVars args <$$>
                 pretty cont
             ExternalPure outV cName args cont ->
                 ppTypedVariable outV <+> text "←" <+>
-                    text "external" <+> pretty cName <+> ppVars args <$$>
+                    text "external" <+> text cName <+> ppVars args <$$>
                 pretty cont
             Let (NonRec name e1) e2 ->
                 text "let" <+> ppTypedVariable name <+> equals <+> hang 0 (pretty e1) <$$>
@@ -141,8 +150,8 @@ instance Pretty Expr where
                 pretty e2
 
 ppTypedVariable :: Variable -> Doc
-ppTypedVariable var = parens $
-    pretty (varName var) <> colon <> P.pretty (varType var)
+ppTypedVariable var =
+    pretty (varName var) <> colon <> prettyPrec 2 (varType var)
 
 instance Pretty Variable where
     pretty var = pretty (varName var)
@@ -192,9 +201,9 @@ data Literal
 instance Pretty Literal where
     pretty lit =
         case lit of
-            LitChar c     -> pretty $ show c
-            LitInt i      -> pretty i
-            LitString str -> pretty str
+            LitChar c     -> text $ show c
+            LitInt i      -> integer i
+            LitString str -> text $ show str
 
 -- FIXME: Move orphan instance to their rightful modules.
 

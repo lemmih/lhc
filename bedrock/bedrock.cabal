@@ -43,7 +43,8 @@ library
   -- other-modules:
   build-depends:       base ==4.*, ansi-wl-pprint,
                        parsec, containers, mtl >= 2.2.1, vector,
-                       llvm-general-pure, llvm-general >= 3.4.4.1, filepath, QuickCheck
+                       llvm-general-pure, llvm-general >= 3.4.4.1, filepath, QuickCheck,
+                       haskell-tc
 
   ghc-options:         -fwarn-incomplete-patterns -fwarn-unused-binds
                        -fwarn-unused-imports
