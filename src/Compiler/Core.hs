@@ -14,7 +14,7 @@ import           Language.Haskell.Scope            (GlobalName (..),
 import           Language.Haskell.TypeCheck.Pretty
 import           Language.Haskell.TypeCheck.Types  (Coercion (..), Pred (..),
                                                     Qual (..), TcType (..),
-                                                    TcVar (..))
+                                                    TcVar (..), TcMetaVar(..))
 -- import Data.Monoid (Monoid(..))
 import           Text.PrettyPrint.ANSI.Leijen      (Doc, char, colon, comma,
                                                     equals, hang, hsep, indent,
@@ -100,54 +100,54 @@ appPrecedence :: Int
 appPrecedence = 1
 
 instance Pretty Expr where
-    prettyPrec p expr =
-        case expr of
-            Var var -> pretty var
-            Con name -> pretty name -- <+> ppVars vars
-            UnboxedTuple vars ->
-                text "(#" <+>
-                (hsep $ punctuate comma $ map pretty vars) <+>
-                text "#)"
-            Lit lit -> pretty lit
-            App a b -> parensIf (p > 0) $
-                pretty a <+> prettyPrec appPrecedence b
-            Lam vars e -> parensIf (p > 0) $
-                char 'λ' <+> ppTypedVars vars <+> rarrow <$$> indent 2 (pretty e)
-            Case scrut var Nothing alts ->
-                text "case" <+> pretty scrut <+> text "of" <+> ppTypedVariable var <$$>
-                indent 2 (vsep $ map pretty alts)
-            Case scrut var (Just defaultBranch) alts ->
-                text "case" <+> pretty scrut <+> text "of" <+> ppTypedVariable var <$$>
-                indent 2 (vsep (map pretty alts) <$$>
-                    text "DEFAULT" <+> rarrow <$$> indent 2 (pretty defaultBranch))
-            Cast expr ty ->
-                parens (pretty expr <+> text ":::" <+> pretty ty)
-            Id -> text "id"
-            WithCoercion CoerceId e -> pretty e
-            WithCoercion c e -> parensIf (p > 0) $
-                pretty c <+> pretty e
-            WithExternal outV cName args st cont ->
-                ppTypedVariable outV <+> text "←" <+>
-                    text "external" <+> text cName <+> ppVars args <$$>
-                pretty cont
-            ExternalPure outV cName args cont ->
-                ppTypedVariable outV <+> text "←" <+>
-                    text "external" <+> text cName <+> ppVars args <$$>
-                pretty cont
-            Let (NonRec name e1) e2 ->
-                text "let" <+> ppTypedVariable name <+> equals <+> hang 0 (pretty e1) <$$>
-                pretty e2
-            Let (Rec binds) e2 ->
-                text "let" <$$>
-                indent 2 (vsep [ ppTypedVariable var <+>
-                                 equals <+>
-                                 hang 0 (pretty body)
-                               | (var,body) <- binds ]) <$$>
-                text "in" <$$>
-                indent 2 (pretty e2)
-            LetStrict name e1 e2 ->
-                text "let" <+> char '!' <> ppTypedVariable name <+> equals <+> pretty e1 <$$>
-                pretty e2
+  prettyPrec p expr =
+    case expr of
+      Var var -> pretty var
+      Con name -> pretty name -- <+> ppVars vars
+      UnboxedTuple vars ->
+        text "(#" <+>
+        (hsep $ punctuate comma $ map pretty vars) <+>
+        text "#)"
+      Lit lit -> pretty lit
+      App a b -> parensIf (p > 0) $ nest 2 $
+        pretty a </> prettyPrec appPrecedence b
+      Lam vars e -> parensIf (p > 0) $
+        char 'λ' <+> ppTypedVars vars <+> rarrow <$$> pretty e
+      Case scrut var Nothing alts ->
+        text "case" <+> hang 2 (pretty scrut) <+> text "of" <$$>
+        indent 2 (ppTypedVariable var <$$> vsep (map pretty alts))
+      Case scrut var (Just defaultBranch) alts ->
+        text "case" <+> hang 2 (pretty scrut) <+> text "of" <$$>
+        indent 2 ( ppTypedVariable var <$$> vsep (map pretty alts) <$$>
+          text "DEFAULT" <+> rarrow <$$> indent 2 (pretty defaultBranch))
+      Cast expr ty ->
+        parens (pretty expr <+> text ":::" <+> pretty ty)
+      Id -> text "id"
+      WithCoercion CoerceId e -> pretty e
+      WithCoercion c e -> parensIf (p > 0) $
+        pretty c <+> pretty e
+      WithExternal outV cName args st cont ->
+        ppTypedVariable outV <+> text "←" <+>
+          text "external" <+> text cName <+> ppVars args <$$>
+        pretty cont
+      ExternalPure outV cName args cont ->
+        ppTypedVariable outV <+> text "←" <+>
+          text "external" <+> text cName <+> ppVars args <$$>
+        pretty cont
+      Let (NonRec name e1) e2 ->
+          text "let" <+> ppTypedVariable name <+> equals <+> align (pretty e1) <$$>
+          pretty e2
+      Let (Rec binds) e2 ->
+          text "let" <$$>
+          indent 2 (vsep [ ppTypedVariable var <+>
+                           equals <+>
+                           hang 0 (pretty body)
+                         | (var,body) <- binds ]) <$$>
+          text "in" <$$>
+          indent 2 (pretty e2)
+      LetStrict name e1 e2 ->
+          text "let" <+> char '!' <> ppTypedVariable name <+> equals <+> pretty e1 <$$>
+          pretty e2
 
 ppTypedVariable :: Variable -> Doc
 ppTypedVariable var =
@@ -206,6 +206,10 @@ instance Pretty Literal where
             LitString str -> text $ show str
 
 -- FIXME: Move orphan instance to their rightful modules.
+
+instance Binary TcMetaVar where
+    put = error "Binary.put not defined for TcMetaRef"
+    get = error "Binary.get not defined for TcMetaVar"
 
 derive makeBinary ''SrcSpan
 derive makeBinary ''SrcSpanInfo

@@ -4,9 +4,10 @@ import           Data.Graph                         (SCC (..), flattenSCC,
                                                      stronglyConnComp)
 import           Data.Tagged
 import           Language.Haskell.Exts.Annotated
-import           Language.Haskell.TypeCheck.Pretty  (pretty)
+import           Language.Haskell.TypeCheck.Pretty  (pretty, displayIO, renderPretty)
 import           System.Exit
 import           System.FilePath
+import System.IO (stdout)
 
 import           Language.Haskell.TypeCheck.Infer
 import           Language.Haskell.TypeCheck.Monad
@@ -129,7 +130,8 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
           let core = Haskell.convert tiEnv' m'
               coreFile = buildDir </> moduleFile m' <.> "core"
               complete = Core.simplify $ Core.simplify $ core
-          print (pretty complete)
+          -- print (pretty complete)
+          displayIO stdout (renderPretty 1 120 (pretty complete))
           encodeFile coreFile complete
           writeFile (coreFile <.> "pretty") (show $ pretty complete)
           writeIORef resolveEnvRef resolveEnv'
@@ -207,7 +209,8 @@ compileExecutable deps file = do
             Core.simplify $ Core.simplify $ Core.simplify $
             Core.deadCodeElimination entrypoint $
             NewType.lower $ mappend libraryCore core
-    print (pretty complete)
+    -- print (pretty complete)
+    displayIO stdout (renderPretty 1 100 (pretty complete))
 
     let bedrock = Core.convert complete
     print (ppModule bedrock)
