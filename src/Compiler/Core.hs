@@ -15,11 +15,6 @@ import           Language.Haskell.TypeCheck.Pretty
 import           Language.Haskell.TypeCheck.Types  (Coercion (..), Pred (..),
                                                     Qual (..), TcType (..),
                                                     TcVar (..), TcMetaVar(..))
--- import Data.Monoid (Monoid(..))
-import           Text.PrettyPrint.ANSI.Leijen      (Doc, char, colon, comma,
-                                                    equals, hang, hsep, indent,
-                                                    parens, punctuate, text,
-                                                    vsep, (<$$>), (<+>), (<>), integer)
 
 data Module = Module
     { coreForeigns  :: [Foreign]
@@ -124,6 +119,8 @@ instance Pretty Expr where
         parens (pretty expr <+> text ":::" <+> pretty ty)
       Id -> text "id"
       WithCoercion CoerceId e -> pretty e
+      WithCoercion (CoerceAp tys) e -> parensIf (p > 0) $
+        pretty e <+> fillSep (map (prettyPrec appPrecedence) tys)
       WithCoercion c e -> parensIf (p > 0) $
         pretty c <+> pretty e
       WithExternal outV cName args st cont ->

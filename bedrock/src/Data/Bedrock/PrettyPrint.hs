@@ -168,6 +168,9 @@ ppBlock block =
       text "=" <+>
       ppExpression simple Doc.<$$>
       ppBlock rest
+    Case scrut Nothing [(Alternative pattern expression)] ->
+      ppPattern pattern <+> text "← " <+> pretty scrut Doc.<$$>
+      ppBlock expression
     Case scrut Nothing alts ->
       ppSyntax "case" <+> pretty scrut <+> ppSyntax "of" Doc.<$$>
       Doc.indent 2 (Doc.vsep $ map ppAlternative alts)
