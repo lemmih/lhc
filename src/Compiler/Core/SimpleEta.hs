@@ -15,8 +15,6 @@ import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
 import qualified Data.Set                    as Set
 
-import           Debug.Trace
-
 -- 1. order by scc
 -- 2. do eta abstraction on top-level defs and for lambdas
 -- 3. record the new number of arguments for top-levels.
@@ -41,8 +39,7 @@ simpleEta anns0 m =
           let (args, expr) = etaTopLevel anns (declBody decl)
               decl' = decl{declBody = expr}
               anns' = Map.insert (declName decl) args anns
-          in trace (show (declName decl) ++ ": " ++ show (length args)) $
-           worker anns' (decl':lst) groups
+          in worker anns' (decl':lst) groups
         CyclicSCC decls ->
           worker anns lst (map AcyclicSCC decls ++ groups)
     (anns', decls) = worker anns0 [] scc
