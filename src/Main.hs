@@ -4,10 +4,11 @@ import           Data.Graph                         (SCC (..), flattenSCC,
                                                      stronglyConnComp)
 import           Data.Tagged
 import           Language.Haskell.Exts.Annotated
-import           Language.Haskell.TypeCheck.Pretty  (pretty, displayIO, renderPretty)
+import           Language.Haskell.TypeCheck.Pretty  (displayIO, pretty,
+                                                     renderPretty)
 import           System.Exit
 import           System.FilePath
-import System.IO (stdout)
+import           System.IO                          (stdout)
 
 import           Language.Haskell.TypeCheck.Infer
 import           Language.Haskell.TypeCheck.Monad
@@ -17,6 +18,7 @@ import           Language.Haskell.Scope             hiding (Interface)
 import qualified Compiler.Core                      as Core
 import qualified Compiler.Core.DCE                  as Core
 import qualified Compiler.Core.NewType              as NewType
+import qualified Compiler.Core.SimpleEta            as Core
 import qualified Compiler.Core.Simplify             as Core
 import qualified Compiler.CoreToBedrock             as Core
 import qualified Compiler.HaskellToCore             as Haskell
@@ -129,39 +131,15 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
           putStrLn "Converting to core..."
           let core = Haskell.convert tiEnv' m'
               coreFile = buildDir </> moduleFile m' <.> "core"
-              complete = Core.simplify $ Core.simplify $ core
+              complete = Core.simplify $ NewType.lower $ Core.simplify $ Core.simplify $ core
+              (_,etaAbs) = Core.simpleEta Core.emptySimpleEtaAnnotation complete
           -- print (pretty complete)
-          displayIO stdout (renderPretty 1 120 (pretty complete))
-          encodeFile coreFile complete
-          writeFile (coreFile <.> "pretty") (show $ pretty complete)
+          displayIO stdout (renderPretty 1 120 (pretty etaAbs))
+          encodeFile coreFile etaAbs
+          writeFile (coreFile <.> "pretty") (show $ pretty etaAbs)
           writeIORef resolveEnvRef resolveEnv'
           writeIORef tiEnvRef tiEnv'
         CyclicSCC{} -> error "Recursive modules not handled yet."
--- compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps [file] = do
---     putStrLn "Parsing file..."
---     ParseOk m <- parseFile file
---     putStrLn "Origin analysis..."
---     let (resolveEnv, errs, m') = resolve emptyResolveEnv m
---         Just scopeIface = lookupInterface (getModuleName m) resolveEnv
---     mapM_ print errs
---     putStrLn "Typechecking..."
---     env <- runTI emptyTcEnv (tiModule m')
---     let iface = mkInterface scopeIface env
---         ifaceFile = buildDir </> moduleFile m' <.> "hi"
---     writeInterface ifaceFile iface
---     putStrLn "Converting to core..."
---     let core = Haskell.convert env m'
---         coreFile = buildDir </> moduleFile m' <.> "core"
---         complete = Core.simplify $ Core.simplify $ core
---     print (pretty complete)
---     encodeFile coreFile complete
---     writeFile (coreFile <.> "pretty") (show $ pretty complete)
---     --let bedrock = Core.convert complete
---     --print (ppModule bedrock)
---     --let bedrockFile = replaceExtension file "bedrock"
---     --writeFile bedrockFile (show $ ppModule bedrock)
---     -- Bedrock.compileModule bedrock file
---     return ()
 
 loadLibrary :: InstalledPackageInfo -> IO [(String, (Interface, Core.Module))]
 loadLibrary pkgInfo =
@@ -207,6 +185,7 @@ compileExecutable deps file = do
         entrypoint = Name ["Main"] "entrypoint" 0
         complete =
             Core.simplify $ Core.simplify $ Core.simplify $
+            snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
             Core.deadCodeElimination entrypoint $
             NewType.lower $ mappend libraryCore core
     -- print (pretty complete)

@@ -41,7 +41,10 @@ instance Pretty Module where
         ]
 
 -- FIXME: Find a better name for this.
-data Decl = Decl TcType Name Expr
+data Decl = Decl
+  { declReturnType :: TcType
+  , declName       :: Name
+  , declBody       :: Expr }
 
 instance Pretty Decl where
     pretty (Decl ty name expr) =
