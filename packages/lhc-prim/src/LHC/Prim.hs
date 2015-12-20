@@ -17,15 +17,19 @@ module LHC.Prim
     , putStrLn
     , getChar
     , getLine
-    , Char
+    , Char(C#)
     , Bool(True,False)
-    , Int
+    , Int(I#)
     , not
     , otherwise
     , (+), (-), (*)
+    -- , udiv, urem
+    , sdiv, srem
     , mapM_
     , (<=)
     , max
+    , i32toi64
+    , i64toi32
     ) where
 
 -- XXX: These have kind # but it is not checked anywhere.
@@ -88,7 +92,7 @@ foreign import ccall addrAdd# :: Addr I8 -> I64 -> Addr I8
 foreign import ccall "cast" i64toi32 :: I64 -> I32
 foreign import ccall "cast" i8toi64 :: I8 -> I64
 foreign import ccall "cast" i8toi32 :: I8 -> I32
-foreign import ccall "cast" i32to64 :: I32 -> I64
+foreign import ccall "cast" i32toi64 :: I32 -> I64
 
 unpackString# :: Addr I8 -> [Char]
 unpackString# ptr =
@@ -157,6 +161,24 @@ a * b =
   case a of
     I# a# -> case b of
       I# b# -> I# (a# *# b#)
+
+foreign import ccall unsafe udiv# :: I32 -> I32 -> I32
+foreign import ccall unsafe sdiv# :: I32 -> I32 -> I32
+
+foreign import ccall unsafe urem# :: I32 -> I32 -> I32
+foreign import ccall unsafe srem# :: I32 -> I32 -> I32
+
+-- udiv :: Int -> Int -> Int
+-- udiv (I# a#) (I# b#) = I# (udiv# a# b#)
+
+sdiv :: Int -> Int -> Int
+sdiv (I# a#) (I# b#) = I# (sdiv# a# b#)
+
+-- urem :: Int -> Int -> Int
+-- urem (I# a#) (I# b#) = I# (urem# a# b#)
+
+srem :: Int -> Int -> Int
+srem (I# a#) (I# b#) = I# (srem# a# b#)
 
 --seq :: a -> b -> b
 --seq a b = b

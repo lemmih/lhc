@@ -668,6 +668,9 @@ convertExp expr =
             scrutVar <- Variable <$> newName "scrut" <*> exprType scrut'
             def <- convertAlts scrutVar alts
             return $ Case scrut' scrutVar (Just def) []
+        HS.Lit _ (HS.Char _ c _) -> do
+            let con = Name ["LHC.Prim"] "C#" 0
+            pure $ Con con `App` Lit (LitChar c)
         HS.Lit _ lit -> pure $ Lit (convertLiteral lit)
         HS.Tuple  _ HS.Unboxed exprs -> do
             vars <- forM exprs $ \(HS.Var _ name) -> do
@@ -720,7 +723,7 @@ convertAltPat scrut failBranch pat successBranch =
         HS.PApp _ name pats -> do
             args <- sequence [ Variable <$> bindName var <*> lookupType var
                              | HS.PVar _ var <- pats ]
-            alt <- Alt <$> (ConPat <$> resolveQGlobalName name <*> pure args)
+            alt <- Alt <$> (ConPat <$> resolveQName name <*> pure args)
                 <*> pure successBranch
             return $ Case (Var scrut) scrut failBranch [alt]
         HS.PInfixApp src a con b -> convertAltPat scrut failBranch (HS.PApp src con [a,b]) successBranch
@@ -738,6 +741,20 @@ convertAltPat scrut failBranch pat successBranch =
             if varName var' == varName scrut
               then return successBranch
               else return $ Let (NonRec var' (Var scrut)) successBranch
+        -- 0 -> ...
+        -- I# i -> case i of
+        --            0# -> ...
+        HS.PLit _ _sign (HS.Int _ int _) -> do
+            let i32 = TcCon $ mkBuiltIn "LHC.Prim" "I32"
+            let i64 = TcCon $ mkBuiltIn "LHC.Prim" "I64"
+            let con = Name ["LHC.Prim"] "I#" 0
+            let i32toi64 = Variable (Name ["LHC.Prim"] "i32toi64" 0) i32
+            intVar <- Variable <$> newName "i" <*> pure i32
+            intVar64 <- Variable <$> newName "i64" <*> pure i64
+            let alt = Alt (ConPat con [intVar]) $
+                      Case (Var i32toi64 `App` Var intVar) intVar64 failBranch
+                      [Alt (LitPat (LitInt int)) successBranch]
+            return $ Case (Var scrut) scrut Nothing [alt]
         HS.PLit _ _sign lit -> do
             alt <- Alt (LitPat $ convertLiteral lit)
                 <$> pure successBranch
@@ -777,7 +794,7 @@ convertLiteral lit =
         HS.PrimString _ str _ -> LitString str
         HS.PrimInt _ int _    -> LitInt int
         HS.PrimChar _ char _  -> LitChar char
-        _ -> error "convertLiteral"
+        _ -> error $ "convertLiteral: " ++ show lit
 
 toGlobalName :: HS.QName Origin -> GlobalName
 toGlobalName qname =

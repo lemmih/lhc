@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 module LHC.Prelude
   ( reverse
   , append ) where
@@ -16,34 +17,31 @@ reverse_go acc lst =
 append :: [a] -> [a] -> [a]
 append [] b     = b
 append (x:xs) b = x : append xs b
-  -- case a of
-  --   Nil       -> b
-  --   Cons x xs -> Cons x (append xs b)
 
--- appendList :: List a -> List a -> List a
--- appendList Nil b         = b
--- appendList (Cons x xs) b = Cons x (appendList xs b)
+intToDigit :: Int -> Char
+intToDigit (I# i) =
+  case i32toi64 i of
+    0# -> '0'
+    1# -> '1'
+    2# -> '2'
+    3# -> '3'
+    4# -> '4'
+    5# -> '5'
+    6# -> '6'
+    7# -> '7'
+    8# -> '8'
+    9# -> '9'
 
--- intToDigit :: Int -> Char
--- intToDigit 0 = '0'
--- intToDigit 1 = '1'
--- intToDigit 2 = '2'
--- intToDigit 3 = '3'
--- intToDigit 4 = '4'
--- intToDigit 5 = '5'
--- intToDigit 6 = '6'
--- intToDigit 7 = '7'
--- intToDigit 8 = '8'
--- intToDigit 9 = '9'
+showInt :: Int -> [Char]
+showInt 0 = '0' : []
+showInt x = reverse (digits x)
 
--- showInt :: Int -> [Char]
--- showInt 0 = "0"
--- showInt x = reverse (digits x)
+ten :: Int
+ten = I# (i64toi32 10#)
 
--- digits :: Int -> [Char]
--- digits 0 = []
--- digits x =
---   let rest = div x 10
---       digit = mod x 10
---   in intToDigit : digits rest
+digits :: Int -> [Char]
+digits (I# i) =
+  case i32toi64 i of
+    0# -> []
+    _  -> intToDigit (srem (I# i) ten) : digits (sdiv (I# i) ten)
 
