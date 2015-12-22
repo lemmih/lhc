@@ -64,8 +64,7 @@ toLLVM bedrock = defaultModule
             , isConstant = False
             , Global.type' = PointerType (IntegerType 64) (AddrSpace 0)
             , initializer = Just $ Constant.Null $ PointerType (IntegerType 64) (AddrSpace 0)
-            , section = Nothing
-            , Global.alignment = 1 }
+            , section = Nothing }
         | reg <- Set.toList $ allRegisters bedrock ] ++
         defs
     }
@@ -76,6 +75,11 @@ toLLVM bedrock = defaultModule
                     { name = LLVM.Name "exit"
                     , returnType = VoidType
                     , parameters = ([ Parameter (IntegerType 32) (UnName 0) []], False)
+                    }
+            newDefinition $ GlobalDefinition functionDefaults
+                    { name = LLVM.Name "llvm.trap"
+                    , returnType = VoidType
+                    , parameters = ([], False)
                     }
             newDefinition $ GlobalDefinition functionDefaults
                     { name = LLVM.Name "puts"
@@ -224,11 +228,16 @@ blockToLLVM = worker
       case block of
         Case Variable{..} mbDefault alts -> do
           branches <- forM alts $ \(Alternative pattern branch) -> do
-            branchName <- newTaggedBlock (patternTag pattern) $
+            branchName <- newTaggedBlock (patternTag pattern) $ do
+                            -- case pattern of
+                            --   NodePat nodeName [] ->
+                            --     traceLLVM $ "Branch taken: " ++ show nodeName
+                            --   LitPat (LiteralInt i) ->
+                            --     traceLLVM $ "Branch taken: Lit: " ++ show i
+                            --   _ -> return ()
                             worker branch
             case pattern of
               NodePat nodeName [] -> do
-                --traceLLVM $ "Branch taken: " ++ show nodeName
                 ident <- resolveNodeName nodeName
                 return (Constant.Int 64 ident, branchName)
               NodePat{} ->
@@ -240,7 +249,12 @@ blockToLLVM = worker
                 error "Data.Bedrock.LLVM: Case over unboxed strings not supported."
           defaultName <- newBlock $
             case mbDefault of
-              Nothing -> return $ Unreachable []
+              Nothing -> do
+                traceLLVM $ "Unreachable branch :("
+                doInst $ Call Nothing C [] (Right $ ConstantOperand $ Constant.GlobalReference
+                        VoidType
+                        (LLVM.Name "llvm.trap")) [] [] []
+                return $ Ret Nothing []
               Just branch -> worker branch
           return $ Switch
               { operand0' = LocalReference
@@ -258,7 +272,7 @@ blockToLLVM = worker
             doInst =<< mkInst VoidType expr
             worker next
         TailCall fName args -> do
-            --traceLLVM $ "TailCall: " ++ show fName
+            -- traceLLVM $ "TailCall: " ++ show fName
             doInst $ Call
                 { tailCallKind = Just Tail
                 , callingConvention = Fast
@@ -288,7 +302,7 @@ blockToLLVM = worker
             return $ Unreachable []
         Return [] -> return $ Ret Nothing []
         Bedrock.Invoke cont args -> do
-            --traceLLVM $ "Bedrock: Invoke"
+            -- traceLLVM $ "Bedrock: Invoke"
             fnPtr <- anonInst $ castReference
                         (typeToLLVM $ variableType cont)
                         (nameToLLVM $ variableName cont)
