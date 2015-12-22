@@ -126,7 +126,7 @@ mkApplyBody :: HPTResult -> Variable -> Variable
 mkApplyBody hpt obj arg = do
     applyObj <- newVariable "node" (StaticNode (sizeOfVariable hpt obj))
     applyArg <- tagVariable "arg" arg
-    applyRet <- newVariable "ret" Node
+    applyRet <- newName "ret"
     let objects = hptNodeScope hpt Vector.! variableIndex obj
         names = Map.keys objects
         body =
@@ -136,15 +136,17 @@ mkApplyBody hpt obj arg = do
             Alternative (NodePat name args) $
             TailCall fn (args ++ [applyArg])
         mkAlt name@(FunctionName fn n) =
-            let args = dropLast n $ hptFnArgs hpt Map.! fn in
+            let args = dropLast n $ hptFnArgs hpt Map.! fn
+                ret = Variable applyRet (StaticNode (length args+1+1)) in
             Alternative (NodePat name args) $
-            Bind [applyRet] (MkNode (FunctionName fn (n-1)) (args++[applyArg])) $
-            Return [applyRet]
+            Bind [ret] (MkNode (FunctionName fn (n-1)) (args++[applyArg])) $
+            Return [ret]
         mkAlt name@(ConstructorName fn n) =
-            let args = dropLast n $ hptNodeArgs hpt Map.! fn in
+            let args = dropLast n $ hptNodeArgs hpt Map.! fn
+                ret = Variable applyRet (StaticNode (length args+1+1)) in
             Alternative (NodePat name args) $
-            Bind [applyRet] (MkNode (ConstructorName fn (n-1)) (args++[applyArg])) $
-            Return [applyRet]
+            Bind [ret] (MkNode (ConstructorName fn (n-1)) (args++[applyArg])) $
+            Return [ret]
         mkAlt name = error $ "mkApply: " ++ show name
     return (applyObj, applyArg, body)
 
