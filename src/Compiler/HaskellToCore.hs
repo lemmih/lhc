@@ -194,14 +194,11 @@ resolveQualifiedName qname =
 resolveQName :: HS.QName Origin -> M Name
 resolveQName qname =
     case qname of
-        HS.Qual _ _ name -> resolveName name
-        HS.UnQual _ name -> resolveName name
-        HS.Special _ HS.UnitCon{} ->
-          return $ Name ["LHC.Prim"] "Unit" 0
-        HS.Special _ HS.Cons{} ->
-          return $ Name ["LHC.Prim"] "Cons" 0
-        HS.Special _ HS.ListCon{} ->
-          return $ Name ["LHC.Prim"] "Nil" 0
+        HS.Qual _ _ name          -> resolveName name
+        HS.UnQual _ name          -> resolveName name
+        HS.Special _ HS.UnitCon{} -> return unitCon
+        HS.Special _ HS.Cons{}    -> return consCon
+        HS.Special _ HS.ListCon{} -> return nilCon
         _ -> error $ "HaskellToCore.resolveQName: " ++ show qname
 
 unQName :: HS.QName Origin -> HS.Name Origin
@@ -214,14 +211,11 @@ unQName qname =
 resolveQGlobalName :: HS.QName Origin -> M Name
 resolveQGlobalName qname =
     case qname of
-        HS.Qual _ _ name -> worker name
-        HS.UnQual _ name -> worker name
-        HS.Special _ HS.UnitCon{} ->
-          return $ Name ["LHC.Prim"] "Unit" 0
-        HS.Special _ HS.Cons{} ->
-          return $ Name ["LHC.Prim"] "Cons" 0
-        HS.Special _ HS.ListCon{} ->
-          return $ Name ["LHC.Prim"] "Nil" 0
+        HS.Qual _ _ name          -> worker name
+        HS.UnQual _ name          -> worker name
+        HS.Special _ HS.UnitCon{} -> return unitCon
+        HS.Special _ HS.Cons{}    -> return consCon
+        HS.Special _ HS.ListCon{} -> return nilCon
         _ -> error "HaskellToCore.resolveQName"
   where
     worker name =
@@ -507,20 +501,16 @@ convertExternal cName ty
         primOut <- Variable <$> newName "primOut" <*> pure i32
         s <- Variable
                 <$> newName "s"
-                <*> pure (TcCon $ mkBuiltIn "LHC.Prim" "RealWorld#")
+                <*> pure realWorld
         boxed <- Variable <$> newName "boxed" <*> pure retType
-
-        io <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IO"
-        -- ioUnit <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "IOUnit"
-        cint <- resolveQualifiedName $ mkBuiltIn "LHC.Prim" "Int32"
 
         return $
             Lam args $
             let action = Lam [s] $
                     WithExternal primOut cName primArgs s $
-                    Let (NonRec boxed $ App (Con cint) (Var primOut)) $
+                    Let (NonRec boxed $ App (Con int32Con) (Var primOut)) $
                     UnboxedTuple [s, boxed]
-            in (App (Con io) action)
+            in (App (Con ioCon) action)
     | otherwise = do -- not isIO
         args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
         primOut <- Variable <$> newName "primOut" <*> pure retType
@@ -530,7 +520,6 @@ convertExternal cName ty
             Var primOut
   where
     (argTypes, isIO, retType) = ffiTypes ty
-    i32 = TcCon $ mkBuiltIn "LHC.Prim" "I32"
 -- convertExternal cName ty
 --     | isIO      = do
 --         out <- newName "out"
@@ -668,9 +657,10 @@ convertExp expr =
             scrutVar <- Variable <$> newName "scrut" <*> exprType scrut'
             def <- convertAlts scrutVar alts
             return $ Case scrut' scrutVar (Just def) []
-        HS.Lit _ (HS.Char _ c _) -> do
-            let con = Name ["LHC.Prim"] "C#" 0
-            pure $ Con con `App` Lit (LitChar c)
+        HS.Lit _ (HS.Char _ c _) ->
+            pure $ Con charCon `App` Lit (LitChar c)
+        HS.Lit _ (HS.Int _ i _) ->
+            pure $ Con intCon `App` (Var i64toi32 `App` Lit (LitInt i))
         HS.Lit _ lit -> pure $ Lit (convertLiteral lit)
         HS.Tuple  _ HS.Unboxed exprs -> do
             vars <- forM exprs $ \(HS.Var _ name) -> do
@@ -684,7 +674,7 @@ convertExp expr =
                      | Decl ty name body <- concat decls ])
                 <$> convertExp expr
         HS.List _ [] -> do
-            return $ Con $ Name ["LHC.Prim"] "Nil" 0
+            return $ Con nilCon
         HS.Do _ stmts -> do
             convertStmts stmts
         _ -> error $ "H->C convertExp: " ++ show expr
@@ -745,13 +735,9 @@ convertAltPat scrut failBranch pat successBranch =
         -- I# i -> case i of
         --            0# -> ...
         HS.PLit _ _sign (HS.Int _ int _) -> do
-            let i32 = TcCon $ mkBuiltIn "LHC.Prim" "I32"
-            let i64 = TcCon $ mkBuiltIn "LHC.Prim" "I64"
-            let con = Name ["LHC.Prim"] "I#" 0
-            let i32toi64 = Variable (Name ["LHC.Prim"] "i32toi64" 0) i32
             intVar <- Variable <$> newName "i" <*> pure i32
             intVar64 <- Variable <$> newName "i64" <*> pure i64
-            let alt = Alt (ConPat con [intVar]) $
+            let alt = Alt (ConPat intCon [intVar]) $
                       Case (Var i32toi64 `App` Var intVar) intVar64 failBranch
                       [Alt (LitPat (LitInt int)) successBranch]
             return $ Case (Var scrut) scrut Nothing [alt]
@@ -762,7 +748,7 @@ convertAltPat scrut failBranch pat successBranch =
         HS.PParen _ pat' ->
             convertAltPat scrut failBranch pat' successBranch
         HS.PList _ [] -> do
-            let alt = Alt (ConPat (Name ["LHC.Prim"] "Nil" 0) []) successBranch
+            let alt = Alt (ConPat nilCon []) successBranch
             return $ Case (Var scrut) scrut failBranch [alt]
         _ -> error $ "Compiler.HaskellToCore.convertAltPat: " ++ show pat
 
@@ -820,3 +806,28 @@ exprType expr =
         Case _ _ (Just e) _ -> exprType e
         Case _ _ Nothing (Alt _ e:_) -> exprType e
         _ -> return TcUndefined
+
+
+
+
+
+
+
+
+
+-- LHC.Prim builtins
+
+i32 = TcCon $ mkBuiltIn "LHC.Prim" "I32"
+i64 = TcCon $ mkBuiltIn "LHC.Prim" "I64"
+realWorld = TcCon $ mkBuiltIn "LHC.Prim" "RealWorld#"
+
+intCon = Name ["LHC.Prim"] "I#" 0
+charCon = Name ["LHC.Prim"] "C#" 0
+nilCon = Name ["LHC.Prim"] "Nil" 0
+consCon = Name ["LHC.Prim"] "Cons" 0
+unitCon = Name ["LHC.Prim"] "Unit" 0
+ioCon = Name ["LHC.Prim"] "IO" 0
+int32Con = Name ["LHC.Prim"] "Int32" 0
+
+i32toi64 = Variable (Name ["LHC.Prim"] "i32toi64" 0) (TcFun i32 i64)
+i64toi32 = Variable (Name ["LHC.Prim"] "i64toi32" 0) (TcFun i64 i32)

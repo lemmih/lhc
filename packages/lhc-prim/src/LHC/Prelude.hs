@@ -19,29 +19,24 @@ append [] b     = b
 append (x:xs) b = x : append xs b
 
 intToDigit :: Int -> Char
-intToDigit (I# i) =
-  case i32toi64 i of
-    0# -> '0'
-    1# -> '1'
-    2# -> '2'
-    3# -> '3'
-    4# -> '4'
-    5# -> '5'
-    6# -> '6'
-    7# -> '7'
-    8# -> '8'
-    9# -> '9'
+intToDigit 0 = '0'
+intToDigit 1 = '1'
+intToDigit 2 = '2'
+intToDigit 3 = '3'
+intToDigit 4 = '4'
+intToDigit 5 = '5'
+intToDigit 6 = '6'
+intToDigit 7 = '7'
+intToDigit 8 = '8'
+intToDigit 9 = '9'
 
 showInt :: Int -> [Char]
 showInt 0 = '0' : []
 showInt x = reverse (digits x)
 
-ten :: Int
-ten = I# (i64toi32 10#)
-
 digits :: Int -> [Char]
 digits (I# i) =
   case i32toi64 i of
     0# -> []
-    _  -> intToDigit (srem (I# i) ten) : digits (sdiv (I# i) ten)
+    _  -> intToDigit (srem (I# i) 10) : digits (sdiv (I# i) 10)
 
