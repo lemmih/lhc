@@ -16,7 +16,7 @@ freeVariablesExpr expr =
   case expr of
     Var var -> Set.singleton (varName var)
     Con{} -> Set.empty
-    UnboxedTuple vars -> Set.fromList (map varName vars)
+    UnboxedTuple args -> Set.unions (map freeVariablesExpr args)
     Lit{} -> Set.empty
     WithExternal outV _name args _st e ->
       Set.fromList (map varName args) `Set.union`

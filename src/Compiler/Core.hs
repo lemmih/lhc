@@ -42,9 +42,9 @@ instance Pretty Module where
 
 -- FIXME: Find a better name for this.
 data Decl = Decl
-  { declReturnType :: TcType
-  , declName       :: Name
-  , declBody       :: Expr }
+  { declType :: TcType
+  , declName :: Name
+  , declBody :: Expr }
 
 instance Pretty Decl where
     pretty (Decl ty name expr) =
@@ -67,12 +67,12 @@ instance Pretty NewType where
 data Variable = Variable
     { varName :: Name
     , varType :: TcType
-    } deriving ( Show, Eq )
+    } deriving ( Show, Eq, Ord )
 
 data Expr
     = Var Variable
     | Con Name
-    | UnboxedTuple [Variable]
+    | UnboxedTuple [Expr]
     | Lit Literal
     | WithExternal Variable String [Variable] Variable Expr
     | ExternalPure Variable String [Variable] Expr
@@ -101,16 +101,21 @@ instance Pretty Expr where
   prettyPrec p expr =
     case expr of
       Var var -> pretty var
+      -- Var var -> ppTypedVariable var
       Con name -> pretty name -- <+> ppVars vars
-      UnboxedTuple vars ->
+      UnboxedTuple args ->
         text "(#" <+>
-        (hsep $ punctuate comma $ map pretty vars) <+>
+        (hsep $ punctuate comma $ map pretty args) <+>
         text "#)"
       Lit lit -> pretty lit
       App a b -> parensIf (p > 0) $ nest 2 $
         pretty a </> prettyPrec appPrecedence b
       Lam vars e -> parensIf (p > 0) $
         char 'λ' <+> ppTypedVars vars <+> rarrow <$$> pretty e
+      Case scrut var Nothing [Alt pattern e] ->
+        pretty var <+> text "←" <+> align (pretty scrut) <$$>
+        pretty pattern <+> text "←" <+> ppTypedVariable var <$$>
+        pretty e
       Case scrut var Nothing alts ->
         text "case" <+> hang 2 (pretty scrut) <+> text "of" <$$>
         indent 2 (ppTypedVariable var <$$> vsep (map pretty alts))

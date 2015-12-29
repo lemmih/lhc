@@ -19,7 +19,9 @@ import qualified Compiler.Core                      as Core
 import qualified Compiler.Core.DCE                  as Core
 import qualified Compiler.Core.NewType              as NewType
 import qualified Compiler.Core.SimpleEta            as Core
+import qualified Compiler.Core.Unique               as Core
 import qualified Compiler.Core.Simplify             as Core
+import qualified Compiler.Core.SimpleInline         as Core
 import qualified Compiler.CoreToBedrock             as Core
 import qualified Compiler.HaskellToCore             as Haskell
 import           Compiler.Interface
@@ -184,6 +186,9 @@ compileExecutable deps file = do
         libraryCore = mconcat (map (snd . snd) ifaces)
         entrypoint = Name ["Main"] "entrypoint" 0
         complete =
+            -- Core.deadCodeElimination entrypoint $
+            -- Core.simpleInline $
+            -- Core.unique $
             Core.simplify $ Core.simplify $ Core.simplify $
             snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
             Core.deadCodeElimination entrypoint $

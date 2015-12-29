@@ -26,7 +26,7 @@ import           Language.Haskell.Scope           (GlobalName (..),
 import qualified Language.Haskell.Scope           as Scope
 import           Language.Haskell.TypeCheck.Monad (TcEnv (..), mkBuiltIn, noSrcSpanInfo)
 import           Language.Haskell.TypeCheck.Types (Coercion (..), Qual (..),
-                                                   TcType (..), TcVar(..))
+                                                   TcType (..), TcVar(..),Pred(..))
 
 import           Debug.Trace
 
@@ -297,7 +297,7 @@ convertDecl' decl =
             let Origin _ src = HS.ann name
             coercion <- findCoercion src
             ty <- lookupType name
-            let argTys = splitTy ty
+            let argTys = splitTy (applyCoercion coercion ty)
             argNames <- forM fnArgNames $ \mbName ->
               case mbName of
                 Nothing -> newName "arg"
@@ -427,6 +427,30 @@ splitTy (TcForall _ (_ :=> ty)) = splitTy ty
 splitTy (TcFun a b) = a : splitTy b
 splitTy ty = [ty]
 
+applyCoercion :: Coercion -> TcType -> TcType
+applyCoercion (CoerceAbs new) (TcForall old (ctx :=> ty)) =
+    TcForall new (map predicate ctx :=> worker ty)
+  where
+    env = zip old new
+    predicate (IsIn cls ty) = IsIn cls (worker ty)
+    worker ty =
+      case ty of
+        TcForall{} ->
+          error "Compiler.HaskellToCore.applyCoercion: RankNTypes not supported"
+        TcFun a b -> TcFun (worker a) (worker b)
+        TcApp a b -> TcApp (worker a) (worker b)
+        TcRef v ->
+          case lookup v env of
+            Nothing -> TcRef v
+            Just new -> TcRef new
+        TcCon{} -> ty
+        TcMetaVar{} -> ty
+        TcUnboxedTuple tys -> TcUnboxedTuple (map worker tys)
+        TcTuple tys -> TcTuple (map worker tys)
+        TcList ty -> TcList (worker ty)
+        TcUndefined -> TcUndefined
+applyCoercion _ ty = ty
+
 toCType :: TcType -> CType
 toCType ty =
     case ty of
@@ -502,14 +526,13 @@ convertExternal cName ty
         s <- Variable
                 <$> newName "s"
                 <*> pure realWorld
-        boxed <- Variable <$> newName "boxed" <*> pure retType
+        -- boxed <- Variable <$> newName "boxed" <*> pure retType
 
         return $
             Lam args $
             let action = Lam [s] $
                     WithExternal primOut cName primArgs s $
-                    Let (NonRec boxed $ App (Con int32Con) (Var primOut)) $
-                    UnboxedTuple [s, boxed]
+                    UnboxedTuple [Var s, App (Con int32Con) (Var primOut)]
             in (App (Con ioCon) action)
     | otherwise = do -- not isIO
         args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
@@ -663,11 +686,8 @@ convertExp expr =
             pure $ Con intCon `App` (Var i64toi32 `App` Lit (LitInt i))
         HS.Lit _ lit -> pure $ Lit (convertLiteral lit)
         HS.Tuple  _ HS.Unboxed exprs -> do
-            vars <- forM exprs $ \(HS.Var _ name) -> do
-                n <- resolveQName name
-                ty <- lookupType $ unQName name
-                return $ Variable n ty
-            return $ UnboxedTuple vars
+            args <- mapM convertExp exprs
+            return $ UnboxedTuple args
         HS.Let _ (HS.BDecls _ binds) expr -> do
             decls <- mapM convertDecl' binds
             Let (Rec [ (Variable name ty, body)
