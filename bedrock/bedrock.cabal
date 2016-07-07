@@ -25,10 +25,12 @@ library
                        Data.Bedrock.TypeCheck
                        Data.Bedrock.HPT
                        Data.Bedrock.EvalApply
+                       Data.Bedrock.SimpleEvalApply
                        Data.Bedrock.Storage
                        Data.Bedrock.Transform
                        Data.Bedrock.Misc
                        Data.Bedrock.NodeSizing
+                       Data.Bedrock.SimpleNodeSizing
                        Data.Bedrock.Simplify
                        Data.Bedrock.VoidElimination
                        Data.Bedrock.StackLayout
@@ -54,5 +56,3 @@ executable bedrock
 
   build-depends:       base ==4.*, optparse-applicative, bedrock,
                        process, filepath
-
-

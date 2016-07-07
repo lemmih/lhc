@@ -185,20 +185,26 @@ resolveName hsName =
     scopeError = error $ "resolveName: Not in scope: " ++
                     getNameIdentifier hsName
 
-resolveQualifiedName :: QualifiedName -> M Name
-resolveQualifiedName qname =
-    asks $ Map.findWithDefault scopeError qname . scopeNodes
-  where
-    scopeError = error $ "resolveGlobalName: Not in scope: " ++ show qname
+-- resolveQualifiedName :: QualifiedName -> M Name
+-- resolveQualifiedName qname =
+--     asks $ Map.findWithDefault scopeError qname . scopeNodes
+--   where
+--     scopeError = error $ "resolveGlobalName: Not in scope: " ++ show qname
 
-resolveQName :: HS.QName Origin -> M Name
+resolveQName :: HS.QName Origin -> M Variable
 resolveQName qname =
     case qname of
-        HS.Qual _ _ name          -> resolveName name
-        HS.UnQual _ name          -> resolveName name
+        HS.Qual _ _ name          -> do
+          n <- resolveName name
+          ty <- lookupType name
+          return $ Variable n ty
+        HS.UnQual _ name          -> do
+          n <- resolveName name
+          ty <- lookupType name
+          return $ Variable n ty
         HS.Special _ HS.UnitCon{} -> return unitCon
         HS.Special _ HS.Cons{}    -> return consCon
-        HS.Special _ HS.ListCon{} -> return nilCon
+        -- HS.Special _ HS.ListCon{} -> return nilCon
         _ -> error $ "HaskellToCore.resolveQName: " ++ show qname
 
 unQName :: HS.QName Origin -> HS.Name Origin
@@ -208,25 +214,31 @@ unQName qname =
         HS.UnQual _ name -> name
 
 -- XXX: Ugly, ugly code.
-resolveQGlobalName :: HS.QName Origin -> M Name
-resolveQGlobalName qname =
-    case qname of
-        HS.Qual _ _ name          -> worker name
-        HS.UnQual _ name          -> worker name
-        HS.Special _ HS.UnitCon{} -> return unitCon
-        HS.Special _ HS.Cons{}    -> return consCon
-        HS.Special _ HS.ListCon{} -> return nilCon
-        _ -> error "HaskellToCore.resolveQName"
-  where
-    worker name =
-        let Origin (Resolved (GlobalName _ qname)) _ = HS.ann name
-        in resolveQualifiedName qname
+-- resolveQGlobalName :: HS.QName Origin -> M Name
+-- resolveQGlobalName qname =
+--     case qname of
+--         HS.Qual _ _ name          -> worker name
+--         HS.UnQual _ name          -> worker name
+--         HS.Special _ HS.UnitCon{} -> return unitCon
+--         HS.Special _ HS.Cons{}    -> return consCon
+--         HS.Special _ HS.ListCon{} -> return nilCon
+--         _ -> error "HaskellToCore.resolveQName"
+--   where
+--     worker name =
+--         let Origin (Resolved (GlobalName _ qname)) _ = HS.ann name
+--         in resolveQualifiedName qname
 
 findCoercion :: HS.SrcSpanInfo -> M Coercion
 findCoercion src = do
     tiEnv <- asks scopeTcEnv
     return $ Map.findWithDefault CoerceId src (tcEnvCoercions tiEnv)
 
+requireCoercion :: HS.SrcSpanInfo -> M Coercion
+requireCoercion src = do
+    tiEnv <- asks scopeTcEnv
+    return $ Map.findWithDefault err src (tcEnvCoercions tiEnv)
+  where
+    err = error $ "Coercion required at: " ++ show src
 
 --resolveConstructor :: HS.QName Scoped -> M Name
 --resolveConstructor con = do
@@ -412,12 +424,13 @@ convertConDecl isNewtype con =
 
             argNames <- replicateM (length tys) (newName "arg")
             ty <- lookupType name
+            let con = Variable conName ty
             let args = zipWith Variable argNames (splitTy ty)
             -- pushDecl $ Decl ty mkCon (Lam args $ Con conName args)
 
             -- pushNode $ NodeDefinition conName (init $ splitTy ty)
             if isNewtype
-                then pushNewType $ NewType conName
+                then pushNewType $ NewType con
                 else pushNode $ NodeDefinition conName (init $ splitTy ty)
         --HS.RecDecl _ name fieldDecls -> do
         _ -> error "convertCon"
@@ -533,7 +546,7 @@ convertExternal cName ty
             let action = Lam [s] $
                     WithExternal primOut cName primArgs s $
                     UnboxedTuple [Var s, App (Con int32Con) (Var primOut)]
-            in (App (Con ioCon) action)
+            in action -- (App (WithCoercion (CoerceAp [retType]) (Con ioCon)) action)
     | otherwise = do -- not isIO
         args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
         primOut <- Variable <$> newName "primOut" <*> pure retType
@@ -644,12 +657,13 @@ convertExp expr =
         HS.Var _ name -> do
             let Origin _ src = HS.ann name
             coercion <- findCoercion src
-            n <- resolveQName name
-            ty <- lookupType $ unQName name
-            return $ WithCoercion coercion (Var (Variable n ty))
+            var <- resolveQName name
+            return $ WithCoercion coercion (Var var)
         HS.Con _ name -> do
-            n <- resolveQName name
-            return $ Con n
+            let Origin _ src = HS.ann name
+            coercion <- findCoercion src
+            var <- resolveQName name
+            return $ WithCoercion coercion (Con var)
         HS.App _ a b ->
             App
                 <$> convertExp a
@@ -659,16 +673,15 @@ convertExp expr =
             be <- convertExp b
             let Origin _ src = HS.ann con
             coercion <- findCoercion src
-            n <- resolveQName con
-            pure $ App (App (WithCoercion coercion (Con n)) ae) be
+            var <- resolveQName con
+            pure $ App (App (WithCoercion coercion (Con var)) ae) be
         HS.InfixApp _ a (HS.QVarOp _ var) b -> do
             ae <- convertExp a
             be <- convertExp b
             let Origin _ src = HS.ann var
             coercion <- findCoercion src
-            n <- resolveQName var
-            ty <- lookupType $ unQName var
-            pure $ App (App (WithCoercion coercion (Var (Variable n ty))) ae) be
+            var <- resolveQName var
+            pure $ App (App (WithCoercion coercion (Var var)) ae) be
         HS.Paren _ sub -> convertExp sub
         HS.Lambda _ pats sub ->
             Lam
@@ -693,8 +706,9 @@ convertExp expr =
             Let (Rec [ (Variable name ty, body)
                      | Decl ty name body <- concat decls ])
                 <$> convertExp expr
-        HS.List _ [] -> do
-            return $ Con nilCon
+        HS.List (Origin _ src) [] -> do
+            coercion <- requireCoercion src
+            return $ WithCoercion coercion (Con nilCon)
         HS.Do _ stmts -> do
             convertStmts stmts
         _ -> error $ "H->C convertExp: " ++ show expr
@@ -778,7 +792,7 @@ convertAlt alt =
         HS.Alt _ (HS.PApp _ name pats) rhs Nothing -> do
             args <- sequence [ Variable <$> bindName var <*> lookupType var
                              | HS.PVar _ var <- pats ]
-            Alt <$> (ConPat <$> resolveQGlobalName name <*> pure args)
+            Alt <$> (ConPat <$> resolveQName name <*> pure args)
                 <*> convertRhs rhs
         HS.Alt _ (HS.PTuple _ HS.Unboxed pats) rhs Nothing -> do
             args <- sequence [ Variable <$> bindName var <*> lookupType var
@@ -840,14 +854,46 @@ exprType expr =
 i32 = TcCon $ mkBuiltIn "LHC.Prim" "I32"
 i64 = TcCon $ mkBuiltIn "LHC.Prim" "I64"
 realWorld = TcCon $ mkBuiltIn "LHC.Prim" "RealWorld#"
+io = TcCon $ mkBuiltIn "LHC.Prim" "IO"
+int32 = TcCon $ mkBuiltIn "LHC.Prim" "Int32"
+charTy = TcCon $ mkBuiltIn "LHC.Prim" "Char"
+intTy = TcCon $ mkBuiltIn "LHC.Prim" "Int"
 
-intCon = Name ["LHC.Prim"] "I#" 0
-charCon = Name ["LHC.Prim"] "C#" 0
-nilCon = Name ["LHC.Prim"] "Nil" 0
-consCon = Name ["LHC.Prim"] "Cons" 0
-unitCon = Name ["LHC.Prim"] "Unit" 0
-ioCon = Name ["LHC.Prim"] "IO" 0
-int32Con = Name ["LHC.Prim"] "Int32" 0
+-- data Int = I# I32
+intCon = Variable (Name ["LHC.Prim"] "I#" 0)
+  (i32 `TcFun` intTy)
+
+-- data Char = C# I32
+charCon = Variable (Name ["LHC.Prim"] "C#" 0)
+  (i32 `TcFun` charTy)
+
+-- data List a = Nil | Cons a (List a)
+nilCon = Variable (Name ["LHC.Prim"] "Nil" 0)
+    (TcForall [a] ([] :=> TcList (TcRef a)))
+  where
+    a = TcVar "a" noSrcSpanInfo
+
+-- data List a = Nil | Cons a (List a)
+consCon = Variable (Name ["LHC.Prim"] "Cons" 0)
+    (TcForall [a] ([] :=> (TcRef a `TcFun` TcList (TcRef a) `TcFun` TcList (TcRef a))))
+  where
+    a = TcVar "a" noSrcSpanInfo
+
+-- data Unit = Unit
+unitCon = Variable (Name ["LHC.Prim"] "Unit" 0)
+  (TcTuple [])
+
+-- newtype IO a = IO (RealWorld# -> (# RealWorld#, a #))
+ioCon :: Variable
+ioCon = Variable (Name ["LHC.Prim"] "IO" 0)
+    $ TcForall [a] ([] :=> ((realWorld `TcFun` TcUnboxedTuple [realWorld, TcRef a]) `TcFun` TcApp io (TcRef a)))
+  where
+    a = TcVar "a" noSrcSpanInfo
+  -- (RealWorld# -> (# RealWorld#, retType #)) -> IO retType
+
+-- data Int32 = Int32 I32
+int32Con = Variable (Name ["LHC.Prim"] "Int32" 0)
+  (i32 `TcFun` int32)
 
 i32toi64 = Variable (Name ["LHC.Prim"] "i32toi64" 0) (TcFun i32 i64)
 i64toi32 = Variable (Name ["LHC.Prim"] "i64toi32" 0) (TcFun i64 i32)

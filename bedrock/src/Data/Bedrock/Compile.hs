@@ -6,6 +6,7 @@ import           Text.ParserCombinators.Parsec     (parseFromFile)
 import           Text.Printf
 
 import           Data.Bedrock.EvalApply
+import qualified Data.Bedrock.SimpleEvalApply as Simple
 import           Data.Bedrock.Exceptions
 import           Data.Bedrock.GlobalVariables
 import           Data.Bedrock.HPT
@@ -21,6 +22,7 @@ import           Data.Bedrock.VoidElimination
 import qualified Data.Bedrock.StackLayout as StackLayout
 import           Data.Bedrock
 import           Data.Bedrock.NodeSizing
+import qualified Data.Bedrock.SimpleNodeSizing as Simple
 import           Data.Bedrock.Storage
 import           Data.Bedrock.Storage.Fixed
 import           Data.Bedrock.Storage.Pluggable
@@ -102,10 +104,13 @@ stdPipeline :: Pipeline
 stdPipeline =
         [ "rename"          :> simplify . unique
         , "inlined"         :> unique . simplify . inline . simplify . inline
-        , PerformHPT
-        , "no-laziness"     :?> runGen . lowerEvalApply
+        -- , PerformHPT
+        -- , "no-laziness"     :?> runGen . lowerEvalApply
         -- , "no-void"         :> voidEliminate
-        , "no-unknown-size" :?> runGen . lowerNodeSize
+        -- , "no-unknown-size" :?> runGen . lowerNodeSize
+        , "no-laziness"     :> runGen Simple.lowerEvalApply
+        , "no-unknown-size" :> runGen Simple.lowerNodeSize
+
         , "no-nodes"        :> simplify . unique . registerIntroduction
         , "no-stack"        :> StackLayout.lower
         , "no-stack"        :> mergeAllocsModule . locallyUnique . runGen cpsTransformation

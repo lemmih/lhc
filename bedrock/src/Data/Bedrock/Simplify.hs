@@ -118,8 +118,7 @@ simplifyExpression expr =
                     simplifyExpression $
                     Application fnName args
                 Just (nodeName, args) ->
-                    simplifyExpression $
-                    MkNode nodeName args
+                    simplifyExpression $ TypeCast var
         Apply a b -> Apply <$> resolve a <*> resolve b
         MkNode name vars -> MkNode name <$> mapM resolve vars
         TypeCast var -> TypeCast <$> resolve var
@@ -223,4 +222,3 @@ lookupStore var = do
 bindStore :: Variable -> NodeName -> [Variable] -> M a -> M a
 bindStore var node vars = local $ \env ->
     env{ envStores = Map.insert var (node, vars) (envStores env) }
-

@@ -123,6 +123,7 @@ taggedName tag = lift $ do
       put st{genUnique = n+1}
       return $ Name $ tag ++ "_" ++ show n
     else do
+      put st{genScope = Set.insert tag (genScope st)}
       return $ Name tag
 
 

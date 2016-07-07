@@ -26,7 +26,7 @@ moduleGraph m =
     exprDependencies expr =
       case expr of
         Var var -> [varName var]
-        Con con -> [con]
+        Con con -> [varName con]
         UnboxedTuple args -> concatMap exprDependencies args
         Lit{} -> []
         WithExternal _ret _external _args _st rest -> exprDependencies rest

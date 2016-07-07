@@ -58,11 +58,11 @@ instance Pretty NodeDefinition where
     pretty (NodeDefinition name args) =
         text "node" <+> pretty name <+> hsep (map pretty args)
 
-data NewType = NewType Name
+data NewType = NewType Variable
 
 instance Pretty NewType where
     pretty (NewType con) =
-        text "newtype" <+> pretty con
+        text "newtype" <+> ppTypedVariable con
 
 data Variable = Variable
     { varName :: Name
@@ -71,7 +71,7 @@ data Variable = Variable
 
 data Expr
     = Var Variable
-    | Con Name
+    | Con Variable
     | UnboxedTuple [Expr]
     | Lit Literal
     | WithExternal Variable String [Variable] Variable Expr
@@ -174,7 +174,7 @@ instance Pretty Alt where
         pretty pattern <+> rarrow <$$> indent 2 (pretty expr)
 
 data Pattern
-    = ConPat Name [Variable]
+    = ConPat Variable [Variable]
     | LitPat Literal
     | UnboxedPat [Variable]
     -- | VarPat Variable
@@ -239,7 +239,3 @@ derive makeBinary ''Decl
 derive makeBinary ''AvailableNamespace
 derive makeBinary ''NewType
 derive makeBinary ''Module
-
-
-
-

@@ -178,5 +178,3 @@ traverseAlternative hpt origin alternative =
     case alternative of
         Alternative pattern branch ->
             Alternative pattern <$> traverseBlock hpt origin branch
-
-

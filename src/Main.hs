@@ -133,7 +133,7 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
           putStrLn "Converting to core..."
           let core = Haskell.convert tiEnv' m'
               coreFile = buildDir </> moduleFile m' <.> "core"
-              complete = Core.simplify $ NewType.lower $ Core.simplify $ Core.simplify $ core
+              complete = Core.simplify $ Core.simplify $ NewType.lower $ Core.simplify $ Core.simplify $ core
               (_,etaAbs) = Core.simpleEta Core.emptySimpleEtaAnnotation complete
           -- print (pretty complete)
           displayIO stdout (renderPretty 1 120 (pretty etaAbs))
@@ -200,4 +200,3 @@ compileExecutable deps file = do
     print (ppModule bedrock)
     Bedrock.compileModule bedrock file
     return ()
-

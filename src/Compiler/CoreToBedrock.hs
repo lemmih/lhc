@@ -17,9 +17,11 @@ import           Data.Char                        (ord)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
 import qualified Data.Set                         as Set
+import Data.Maybe
 
 import           Language.Haskell.TypeCheck.Monad (mkBuiltIn)
-import           Language.Haskell.TypeCheck.Types (TcType (..))
+import           Language.Haskell.TypeCheck.Types (TcType (..), Qual(..),Coercion(..))
+import           Language.Haskell.Scope (QualifiedName)
 
 import Debug.Trace
 
@@ -34,7 +36,7 @@ convert m = Bedrock.Module
   , functions    = fns
   , modNamespace = ns }
   where
-    (fns, ns) = runM (convertModule m) (Core.coreNamespace m)
+    (fns, ns) = runM (convertModule m) (Core.coreNewTypes m) (Core.coreNamespace m)
 
 convertNodeDefinition :: Core.NodeDefinition -> NodeDefinition
 convertNodeDefinition (Core.NodeDefinition name tys) =
@@ -53,27 +55,29 @@ convertModule m = setArities arities $ do
                       _ -> 0 ] ++
       [ (name, length args)
       | Core.NodeDefinition name args <- coreNodes m ] ++
-      [ (con, 1)
+      [ (Core.varName con, 1)
       | Core.NewType con <- coreNewTypes m ]
 
 data Env = Env
     { envArity    :: Map Name Int
     , envRoot     :: Name
     , envLocation :: [String]
+    , envNewTypes :: [NewType]
     }
 newtype M a = M { unM :: RWS Env [Function] AvailableNamespace a }
     deriving
         ( Monad, MonadWriter [Function], MonadReader Env
         , MonadState AvailableNamespace
         , Applicative, Functor )
-runM ::  M a -> AvailableNamespace -> ([Function], AvailableNamespace)
-runM action ns = (fns, ns')
+runM ::  M a -> [NewType] -> AvailableNamespace -> ([Function], AvailableNamespace)
+runM action newtypes ns = (fns, ns')
   where
     (ns',fns) = execRWS (unM action) env ns
     env = Env
         { envArity    = Map.empty
         , envRoot     = error "envRoot"
         , envLocation = []
+        , envNewTypes = newtypes
         }
 
 setArity :: Name -> Int -> M a -> M a
@@ -112,10 +116,28 @@ pushFunction regArgs origin body = do
           { fnName = name
           , fnAttributes = []
           , fnArguments = args
-          , fnResults = [Node]
+          , fnResults = blockType body
           , fnBody = body }
   tell [fn]
   return (name, Set.toList free)
+
+{-
+data Type
+  = NodePtr
+  | Node
+  | StaticNode NodeSize
+  | Primitive CType
+  | LLVMPrimitive LLVM.Type
+  | FramePtr
+-}
+blockType :: Bedrock.Block -> [Type]
+blockType block =
+  case block of
+    Bedrock.Case _ (Just defBlock) _ -> blockType defBlock
+    Bedrock.Case _ _ (Alternative _ rest:_) -> blockType rest
+    Bedrock.Bind _ _ rest -> blockType rest
+    Bedrock.Return vars -> map Bedrock.variableType vars
+    _ -> error $ "Can't find block type: " ++ show block
 
 -- XXX: Lookup the kind to find the bedrock type.
 convertVariable :: Core.Variable -> M Variable
@@ -166,28 +188,92 @@ setProgramExit block =
     Exit -> Exit
     Panic msg -> Panic msg
 
-convertResultType :: TcType -> Type
-convertResultType tcTy =
-  case tcTy of
-    TcApp (TcCon qname) sub
-      | qname == mkBuiltIn "LHC.Prim" "Addr"
-          -> case convertTcType sub of
-               Primitive prim -> Primitive (CPointer prim)
-               _ -> error $ "CoreToBedrock: Addr must be primitive: " ++ show sub
-    TcCon qname
-      | qname == mkBuiltIn "LHC.Prim" "I8"
-           -> Primitive I8
-    TcCon qname
-      | qname == mkBuiltIn "LHC.Prim" "I32"
-           -> Primitive I32
-    TcCon qname
-      | qname == mkBuiltIn "LHC.Prim" "I64"
-           -> Primitive I64
-    TcCon qname
-      | qname == mkBuiltIn "LHC.Prim" "RealWorld#"
-             -> Primitive I64
-    TcFun _ a -> convertResultType a
-    _ -> Node
+-- coreType :: Core.Expr -> Type
+-- coreType expr =
+--   case expr of
+--     Var var -> convertResultType (varType var)
+--     Con Name
+--     UnboxedTuple [Expr]
+--     Lit Literal
+--     WithExternal Variable String [Variable] Variable Expr
+--     ExternalPure Variable String [Variable] Expr
+--     App Expr Expr
+--     Lam [Variable] Expr
+--     Let LetBind Expr
+--     LetStrict Variable Expr Expr
+--     Case Expr Variable (Maybe Expr) [Alt]
+--     Cast Expr TcType
+--     Id
+--     WithCoercion Coercion Expr
+
+convertResultType :: [Variable] -> TcType -> M [Type]
+convertResultType args tcTy =
+    case collect [] tcTy of
+      (TcCon qname, [sub])
+        | qname == mkBuiltIn "LHC.Prim" "Addr"
+            -> case convertTcType sub of
+                 Primitive prim -> return [Primitive (CPointer prim)]
+                 _ -> error $ "CoreToBedrock: Addr must be primitive: " ++ show sub
+      (TcCon qname, [])
+        | qname == mkBuiltIn "LHC.Prim" "I8"
+             -> return [Primitive I8]
+      (TcCon qname, [])
+        | qname == mkBuiltIn "LHC.Prim" "I32"
+             -> return [Primitive I32]
+      (TcCon qname, [])
+        | qname == mkBuiltIn "LHC.Prim" "I64"
+             -> return [Primitive I64]
+      (TcCon qname, [])
+        | qname == mkBuiltIn "LHC.Prim" "RealWorld#"
+             -> return [Primitive I64]
+      (TcCon qname, conArgs) -> do
+        mbExpanded <- expandNewType qname conArgs
+        case mbExpanded of
+          Nothing -> trace ("Expanded to nothing: " ++ show qname) $ return [NodePtr]
+          Just ty -> trace ("Expanded to: " ++ show (qname, ty)) $ convertResultType args ty
+      (TcFun _ a,[]) ->
+        case args of
+          [] -> return [NodePtr]
+          (_:argss) -> convertResultType argss a
+      -- TcForall _ (_ :=> ty) -> convertResultType ty
+      (TcUnboxedTuple tys,[]) -> concat <$> mapM (convertResultType []) tys
+      (TcForall _ ([] :=> ty), []) -> convertResultType args ty
+      _ -> trace ("NodePtr: " ++ show tcTy) $ return [NodePtr]
+  where
+    collect acc (TcApp a b) = collect (b:acc) a
+    collect acc ty = (ty, reverse acc)
+
+expandNewType :: QualifiedName -> [TcType] -> M (Maybe TcType)
+expandNewType qname args = do
+  newtypes <- asks envNewTypes
+  return $ listToMaybe
+    [ ntSubst args
+    | nt <- newtypes
+    , let (ntName, ntSubst) = newtypeSubstitution nt
+    , ntName == qname ]
+
+-- newtype LHC.Prim.IO:∀ a. (LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)) →  LHC.Prim.IO a
+-- substitution:
+--   \[a] -> LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)
+newtypeSubstitution :: NewType -> (QualifiedName, [TcType] -> TcType)
+newtypeSubstitution (NewType var) =
+    split (Core.varType var)
+  where
+    split (TcForall tcvars ([] :=> ty)) = split ty
+    split (TcFun a b) =
+      case collect [] b of
+        (TcCon newtypeName, conArgs) -> (newtypeName, \args -> subst (zip conArgs args) a)
+        _ -> error "Weird newtype"
+    subst s ty =
+      case lookup ty s of
+        Just ty' -> ty'
+        Nothing -> case ty of
+          TcApp a b -> TcApp (subst s a) (subst s b)
+          TcFun a b -> TcFun (subst s a) (subst s b)
+          TcTuple ls -> TcTuple (map (subst s) ls)
+          _ -> ty
+    collect acc (TcApp a b) = collect (b:acc) a
+    collect acc ty = (ty, reverse acc)
 
 -- XXX: Move this function.
 isPrimitive :: Type -> Bool
@@ -199,11 +285,12 @@ convertDecl (Core.Decl ty name (Lam vars expr)) = do
   vars' <- mapM convertVariable vars
   body <- local (\env -> env{envRoot = name}) $
           convertExpr False expr (pure . Return)
+  retTys <- convertResultType vars' ty
   let fn = Function
           { fnName = name
           , fnAttributes = []
           , fnArguments = vars'
-          , fnResults = [convertResultType ty]
+          , fnResults = retTys
           , fnBody = if name == entrypointName
                       then setProgramExit body
                       else body
@@ -214,11 +301,12 @@ convertDecl (Core.Decl _ty name (WithCoercion _ expr)) =
 convertDecl (Core.Decl ty name expr) = do
   body <- local (\env -> env{envRoot = name}) $
           convertExpr False expr (pure . Return)
+  retTys <- convertResultType [] ty
   let fn = Function
           { fnName = name
           , fnAttributes = []
           , fnArguments = []
-          , fnResults = [convertResultType ty]
+          , fnResults = retTys
           , fnBody = if name == entrypointName
                       then setProgramExit body
                       else body
@@ -238,109 +326,111 @@ setOrigin = local $ \env ->
   let Name orig ident _ = envRoot env
   in env { envLocation = orig ++ [ident] }
 
-collectApps :: Core.Expr -> (Core.Expr, [Core.Expr])
+applyCoercion :: Coercion -> TcType -> TcType
+applyCoercion CoerceId ty = ty
+applyCoercion (CoerceAbs vars) ty = error $ "Weird Ap coercion: " ++ show (vars, ty)
+applyCoercion (CoerceAp tys) (TcForall vars ([] :=> ty)) = worker (zip vars tys) ty
+  where
+    worker subst ty =
+      case ty of
+        TcForall{} -> error $ "applyCoercion: TcForall"
+        TcFun a b -> TcFun (worker subst a) (worker subst b)
+        TcApp a b -> TcApp (worker subst a) (worker subst b)
+        TcRef var ->
+          case lookup var subst of
+            Nothing -> ty
+            Just ty' -> ty
+        TcCon con -> TcCon con
+        TcMetaVar meta -> TcMetaVar meta
+        TcUnboxedTuple tys -> TcUnboxedTuple (map (worker subst) tys)
+        TcTuple tys -> TcTuple (map (worker subst) tys)
+        TcList ty -> TcList (worker subst ty)
+        TcUndefined -> TcUndefined
+
+collectApps :: Core.Expr -> (Core.Expr, Coercion, [Core.Expr])
 collectApps = worker []
   where
     worker acc expr =
         case expr of
             App a b -> worker (b:acc) a
-            WithCoercion _ e -> worker acc e
-            _ -> (expr, acc)
+            WithCoercion c e -> (e, c, acc)
+            _ -> (expr, CoerceId, acc)
 
 convertExpr :: Bool -> Core.Expr -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
 convertExpr lazy expr rest =
   case expr of
     UnboxedTuple args -> do
       tmp <- newVariable [] "unboxed" Node
+      convertExprs args rest
+    UnboxedTuple args -> do
+      tmp <- newVariable [] "unboxed" Node
       convertExprs args $ \args' -> do
         Bind [tmp] (MkNode UnboxedTupleName args')
-            <$> rest [tmp]
+          <$> rest [tmp]
     WithCoercion _ e -> convertExpr lazy e rest
-    --CaseUnboxed scrut binds branch | not lazy ->
-    --    convertExpr False scrut $ \vars ->
-    _ | (Con name, args) <- collectApps expr ->
-        convertExprs args $ \args' -> do
-            let ty = if lazy then NodePtr else Node
-                con = if lazy then Store else MkNode
-            tmp <- newVariable [] "con" ty
-            Just arity <- lookupArity name
-            Bind [tmp] (con (ConstructorName name (arity-length args)) args')
-                <$> rest [tmp]
-    --Var v | lazy -> do
-    --    v' <- convertVariable v
-    --    let fn = variableName v'
-    --    mbArity <- lookupArity fn
-    --    case mbArity of
-    --        Nothing -> rest [v']
-    --        Just arity -> do
-    --            tmp <- newVariable [] "thunk" NodePtr
-    --            Bind [tmp] (Store (FunctionName fn arity) [])
-    --                <$> rest [tmp]
-    _ | (Var v, args) <- collectApps expr, lazy ->
-        convertExprs args $ \args' -> do
-            v' <- convertVariable v
-            let fn = variableName v'
-                fnRetTy = convertResultType (Core.varType v)
-            mbArity <- lookupArity fn
-            case mbArity of
-                Just arity | arity == length args' && isPrimitive fnRetTy -> do
-                    tmp <- newVariable [] "thunk" fnRetTy
-                    Bind [tmp] (Application fn args')
-                        <$> rest [tmp]
-                Just arity | arity >= length args' -> do
-                    tmp <- newVariable [] "thunk" NodePtr
-                    Bind [tmp] (Store (FunctionName fn (arity-length args')) args')
-                        <$> rest [tmp]
-                -- Just arity | arity < length args' -> do
-                Nothing | null args -> do
-                    rest [v']
-                Nothing -> do
-                    body <- do
-                        tmp <- deriveVariable v' "eval" Node
-                        Bind [tmp] (Eval v')
-                            <$> applyMany tmp args' (\next -> pure $ Return [next])
-                    (node, nodeArgs) <- pushFunction [] (Left "ap") body
-                    tmp <- newVariable [] "ap" NodePtr
-                    Bind [tmp] (Store (FunctionName node 0) nodeArgs)
-                        <$> rest [tmp]
-    _ | (Var v, args) <- collectApps expr, not lazy ->
-        convertExprs args $ \args' -> do
-            v' <- convertVariable v
-            let fn = variableName v'
-                fnRetTy = convertResultType (Core.varType v)
-            mbArity <- lookupArity fn
-            case mbArity of
-                Nothing | null args, variableType v' /= NodePtr ->
-                    rest [v']
-                Nothing -> do
-                    tmp <- deriveVariable v' "eval" Node
-                    Bind [tmp] (Eval v')
-                        <$> applyMany tmp args' (\next -> rest [next])
-                Just arity | arity == length args' -> do
-                    tmp <- newVariable [] "thunk" fnRetTy
-                    Bind [tmp] (Application fn args')
-                        <$> rest [tmp]
-                Just arity | arity < length args' -> do
-                    tmp <- newVariable [] "thunk" Node
-                    Bind [tmp] (Application fn (take arity args'))
-                        <$> applyMany tmp (drop arity args') (\next -> rest [next])
-                Just arity -> do
-                    tmp <- newVariable [] "thunk" Node
-                    Bind [tmp] (MkNode (FunctionName fn (arity-length args')) args')
-                        <$> rest [tmp]
-    -- Var v | not lazy -> do
-    --     v' <- convertVariable v
-    --     let fn = variableName v'
-    --     mbArity <- lookupArity fn
-    --     case mbArity of
-    --         Nothing -> do
-    --             tmp <- deriveVariable v' "eval" Node
-    --             Bind [tmp] (Eval v')
-    --                 <$> rest [tmp]
-    --         Just arity -> do
-    --             tmp <- newVariable [] "thunk" Node
-    --             Bind [tmp] (MkNode (FunctionName fn arity) [])
-    --                 <$> rest [tmp]
+    _ | (Con con, coercion, args) <- collectApps expr ->
+      convertExprs args $ \args' -> do
+        tmp <- newVariable [] "con" NodePtr
+        let name = Core.varName con
+        Just arity <- lookupArity name
+        Bind [tmp] (Store (ConstructorName name (arity-length args)) args')
+            <$> rest [tmp]
+    _ | (Var v, coercion, args) <- collectApps expr, lazy ->
+      convertExprs args $ \args' -> do
+        v' <- convertVariable v
+        let fn = variableName v'
+        fnRetTys <- convertResultType args' (Core.varType v)
+        mbArity <- lookupArity fn
+        case mbArity of
+          Just arity | arity == length args' && (length fnRetTys > 1 || all isPrimitive fnRetTys) -> do
+            tmp <- mapM (newVariable [] "thunk") fnRetTys
+            Bind tmp (Application fn args')
+              <$> rest tmp
+          Just arity | arity >= length args' -> do
+            tmp <- newVariable [] "thunk" NodePtr
+            Bind [tmp] (Store (FunctionName fn (arity-length args')) args')
+              <$> rest [tmp]
+          Nothing | null args -> do
+            rest [v']
+          Nothing -> do
+            body <- do
+              tmp <- deriveVariable v' "eval" NodePtr
+              Bind [tmp] (Eval v') <$>
+                applyMany fnRetTys tmp args' (pure . Return)
+            (node, nodeArgs) <- pushFunction [] (Left "ap") body
+            tmp <- newVariable [] "ap" NodePtr
+            Bind [tmp] (Store (FunctionName node 0) nodeArgs)
+              <$> rest [tmp]
+    _ | (Var v, coercion, args) <- collectApps expr, not lazy ->
+      convertExprs args $ \args' -> do
+        v' <- convertVariable v
+        let fn = variableName v'
+        mbArity <- lookupArity fn
+        case mbArity of
+          Nothing | null args, variableType v' /= NodePtr ->
+            rest [v']
+          Nothing -> do
+            fnRetTys <- convertResultType [] (Core.varType v)
+            tmp <- deriveVariable v' "eval" NodePtr
+            Bind [tmp] (Eval v')
+              <$> applyMany fnRetTys tmp args' rest
+          Just arity | arity == length args' -> do
+            fnRetTys <- convertResultType args' (Core.varType v)
+            tmp <- mapM (newVariable [] "thunk") fnRetTys
+            Bind tmp (Application fn args')
+              <$> rest tmp
+          Just arity | arity < length args' -> do
+            [fnRetTy] <- convertResultType (take arity args') (applyCoercion coercion $ Core.varType v)
+            finalTys <- convertResultType args' (applyCoercion coercion $ Core.varType v)
+            tmp <- newVariable [] "ret" fnRetTy
+            -- fetched <- newVariable [] "thunk" Node
+            Bind [tmp] (Application fn (take arity args')) <$>
+              -- Bind [fetched] (Bedrock.Fetch (MemAttributes False Nothing) tmp)
+              applyMany finalTys tmp (drop arity args') rest
+          Just arity -> do
+            tmp <- newVariable [] "thunk" Node
+            Bind [tmp] (MkNode (FunctionName fn (arity-length args')) args')
+              <$> rest [tmp]
     Core.Lit (Core.LitString str) -> do
         tmp <- newVariable [] "lit" (Primitive (CPointer I8))
         Bind [tmp] (Bedrock.Literal (LiteralString str))
@@ -349,23 +439,6 @@ convertExpr lazy expr rest =
         tmp <- newVariable [] "int" (Primitive I64)
         Bind [tmp] (Bedrock.Literal (LiteralInt int))
             <$> rest [tmp]
-    -- App a b | lazy -> do
-    --     body <- --setOrigin $
-    --         convertExpr False a $ \[aVal] ->
-    --         convertExpr True b $ \[bVal] ->  do
-    --         ret <- deriveVariable aVal "apply" Node
-    --         Bind [ret] (Apply aVal bVal)
-    --             <$> pure (Return [ret])
-    --     (node, nodeArgs) <- pushFunction [] (Left "ap") body
-    --     tmp <- newVariable [] "ap" NodePtr
-    --     Bind [tmp] (Store (FunctionName node 0) nodeArgs)
-    --         <$> rest [tmp]
-    -- App a b | not lazy ->
-    --     convertExpr False a $ \[aVal] -> -- node
-    --     convertExpr True b $ \[bVal] -> do -- nodeptr
-    --     ret <- deriveVariable aVal "apply" Node
-    --     Bind [ret] (Apply aVal bVal)
-    --             <$> rest [ret]
     Lam v sub | lazy -> do
       v' <- mapM convertVariable v
       (node,nodeArgs) <- do
@@ -374,12 +447,25 @@ convertExpr lazy expr rest =
       tmp <- newVariable [] "thunk" NodePtr
       Bind [tmp] (Store (FunctionName node (length v)) nodeArgs)
           <$> rest [tmp]
+    Core.Case scrut var Nothing [Core.Alt (Core.UnboxedPat binds) branch]  ->
+      convertExpr False scrut $ \vals -> do
+        binds' <- mapM convertVariable binds
+        let worker [] [] = convertExpr False branch rest
+            worker (x:xs) (y:ys) = Bind [x] (TypeCast y) <$> worker xs ys
+        worker binds' vals
     Core.Case scrut var Nothing alts | not lazy ->
-      convertExpr False scrut $ \[val] -> do
-        var' <- convertVariable var
-        -- Bind [var'] (Bedrock.TypeCast val) <$>
-        Bedrock.Case val Nothing <$>
-                mapM convertAlt alts
+      convertExpr False scrut $ \[val] ->
+        if variableType val == NodePtr
+          then do
+            var' <- convertVariable var
+            tmp <- deriveVariable val "node" Node
+            -- Bind [var'] (Bedrock.TypeCast val) <$>
+            Bind [tmp] (Bedrock.Fetch (MemAttributes False Nothing) val) <$>
+              (Bedrock.Case tmp Nothing <$>
+                    mapM convertAlt alts)
+          else
+            Bedrock.Case val Nothing <$>
+                  mapM convertAlt alts
     Core.Case scrut var (Just def) alts | not lazy ->
         convertExpr False scrut $ \[val] -> do
             var' <- convertVariable var
@@ -389,18 +475,11 @@ convertExpr lazy expr rest =
                     Bind [var'] (Bedrock.TypeCast val) <$>
                         Bedrock.Case val (Just defExpr) <$>
                             mapM convertAlt alts
-                else
-                    Bedrock.Case val (Just defExpr) <$>
+                else do
+                  tmp <- deriveVariable val "node" Node
+                  Bind [tmp] (Bedrock.Fetch (MemAttributes False Nothing) val) <$>
+                    Bedrock.Case tmp (Just defExpr) <$>
                         mapM convertAlt alts
-    --External external CVoid args st | not lazy -> do
-    --    let tmp = Variable (Name [] "tmp" 0) NodePtr
-    --        ret = Variable (Name [] "ret" 0) Node
-    --        unit = ConstructorName (Name ["Main"] "IOUnit" 0)
-    --        tuple = ConstructorName (Name ["Internal"] "()" 0)
-    --    (Bind [] (CCall external args) .
-    --     Bind [tmp] (Store tuple []) .
-    --     Bind [ret] (MkNode unit [tmp, st]))
-    --        <$> rest ret
     WithExternal binder external args st scoped | not lazy -> do
       binder' <- convertVariable binder
       args' <- mapM convertVariable args
@@ -428,7 +507,7 @@ convertExpr lazy expr rest =
     _ | lazy -> error $ "C->B convertExpr: " ++ show (lazy, expr)
     _ | not lazy ->
       convertExpr True expr $ \[val] -> do
-      tmp <- deriveVariable val "eval" Node
+      tmp <- deriveVariable val "eval" NodePtr
       Bind [tmp] (Eval val)
           <$> rest [tmp]
 
@@ -439,12 +518,16 @@ convertExprs (x:xs) fn =
     convertExprs xs $ \vs ->
     fn (v ++ vs)
 
-applyMany :: Variable -> [Variable] -> (Variable -> M Block) -> M Block
-applyMany node [] fn = fn node
-applyMany node (x:xs) fn = do
-    ret <- deriveVariable node "apply" Node
+applyMany :: [Type] -> Variable -> [Variable] -> ([Variable] -> M Block) -> M Block
+applyMany fianlTy node [] fn = fn [node]
+applyMany finalTy node [x] fn = do
+    ret <- mapM (deriveVariable node "apply") finalTy
+    Bind ret (Apply node x)
+        <$> fn ret
+applyMany finalTy node (x:xs) fn = do
+    ret <- deriveVariable node "apply" NodePtr
     Bind [ret] (Apply node x)
-        <$> applyMany ret xs fn
+        <$> applyMany finalTy ret xs fn
 
 deriveVariable :: Variable -> String -> Type -> M Variable
 deriveVariable (Variable (Name orig ident _) _) tag ty = do
@@ -455,8 +538,9 @@ deriveVariable (Variable (Name orig ident _) _) tag ty = do
 convertAlt :: Alt -> M Bedrock.Alternative
 convertAlt (Alt pattern branch) =
     case pattern of
-        ConPat name args -> do
+        ConPat con args -> do
             args' <- mapM convertVariable args
+            let name = Core.varName con
             Alternative (NodePat (ConstructorName name 0) args')
                 <$> convertExpr False branch (pure . Return)
         Core.LitPat lit ->

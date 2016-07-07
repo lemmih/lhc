@@ -1,6 +1,7 @@
 module Compiler.Core.NewType where
 
 import Compiler.Core
+import Language.Haskell.TypeCheck.Types
 
 lower :: Module -> Module
 lower m = m
@@ -12,6 +13,11 @@ lower m = m
     expr e =
       case e of
         Var{} -> e
+        WithCoercion (CoerceAp tys) (Con con)
+          | isNewtype con ->
+              case varType con of
+                TcForall vars _ | length vars == length tys -> Id
+                _ -> error $ "Weird newtype: " ++ show e
         Con con
           | isNewtype con -> Id
           | otherwise     -> e
@@ -33,5 +39,3 @@ lower m = m
     alt (Alt pattern branch) = Alt pattern (expr branch)
     letBind (NonRec bind rhs) = NonRec bind (expr rhs)
     letBind (Rec binds) = Rec [ (bind, expr rhs) | (bind, rhs) <- binds ]
-
-

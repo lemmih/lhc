@@ -17,6 +17,7 @@ simplify m = m
         Lit{} -> e
         WithExternal{} -> e
         ExternalPure{} -> e
+        App Id b -> expr b
         App a b -> App (expr a) (expr b)
         Lam a (Lam b rest) -> expr (Lam (a++b) rest)
         Lam vars rest -> Lam vars (expr rest)

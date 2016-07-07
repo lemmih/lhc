@@ -44,10 +44,16 @@ import           Data.Bedrock.Rename
 
 import           Data.Bedrock.PrettyPrint     ()
 
+import Debug.Trace
+
 vector !!! idx = \ident ->
     if Vector.length vector <= idx
     then error $ "Invalid index: " ++ ident ++ ": " ++ show (Vector.length vector, idx)
     else vector Vector.! idx
+
+mread :: String -> MVector s a -> Int -> ST s a
+mread label vector idx = -- trace ("Reading from: " ++ label) $
+  MVector.read vector idx
 
 data HPTResult = HPTResult
     { hptIterations          :: Int
@@ -224,14 +230,14 @@ mkFnRets free m = worker free [] (functions m)
   where
     worker n acc [] = (Map.fromList acc, n)
     worker n acc (fn:fns) =
-        let (rets, n') = assignID n [] (fnResults fn)
+        let (rets, n') = assignID (fnName fn) n [] (fnResults fn)
             acc' = (fnName fn, rets) : acc
         in worker n' acc' fns
-    assignID n acc [] = (reverse acc, n)
-    assignID n acc (ty:tys) =
+    assignID name n acc [] = (reverse acc, n)
+    assignID name n acc (ty:tys) =
         let (idNum, n') = newIDByType n ty
-            var = Variable (Name [] "ret" idNum) ty
-        in assignID n' (var:acc) tys
+            var = Variable (Name [] (nameIdentifier name ++ "_ret") idNum) ty
+        in assignID name n' (var:acc) tys
 
 mkFnRaise :: AvailableNamespace -> Module -> (FnRaise, AvailableNamespace)
 mkFnRaise free m = worker free [] (functions m)
@@ -345,7 +351,7 @@ isVariableShared = isVariableShared' . variableIndex
 isVariableShared' :: Int -> HPT s Bool
 isVariableShared' index = do
     vector <- asks envSharedVariables
-    liftST $ MVector.read vector index
+    liftST $ mread "envSharedVariables" vector index
 
 markVariableShared :: Variable -> HPT s ()
 markVariableShared = markVariableShared' . variableIndex
@@ -358,7 +364,7 @@ markVariableShared' index = do
 _isHeapLocationShared :: HeapLocation -> HPT s Bool
 _isHeapLocationShared hpLocation = do
     vector <- asks envSharedHeapLocations
-    liftST $ MVector.read vector hpLocation
+    liftST $ mread "envSharedHeapLocations" vector hpLocation
 
 markHeapLocationShared :: HeapLocation -> HPT s ()
 markHeapLocationShared hpLocation = do
@@ -407,7 +413,7 @@ getNodeScope = getNodeScope' . variableIndex
 getNodeScope' :: Int -> HPT s Objects
 getNodeScope' index = do
     scope <- asks envNodeScope
-    liftST $ MVector.read scope index
+    liftST $ mread "envNodeScope" scope index
 
 getPtrScope :: Variable -> HPT s HeapLocationSet
 getPtrScope = getPtrScope' . variableIndex
@@ -415,18 +421,18 @@ getPtrScope = getPtrScope' . variableIndex
 getPtrScope' :: Int -> HPT s HeapLocationSet
 getPtrScope' index = do
     scope <- asks envPtrScope
-    liftST $ MVector.read scope index
+    liftST $ mread "envPtrScope" scope index
 
 getHeapObjects :: HeapLocation -> HPT s Objects
 getHeapObjects hp = do
     heap <- asks envHeap
-    liftST $ MVector.read heap hp
+    liftST $ mread "envHeap" heap hp
 
 setHeapObjects :: HeapLocation -> Objects -> HPT s ()
 setHeapObjects hp objects = do
     heap <- asks envHeap
     liftST $ do
-        oldObjects <- MVector.read heap hp
+        oldObjects <- mread "envHeap_upd" heap hp
         MVector.write heap hp (mergeObjects objects oldObjects)
 
 setHeapSetObjects :: HeapLocationSet -> Objects -> HPT s ()
@@ -434,20 +440,20 @@ setHeapSetObjects (HeapLocationSet hpSet) objects =
     forM_ (IntSet.toList hpSet) $ \hp -> setHeapObjects hp objects
 
 setNodeScope :: Variable -> Objects -> HPT s ()
-setNodeScope = setNodeScope' . variableIndex
+setNodeScope v o = {-trace ("setNodeScope: "++show v) $ -}setNodeScope' (variableIndex v) o
 
 setNodeScope' :: Int -> Objects -> HPT s ()
 setNodeScope' index objects = do
     scope <- asks envNodeScope
     liftST $ do
-        oldObjects <- MVector.read scope index
+        oldObjects <- mread "envNodeScope_upd" scope index
         MVector.write scope index (mergeObjects objects oldObjects)
 
 setPtrScope :: Variable -> HeapLocationSet -> HPT s ()
 setPtrScope var heapLocs = do
     scope <- asks envPtrScope
     liftST $ do
-        oldPtrs <- MVector.read scope index
+        oldPtrs <- mread "envPtrScope_upd" scope index
         MVector.write scope index (merge heapLocs oldPtrs)
   where
     merge (HeapLocationSet s1) (HeapLocationSet s2) =
@@ -814,12 +820,3 @@ analyseUsage m =
             GCEnd{}                -> return ()
             GCMark var             -> push var
             GCMarkNode var         -> push var
-
-
-
-
-
-
-
-
-

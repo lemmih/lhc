@@ -30,6 +30,8 @@ module LHC.Prim
     , max
     , i32toi64
     , i64toi32
+    , length
+    , emptyString
     ) where
 
 -- XXX: These have kind # but it is not checked anywhere.
@@ -213,3 +215,11 @@ max a b =
     False -> a
 
 
+length :: [a] -> Int
+length lst = length lst
+
+emptyString :: [Char]
+emptyString = []
+
+id :: a -> a
+id x = x

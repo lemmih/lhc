@@ -99,7 +99,7 @@ etaExpr expr =
     Con{} -> pure expr
     UnboxedTuple{} -> pure expr
     Lit{} -> pure expr
-    WithCoercion _ e -> etaExpr e
+    WithCoercion c e -> WithCoercion c <$> etaExpr e
 
     -- WithExternal Variable String [Variable] Variable Expr
     -- ExternalPure Variable String [Variable] Expr
