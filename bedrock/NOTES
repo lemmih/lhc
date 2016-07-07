@@ -652,3 +652,52 @@ Type checking:
 
 
 
+
+
+
+Abstractions and their costs:
+  Sharing the result of suspended computations.
+    Suspended computations are updated with their result to avoid
+    running the computations more than once.
+    However, static analysis can tell us when a suspended computation
+    is guaranteed to never be used more than once.
+
+  Returning objects via the heap.
+    Returning objects through registers is faster when the objecs
+    are immediately consumed. Is it slower when they're not.
+
+
+
+Function pointers and node layouts:
+
+  Suspended functions and stack frames are both data objects that have an
+  associated function pointer. For suspended functions, the function pointer
+  points to the evaluation function. For stack frames, the function pointer
+  points to the return address of the caller. There are two ways of encoding
+  this associated function pointer: (a) in the source code via a switch on the
+  object ID (this is what the GRIN paper proposed), (b) add the function
+  pointer to the data object (this is what GHC does). Option A gives a lot of
+  free bits in the data object but it also leads to huge switches that aren't
+  efficient. Option B leaves us with nearly no free bits to play with. One
+  could mix option A+B and keep both the ID and function pointer in each data
+  object but that wastes a lot of memory.
+
+  This might be the best approach:
+
+  Use option A for data structures. Most objects should belong to this
+  category so this is where a compact representation is most important.
+
+  Use option B for stack frames and suspended functions. This leads to simple
+  and fast code for evaluation and function returns. Align relevant functions
+  to free up, say, 3 bits to use for tagging. At least 1 bit should be
+  reserved for inlining because tail pointer inlining is a special and
+  important optimization. Alignment of 8, 16, or even 32, do not sound too
+  bad. Executable would be a bit larger but so what?
+
+
+
+
+
+
+
+
