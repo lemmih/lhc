@@ -23,7 +23,7 @@ import           Language.Haskell.TypeCheck.Monad (mkBuiltIn)
 import           Language.Haskell.TypeCheck.Types (TcType (..), Qual(..),Coercion(..))
 import           Language.Haskell.Scope (QualifiedName)
 
-import Debug.Trace
+-- import Debug.Trace
 
 entrypointName :: Name
 entrypointName = Name ["Main"] "entrypoint" 0
@@ -229,8 +229,8 @@ convertResultType args tcTy =
       (TcCon qname, conArgs) -> do
         mbExpanded <- expandNewType qname conArgs
         case mbExpanded of
-          Nothing -> trace ("Expanded to nothing: " ++ show qname) $ return [NodePtr]
-          Just ty -> trace ("Expanded to: " ++ show (qname, ty)) $ convertResultType args ty
+          Nothing -> return [NodePtr]
+          Just ty -> convertResultType args ty
       (TcFun _ a,[]) ->
         case args of
           [] -> return [NodePtr]
@@ -238,7 +238,7 @@ convertResultType args tcTy =
       -- TcForall _ (_ :=> ty) -> convertResultType ty
       (TcUnboxedTuple tys,[]) -> concat <$> mapM (convertResultType []) tys
       (TcForall _ ([] :=> ty), []) -> convertResultType args ty
-      _ -> trace ("NodePtr: " ++ show tcTy) $ return [NodePtr]
+      _ -> return [NodePtr]
   where
     collect acc (TcApp a b) = collect (b:acc) a
     collect acc ty = (ty, reverse acc)
