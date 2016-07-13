@@ -18,6 +18,7 @@ import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.RegisterIntroduction
 import           Data.Bedrock.Rename
 import           Data.Bedrock.Simplify
+import           Data.Bedrock.Simplify.LocalDCE
 import           Data.Bedrock.VoidElimination
 import qualified Data.Bedrock.StackLayout as StackLayout
 import           Data.Bedrock
@@ -103,7 +104,7 @@ compileWithOpts keepIntermediateFiles verbose path m = do
 stdPipeline :: Pipeline
 stdPipeline =
         [ "rename"          :> simplify . unique
-        , "inlined"         :> unique . simplify . inline . simplify . inline
+        , "inlined"         :> unique . simplifySteps 10
         -- , PerformHPT
         -- , "no-laziness"     :?> runGen . lowerEvalApply
         -- , "no-void"         :> voidEliminate
@@ -120,6 +121,9 @@ stdPipeline =
         , "no-globals"      :> locallyUnique . lowerGlobalRegisters
         -- , "pretty"          :> locallyUnique
         ]
+  where
+    simplifySteps 0 = id
+    simplifySteps n = simplifySteps (n-1) . unique . localDCE . simplify . inline
         -- [ "rename"          :> simplify . unique
         -- , PerformHPT
         -- , "no-laziness"     :?> runGen . lowerEvalApply

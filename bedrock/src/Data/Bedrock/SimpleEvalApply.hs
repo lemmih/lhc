@@ -4,6 +4,8 @@ import           Control.Monad
 import           Control.Monad.State
 import qualified Data.IntSet            as IntSet
 import qualified Data.Map               as Map
+import           Data.Set               (Set)
+import qualified Data.Set               as Set
 import qualified Data.Vector            as Vectorg
 
 import           Data.Bedrock
@@ -101,11 +103,13 @@ applyPairs :: Gen [(([Type], Type), [(NodeName, [Type])])]
 applyPairs = do
   fs <- gets (Map.elems . envFunctions)
   ns <- gets (nodes . envModule)
+  let activeNodes = Set.unions (map functionNodes fs)
   return $ Map.toList $ Map.fromListWith (++) $
     [ ((retTys, argTy), [(nodeName, map variableType appliedArgs)])
     | fn <- fs
     , n <- [1..length (fnArguments fn)]
     , let nodeName = FunctionName (fnName fn) n
+    , nodeName `Set.member` activeNodes
     , let retTys = if n == 1 then fnResults fn else [NodePtr]
     , let appliedArgs = reverse (drop n (reverse (fnArguments fn)))
     , let argTy = variableType (reverse (fnArguments fn) !! (n-1)) ] ++
@@ -113,9 +117,28 @@ applyPairs = do
     | NodeDefinition name args <- ns
     , n <- [1..length args]
     , let nodeName = ConstructorName name n
+    , nodeName `Set.member` activeNodes
     , let appliedArgs = reverse (drop n (reverse args))
     , let retTys = [NodePtr]
     , let argTy = reverse args !! (n-1) ]
+
+functionNodes :: Function -> Set NodeName
+functionNodes = blockNodes . fnBody
+
+blockNodes :: Block -> Set NodeName
+blockNodes block =
+  case block of
+    Case _scrut mbBlock alts ->
+      maybe Set.empty blockNodes mbBlock `Set.union`
+      Set.unions
+        [ blockNodes branch
+        | Alternative _pattern branch <- alts ]
+    Bind _vars (Store node _args) rest ->
+      Set.insert node (blockNodes rest)
+    Bind _vars (MkNode node _args) rest ->
+      Set.insert node (blockNodes rest)
+    Bind _vars _ rest -> blockNodes rest
+    _ -> Set.empty
 
 mkEvalAlternative :: Function -> Gen Alternative
 mkEvalAlternative fn = do
@@ -149,6 +172,6 @@ replaceEvalApply applys eval = fix $ \loop block ->
         Eval arg -> Application eval [arg]
         Apply fn arg ->
           case Map.lookup (expectedRetTypes, variableType arg) applys of
-            Nothing -> error $ "Missing apply function: " ++ show (fn,arg)
+            Nothing -> Undefined -- error $ "Missing apply function: " ++ show (fn,arg)
             Just apply -> Application apply [fn, arg]
         _        -> expr

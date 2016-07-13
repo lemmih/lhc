@@ -8,7 +8,7 @@ import qualified Data.Map            as Map
 
 data Cost
   = ProhibitlyExpensive
-  | Cost Int [Variable] ([Variable] -> Block -> Block)
+  | Cost Int [Variable] (([Variable] -> Block) -> Block)
 
 type Env = Map Name (Either Function Cost)
 type M a = State Env a
@@ -33,26 +33,27 @@ getFunctionCost name = do
           setFunctionCost name cost
           return cost
 
-blockCost :: Block -> M (Maybe (Int, [Variable] -> Block -> Block))
+blockCost :: Block -> M (Maybe (Int, ([Variable] -> Block) -> Block))
 blockCost block =
   case block of
     Case scrut defaultBranch alts -> return Nothing
     Bind vars expr rest ->
-      fmap (step (exprCost expr) (\_ -> Bind vars expr)) <$> (blockCost rest)
-    Return rets -> return $ Just (0, \vars -> typeCastMany (zip vars rets))
-    Raise{} -> return $ Just (0, \_ -> const block)
+      fmap (step (exprCost expr) (Bind vars expr)) <$> (blockCost rest)
+    Return rets -> return $ Just (0, \mk -> mk rets)
+    Raise{} -> return $ Just (0, \_ -> block)
     TailCall{} -> return Nothing
     Invoke{} -> return Nothing
     InvokeHandler{} -> return Nothing
     Exit -> return Nothing
-    Panic{} -> return $ Just (0, \_ -> const block)
+    Panic{} -> return $ Just (0, \_ -> block)
   where
-    step n fn (n', fn') = (n+n', \vars -> fn vars . fn' vars)
+    step n fn (n', fn') = (n+n', fn . fn')
     exprCost expr =
       case expr of
         Eval{} -> 0
         Apply{} -> 0
         Literal{} -> 0
+        TypeCast{} -> 0
         CCall fn _ -> ccallCost fn
         _ -> 1
     ccallCost _ = 0
@@ -91,15 +92,22 @@ inlineBlock block =
     Bind vars expr@(Application fn args) rest -> do
       cost <- getFunctionCost fn
       case cost of
-        Cost n inlinedArgs inliner | n <= 0 ->
-          (typeCastMany (zip inlinedArgs args) .
-          inliner vars) <$> inlineBlock rest
+        Cost n inlinedArgs inliner | n <= 0 -> do
+          rest' <- inlineBlock rest
+          return $
+            typeCastMany (zip inlinedArgs args) $
+            inliner (\vals -> typeCastMany (zip vars vals) rest')
         _ProhibitlyExpensive -> Bind vars expr <$> inlineBlock rest
     Bind vars expr rest ->
       Bind vars expr <$> inlineBlock rest
     Return{} -> return block
     Raise{} -> return block
-    TailCall{} -> return block -- FIXME
+    TailCall fn args -> do
+      cost <- getFunctionCost fn
+      return $ case cost of
+        Cost n inlinedArgs inliner | n <= 0 ->
+          typeCastMany (zip inlinedArgs args) $ inliner Return
+        _ -> TailCall fn args
     Invoke{} -> return block
     InvokeHandler{} -> return block
     Exit -> return block

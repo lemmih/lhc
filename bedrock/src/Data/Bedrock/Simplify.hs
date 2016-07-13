@@ -62,26 +62,26 @@ simplifyBlock block =
             Bind [node]
                 <$> simplifyExpression expr
                 <*> simplifyBlock rest
-        Bind [ret] (Apply node arg) rest -> do
-            mbConst <- lookupConstant node
+        Bind rets (Apply ptr arg) rest -> do
+            mbConst <- lookupStore ptr
             case mbConst of
                 Just (FunctionName fnName 1, args) ->
                     simplifyBlock $
-                        Bind [ret] (Application fnName (args ++ [arg])) rest
-                Just (FunctionName fnName n, args) | n > 1 ->
+                        Bind rets (Application fnName (args ++ [arg])) rest
+                Just (FunctionName fnName n, args) ->
                     simplifyBlock $
-                        Bind [ret] (MkNode (FunctionName fnName (n-1)) (args ++ [arg])) rest
+                        Bind rets (Store (FunctionName fnName (n-1)) (args ++ [arg])) rest
                 _Nothing ->
-                    Bind [ret]
-                        <$> (Apply <$> resolve node <*> resolve arg)
+                    Bind rets
+                        <$> (Apply <$> resolve ptr <*> resolve arg)
                         <*> simplifyBlock rest
         Bind [] TypeCast{} rest ->
             simplifyBlock rest
         Bind [dst] (TypeCast src) rest | variableType dst == variableType src ->
               bindVariable dst src (simplifyBlock rest)
         Bind binds simple rest ->
-            Bind <$> mapM resolve binds
-                <*> simplifyExpression simple
+            Bind binds
+                <$> simplifyExpression simple
                 <*> simplifyBlock rest
         Case scrut Nothing alts ->
             Case
@@ -200,7 +200,15 @@ bindVariable :: Variable -> Variable -> M a -> M a
 bindVariable old new fn = do
     new' <- resolve new
     local
-        (\env -> env{ envRenaming = Map.insert old new' (envRenaming env) })
+        (\env -> env{
+            envRenaming = Map.insert old new' (envRenaming env),
+            envStores = case Map.lookup old (envStores env) of
+              Nothing -> envStores env
+              Just node -> Map.insert new' node (envStores env),
+            envConstant = case Map.lookup old (envConstant env) of
+                Nothing -> envConstant env
+                Just node -> Map.insert new' node (envConstant env)
+          })
         fn
 
 lookupConstant :: Variable -> M (Maybe (NodeName, [Variable]))

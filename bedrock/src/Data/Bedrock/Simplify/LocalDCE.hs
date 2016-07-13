@@ -1,0 +1,99 @@
+-- Local Dead Code Elimination
+module Data.Bedrock.Simplify.LocalDCE
+    ( localDCE ) where
+
+import           Data.Bedrock
+import           Data.Bedrock.Transform
+
+import           Data.Set     (Set)
+import qualified Data.Set     as Set
+import           Data.Map     (Map)
+import qualified Data.Map     as Map
+import Control.Monad.Reader
+import Control.Monad.Writer
+
+localDCE :: Module -> Module
+localDCE m =
+  m{ functions = map dceFunction (functions m) }
+
+
+newtype Out = Out (Map Variable (Set Variable))
+type In = Set Variable
+type M a = ReaderT In (Writer Out) a
+
+instance Monoid Out where
+  mempty = Out Map.empty
+  mappend (Out m1) (Out m2) = Out (Map.unionWith Set.union m1 m2)
+
+dceFunction :: Function -> Function
+dceFunction fn =
+    fn{ fnBody = body }
+  where
+    root = Variable (fnName fn) Node
+    (body, out) = runWriter (runReaderT (dceBlock root (fnBody fn)) dirty)
+    dirty = findUsed root out
+
+findUsed :: Variable -> Out -> Set Variable
+findUsed root (Out m) = worker [root] m
+  where
+    worker [] _     = Set.empty
+    worker (x:xs) m =
+      case Map.lookup x m of
+        Nothing   -> worker xs m
+        Just deps -> Set.union deps $ worker (Set.toList deps ++ xs) (Map.delete x m)
+
+useMany :: [Variable] -> [Variable] -> M ()
+useMany keys vars =
+    forM_ keys $ \key -> tell (Out $ Map.singleton key set)
+  where
+    set = Set.fromList vars
+
+onMaybe :: (a -> M b) -> Maybe a -> M (Maybe b)
+onMaybe _ Nothing   = return Nothing
+onMaybe fn (Just a) = fn a >>= return . Just
+
+ifUsed :: [Variable] -> (Block -> Block) -> M (Block -> Block)
+ifUsed lst fn = asks $ \dirty ->
+  if any (`Set.member` dirty) lst
+    then fn
+    else id
+
+dceBlock :: Variable -> Block -> M Block
+dceBlock root block =
+  case block of
+    Case scrut mbDefault alts -> do
+      useMany [root] [scrut]
+      Case scrut
+        <$> onMaybe (dceBlock root) mbDefault
+        <*> sequence
+          [ Alternative pattern <$> dceBlock root branch
+          | Alternative pattern branch <- alts ]
+    Bind vars expr rest -> do
+      let deps = freeVariablesSimple expr Set.empty
+      useMany vars (Set.toList deps)
+      unless (isSimple expr) $
+        useMany [root] vars
+      (ifUsed vars $ Bind vars expr) <*> dceBlock root rest
+    Return vars -> do
+      useMany [root] vars
+      return block
+    Raise var -> do
+      useMany [root] [var]
+      return block
+    TailCall fn args -> do
+      useMany [root] args
+      return block
+    Invoke a args -> do
+      useMany [root] (a:args)
+      return block
+    InvokeHandler a b -> do
+      useMany [root] [a,b]
+      return block
+    Exit    -> return block
+    Panic{} -> return block
+
+isSimple :: Expression -> Bool
+isSimple Store{} = True
+isSimple Literal{} = True
+isSimple TypeCast{} = True
+isSimple _ = False

@@ -223,6 +223,7 @@ uniqExpression expr =
         Fetch{} -> pure expr
         Load{} -> error "uniqSimple: Load"
         Add{} -> pure expr
+        Undefined -> pure expr
         Eval{} -> pure expr
         Apply{} -> pure expr
         ReadGlobal{} -> error "uniqSimple: ReadGlobal"
@@ -239,5 +240,3 @@ uniqExpression expr =
         Address{} -> pure expr
         ReadRegister{} -> pure expr
         WriteRegister{} -> pure expr
-
-
