@@ -59,7 +59,7 @@ int main() {
     uint64_t size = 128<<n;
     uint64_t iterations = WRITE_SIZE>>n;
     clock_t start, end;
-    printf("Testing heap size: %lu kb:\t", (size*WORD_SIZE)/1024);
+    printf("Testing nusery size: %5lu kb:\t", (size*WORD_SIZE)/1024);
     fflush(stdout);
     start = clock();
     for(j=0;j<iterations;j++) {
