@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 /*
   0: 21.4%   1 kb 16.65
@@ -23,39 +24,51 @@
  17: 62.8% 128 mb  8.67
  */
 
-#define WORD_SIZE   8
-#define WORDS_PER_KILO (1024/WORD_SIZE)
-
-#ifndef SHIFT
-#define SHIFT       12
-#endif
-
-#define SIZE        (128<<SHIFT)
-// #define ITERATIONS  ((WORDS_PER_KILO*2621440)>>SHIFT)
-#define ITERATIONS  (HEAP_SIZE/SIZE*16)
-#define OBJ_SIZE    4
-// #define HEAP_SIZE   ((uint64_t)((uint64_t)SIZE*(uint64_t)ITERATIONS/NTH*OBJ_SIZE))
-#define HEAP_SIZE   (uint64_t)(2*1024*1024*WORDS_PER_KILO)
+#define STEPS 17
+#define WORD_SIZE ((uint64_t)sizeof(uint64_t))
+// write size in kb. set to 32gb.
+#define WRITE_SIZE (1024*1024*32)
 
 int main() {
   uint64_t i,j,n;
-  uint64_t *heap;
-#if SIZE < 1024*1024
-  uint64_t nursery[SIZE];
-#else
   uint64_t *nursery;
-  nursery = (uint64_t*) malloc(SIZE*WORD_SIZE);
-  printf("Using malloc instead of stack.\n");
-#endif
+  printf("Allocating nursery, %d mb:\t", (1024<<(STEPS-1))/1024/1024);
+  fflush(stdout);
+  nursery = (uint64_t*) malloc(1024<<(STEPS-1));
+  printf("Done.\n");
   // heap = (uint64_t*) malloc(HEAP_SIZE*WORD_SIZE);
   // printf("Heap:       %lu MiBi\n", HEAP_SIZE*WORD_SIZE/1024/1024);
-  printf("Nursery:    %d KiBi\n", SIZE*WORD_SIZE/1024);
-  printf("Iterations: %lu\n", ITERATIONS);
-  printf("Memory being written: %lu MiBi\n", (SIZE*ITERATIONS/1024/1024)*WORD_SIZE);
-  for(j=0;j<ITERATIONS;j++) {
-    for(i=0;i<SIZE;i++) {
-      nursery[i]=i;
+  // printf("Nursery:    %d KiBi\n", SIZE*WORD_SIZE/1024);
+  // printf("Iterations: %lu\n", ITERATIONS);
+  // printf("Memory being written: %lu MiBi\n", (SIZE*ITERATIONS/1024/1024)*WORD_SIZE);
+  printf("Warm up:\t\t\t");
+  fflush(stdout);
+  // Warm up
+  for(n=0;n<3;n++) {
+    uint64_t size = 128<<n;
+    uint64_t iterations = WRITE_SIZE>>n;
+    for(j=0;j<iterations;j++) {
+      for(i=0;i<size;i++) {
+        nursery[i]=i;
+      }
     }
+  }
+  printf("Done.\n");
+
+  for(n=0;n<STEPS;n++) {
+    uint64_t size = 128<<n;
+    uint64_t iterations = WRITE_SIZE>>n;
+    clock_t start, end;
+    printf("Testing heap size: %lu kb:\t", (size*WORD_SIZE)/1024);
+    fflush(stdout);
+    start = clock();
+    for(j=0;j<iterations;j++) {
+      for(i=0;i<size;i++) {
+        nursery[i]=i;
+      }
+    }
+    end = clock();
+    printf("%.2f gb/s\n", WRITE_SIZE/((end-start)/(double)CLOCKS_PER_SEC)/1024/1024);
   }
   // for(j=0;j<(uint64_t)ITERATIONS*SIZE;j++) {
   //   nursery[j%SIZE]=j%SIZE;
