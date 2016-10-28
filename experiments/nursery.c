@@ -44,7 +44,7 @@ int main() {
   printf("Warm up:\t\t\t");
   fflush(stdout);
   // Warm up
-  for(n=0;n<3;n++) {
+  for(n=STEPS-3;n<STEPS;n++) {
     uint64_t size = 128<<n;
     uint64_t iterations = WRITE_SIZE>>n;
     for(j=0;j<iterations;j++) {
@@ -59,7 +59,7 @@ int main() {
     uint64_t size = 128<<n;
     uint64_t iterations = WRITE_SIZE>>n;
     clock_t start, end;
-    printf("Testing nusery size: %5lu kb:\t", (size*WORD_SIZE)/1024);
+    printf("Testing nusery size: %llu kb:\t", (size*WORD_SIZE)/1024);
     fflush(stdout);
     start = clock();
     for(j=0;j<iterations;j++) {
