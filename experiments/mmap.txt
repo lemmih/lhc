@@ -5,3 +5,12 @@ Memory size: 16 MiBi
 Iterations:  500
 Reusing pages: 0.91s, 8795.09 MiBi/s
 Mapping new pages: 1.25s, 6379.02 MiBi/s
+
+
+CPU: MacBook Air, Mid 2012, 1.8Ghz Core i5, 256KB L2, 3MB L3, RAM 1600 MHz DD3.
+
+Reusing memory vs. mapping new pages.
+Memory size: 16 MiBi
+Iterations:  500
+Reusing pages: 1.32s, 6065.67 MiBi/s
+Mapping new pages: 6.20s, 1291.02 MiBi/s

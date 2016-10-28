@@ -19,3 +19,25 @@ Testing nursery size: 8192 kb:	8.81 gb/s
 Testing nursery size: 16384 kb:	7.98 gb/s
 Testing nursery size: 32768 kb:	8.61 gb/s
 Testing nursery size: 65536 kb:	8.26 gb/s
+
+CPU: MacBook Air, Mid 2012, 1.8Ghz Core i5, 256KB L2, 3MB L3, RAM 1600 MHz DD3.
+
+Allocating nursery, 64 mb:	Done.
+Warm up:			Done.
+Testing nursery size: 1 kb:	22.55 gb/s
+Testing nursery size: 2 kb:	22.12 gb/s
+Testing nursery size: 4 kb:	21.96 gb/s
+Testing nursery size: 8 kb:	22.94 gb/s
+Testing nursery size: 16 kb:	23.43 gb/s
+Testing nursery size: 32 kb:	23.73 gb/s
+Testing nursery size: 64 kb:	22.84 gb/s
+Testing nursery size: 128 kb:	23.06 gb/s
+Testing nursery size: 256 kb:	22.54 gb/s
+Testing nursery size: 512 kb:	16.64 gb/s
+Testing nursery size: 1024 kb:	16.83 gb/s
+Testing nursery size: 2048 kb:	14.05 gb/s
+Testing nursery size: 4096 kb:	7.72 gb/s
+Testing nursery size: 8192 kb:	6.37 gb/s
+Testing nursery size: 16384 kb:	6.19 gb/s
+Testing nursery size: 32768 kb:	6.22 gb/s
+Testing nursery size: 65536 kb:	6.15 gb/s
