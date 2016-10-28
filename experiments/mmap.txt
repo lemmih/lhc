@@ -1,0 +1,7 @@
+CPU: i5-3210M, 3.1Ghz, 2 cores, 3MB cache
+
+Reusing memory vs. mapping new pages.
+Memory size: 16 MiBi
+Iterations:  500
+Reusing pages: 0.91s, 8795.09 MiBi/s
+Mapping new pages: 1.25s, 6379.02 MiBi/s

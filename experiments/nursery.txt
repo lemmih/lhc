@@ -1,0 +1,21 @@
+CPU: i5-3210M, 3.1Ghz, 2 cores, 3MB cache
+
+Allocating nursery, 64 mb:	Done.
+Warm up:			Done.
+Testing nursery size: 1 kb:	26.53 gb/s
+Testing nursery size: 2 kb:	28.52 gb/s
+Testing nursery size: 4 kb:	26.39 gb/s
+Testing nursery size: 8 kb:	28.96 gb/s
+Testing nursery size: 16 kb:	28.79 gb/s
+Testing nursery size: 32 kb:	30.16 gb/s
+Testing nursery size: 64 kb:	29.08 gb/s
+Testing nursery size: 128 kb:	28.21 gb/s
+Testing nursery size: 256 kb:	27.09 gb/s
+Testing nursery size: 512 kb:	20.75 gb/s
+Testing nursery size: 1024 kb:	20.48 gb/s
+Testing nursery size: 2048 kb:	17.15 gb/s
+Testing nursery size: 4096 kb:	12.09 gb/s
+Testing nursery size: 8192 kb:	8.81 gb/s
+Testing nursery size: 16384 kb:	7.98 gb/s
+Testing nursery size: 32768 kb:	8.61 gb/s
+Testing nursery size: 65536 kb:	8.26 gb/s
