@@ -1,4 +1,4 @@
-CPU: i5-3210M, 3.1Ghz, 2 cores, 3MB cache
+CPU: i5-3210M, 3.1Ghz, 2 cores, 3MB cache, Linux
 
 Allocating nursery, 64 mb:	Done.
 Warm up:			Done.
