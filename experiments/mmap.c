@@ -7,8 +7,8 @@
 
 // 16 mibi
 #define SIZE (1<<24)
-#define ITERATIONS 100
-#define TOTAL_MEMORY (SIZE*ITERATIONS)
+#define ITERATIONS 500
+#define TOTAL_MEMORY ((SIZE/1024/1024)*ITERATIONS)
 
 int main() {
   uint64_t *ptr;
@@ -21,7 +21,7 @@ int main() {
 
   timing_start = clock();
   ptr = mmap(NULL, SIZE, PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
-  for(uint64_t j=0;j<100;j++) {
+  for(uint64_t j=0;j<ITERATIONS;j++) {
     for(uint64_t i=0; i<SIZE/sizeof(uint64_t); i+=2) {
       ptr[i] = j+i;
       ptr[i+1] = j+i+1;
@@ -30,11 +30,11 @@ int main() {
   munmap(ptr, SIZE);
   timing_end = clock();
   timing_t = ((double)(timing_end-timing_start))/CLOCKS_PER_SEC;
-  printf("Reusing pages: %.2fs, %.2f MiBi/s\n", timing_t, (double)TOTAL_MEMORY/timing_t/1024/1024);
+  printf("Reusing pages: %.2fs, %.2f MiBi/s\n", timing_t, (double)TOTAL_MEMORY/timing_t);
 
 
   timing_start = clock();
-  for(uint64_t j=0;j<100;j++) {
+  for(uint64_t j=0;j<ITERATIONS;j++) {
     ptr = mmap(NULL, SIZE, PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     for(uint64_t i=0; i<SIZE/sizeof(uint64_t); i+=2) {
       ptr[i] = j+i;
@@ -44,6 +44,6 @@ int main() {
   }
   timing_end = clock();
   timing_t = ((double)(timing_end-timing_start))/CLOCKS_PER_SEC;
-  printf("Mapping new pages: %.2fs, %.2f MiBi/s\n", timing_t, (double)TOTAL_MEMORY/timing_t/1024/1024);
+  printf("Mapping new pages: %.2fs, %.2f MiBi/s\n", timing_t, (double)TOTAL_MEMORY/timing_t);
   return 0;
 }
