@@ -2,7 +2,23 @@ GHC Inefficiencies:
   Suspended functions (thunks) are padded with 1 word. 2016-10-28
     This padding is necessary to atomically update thunks with an indirection.
 
+    let x = succ 10 in ....
 
+       GHC
+    ┌──────┬─────┬──┐ ┌────┬────┐
+    │ succ │ pad │  ├─┤ I# │ 10 │
+    └──────┴─────┴──┘ └────┴────┘
+          3 words
+
+    After eval + update:
+
+      GHC
+    ┌─────┬───┬──┐ ┌────┬────┐
+    │ Ind │   │  ├─┤ I# │ 10 │
+    └─────┴─┬─┴──┘ └────┴────┘
+         ┌──┴─┬────┐
+         │ I# │ 11 │
+         └────┴────┘
 
 
 
