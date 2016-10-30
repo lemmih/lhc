@@ -1,0 +1,52 @@
+GHC Inefficiencies:
+  Suspended functions (thunks) are padded with 1 word. 2016-10-28
+    This padding is necessary to atomically update thunks with an indirection.
+
+
+
+
+
+Graph compression: (written 2016-10-30)
+  Inlining of data 32bit or less:
+    Object tags fit in 32bits which leaves us 32bit for extra data. For example,
+    characters only take up a single word compared to two words in GHC.
+
+    Consider the memory layout (each box is one word) of 'a' in LHC and GHC:
+
+         GHC             LHC
+    ┌────┬─────┐      ┌────────┐
+    │ C# │ 'a' │      │ C# 'a' │
+    └────┴─────┘      └────────┘
+       2 words          1 word
+
+  Inlining fixed-sized objects:
+    Objects with a fixed size (ie. not containing any heap pointers) can be
+    inlined into their parent object. A bitmap in the parent tag indicates
+    which objects have been inlined.
+
+    Memory layout of (Just ()):
+
+        GHC                 LHC
+    ┌──────┬───┐      ┌──────┬──────┐
+    │ Just │   │      │ Just │ Unit │
+    └──────┴─┬─┘      └──────┴──────┘
+         ┌───┴──┐
+         │ Unit │
+         └──────┘
+
+    Inlining doesn't affect sharing. Other objects can still refer to an object
+    that has been inlined.
+
+  Inlining tail pointers:
+    The last pointer in an object can always be inlined, even if the pointee
+    itself contains heap pointers.
+
+    Consider the memory layout of 'h':'i':[]:
+
+                 GHC (11 words)                 LHC (5 words)
+    ┌───┬───┬───┐┌───┬───┬───┐┌────┐  ┌───┬────────┬───┬────────┬────┐
+    │ : │   │   ├┤ : │   │   ├┤ [] │  │ : │ C# 'h' │ : │ C# 'i' │ [] │
+    └───┴─┬─┴───┘└───┴─┬─┴───┘└────┘  └───┴────────┴───┴────────┴────┘
+       ┌──┴─┬─────┐ ┌──┴─┬─────┐
+       │ C# │ 'h' │ │ C# │ 'i' │
+       └────┴─────┘ └────┴─────┘
