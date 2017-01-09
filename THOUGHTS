@@ -66,3 +66,38 @@ Graph compression: (written 2016-10-30)
        ┌──┴─┬─────┐ ┌──┴─┬─────┐
        │ C# │ 'h' │ │ C# │ 'i' │
        └────┴─────┘ └────┴─────┘
+
+
+
+Pretty code lowering:
+  GHC's type-checker likes to re-order definitions. The `haskell-tc` library
+  guarantees to add type-annotations without re-ordering anything.
+  
+  Desugaring:
+    Complicated pattern matching:
+      GHC tends to use this pattern:
+        ```fn X Y = branchCodeTop
+        fn _ _ = branchCodeBottom```
+        
+        ```let fail = branchCodeBottom
+        in case a of
+             X -> case b of
+                    Y -> branchCodeTop
+                    _ -> fail
+             _ -> fail```
+
+        This in undesirable because it rearranges the order of the code.
+        
+        It IS acceptable to re-order the branches when the order of the checks is actually changed. Consider:
+        ```fn (Just True) = branch1
+        fn Nothing = branch2
+        fn (Just False) = branch3```
+        
+        It is OK to desugar like this:
+        
+        ```case arg of
+          Just bool -> case bool of
+            True -> branch1
+            False -> branch3
+           Nothing -> branch2```
+        
