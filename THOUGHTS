@@ -98,5 +98,5 @@ Pretty code lowering:
           Just bool -> case bool of
             True  -> branch1
             False -> branch3
-           Nothing -> branch2
+          Nothing -> branch2
         
