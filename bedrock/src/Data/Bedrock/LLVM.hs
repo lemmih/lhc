@@ -3,6 +3,12 @@
 {-# LANGUAGE RecordWildCards            #-}
 module Data.Bedrock.LLVM ( compile ) where
 
+import           Data.Bedrock                       as Bedrock
+
+compile :: Bedrock.Module -> FilePath -> IO ()
+compile = error "LLVM.compile not implemented"
+
+{-
 import           Control.Monad.Reader
 import qualified Data.Map                           as Map
 import qualified Data.Set                           as Set
@@ -516,9 +522,4 @@ castReference origType origName destType =
     cons _ _                                     = BitCast
 
 
-
-
-
-
-
-
+-}

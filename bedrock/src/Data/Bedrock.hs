@@ -1,8 +1,8 @@
 module Data.Bedrock where
 
-import Test.QuickCheck
+import Test.QuickCheck (Arbitrary(..), listOf, elements, listOf1, oneof, suchThat)
 import Control.Applicative ((<$>), (<*>), pure )
-import qualified LLVM.General.AST                   as LLVM
+import qualified LLVM.AST.Type                   as LLVM
 
 data Name = Name
   { nameModule     :: [String]
@@ -282,4 +282,3 @@ instance Arbitrary Block where
     , InvokeHandler <$> arbitrary <*> arbitrary
     , pure Exit
     , Panic <$> arbitrary ]
-
