@@ -2,29 +2,23 @@
 module Compiler.Interface where
 
 import Compiler.Core ()
-import           Control.Applicative
 import           Data.Binary
 import           Data.Derive.Binary
 import           Data.DeriveTH
 import qualified Data.Map                               as Map
-import           Language.Haskell.Exts.Annotated.Syntax
-import           Language.Haskell.Exts.SrcLoc
-import           Language.Haskell.Scope                 (GlobalName (..),
-                                                         Origin)
-import           Language.Haskell.Scope                 (QualifiedName (..))
+import           Language.Haskell.Scope                 (Entity (..))
 import qualified Language.Haskell.Scope                 as Scope
-import           Language.Haskell.TypeCheck.Monad
-import           Language.Haskell.TypeCheck.Types
+import           Language.Haskell.TypeCheck as TC
 
 data Interface =
   Interface
-  { ifaceValues       :: [(GlobalName, TcType)]
+  { ifaceValues       :: [(Entity, TC.Type)]
     -- ^ Values such as 'length', 'Just', etc
-  , ifaceTypes        :: [(GlobalName, [GlobalName])]
+  , ifaceTypes        :: [(Entity, [Entity])]
     -- ^ Types: (Maybe, [Nothing, Just])
-  , ifaceConstructors :: [(GlobalName, [GlobalName])]
+  , ifaceConstructors :: [(Entity, [Entity])]
     -- ^ Constructors: (Interface, [ifaceValues, ...])
-  , ifaceClasses      :: [(GlobalName, [GlobalName])]
+  , ifaceClasses      :: [(Entity, [Entity])]
     -- ^ Classes: (Show, [show, showList, showsPrec])
   }
 
@@ -38,22 +32,16 @@ derive makeBinary ''Interface
 mkInterface :: Scope.Interface -> TcEnv -> Interface
 mkInterface scope env = Interface
   { ifaceValues       =
-      [ case Map.lookup gname (tcEnvValues env) of
+      [ case Map.lookup entity (tcEnvValues env) of
           Nothing -> error "Compiler.Interface.mkInterface: missing type"
-          Just ty -> (gname, ty)
-      | gname <- Scope.ifaceValues scope ]
-  , ifaceTypes        = Scope.ifaceTypes scope
+          Just ty -> (entity, ty)
+      | entity <- scope ]
+  , ifaceTypes        = []
   , ifaceConstructors = []
   , ifaceClasses      = [] }
 
 toScopeInterface :: Interface -> Scope.Interface
-toScopeInterface iface =
-  Scope.Interface
-  { Scope.ifaceValues = map fst (ifaceValues iface)
-  , Scope.ifaceTypes  = ifaceTypes iface
-  , Scope.ifaceConstructors = []
-  , Scope.ifaceClasses = []
-  }
+toScopeInterface iface = [] -- FIXME
 
 addToTcEnv :: Interface -> TcEnv -> TcEnv
 addToTcEnv iface env = env
@@ -68,9 +56,3 @@ writeInterface = encodeFile
 
 readInterface :: FilePath -> IO Interface
 readInterface = decodeFile
-
-
-
-
-
-

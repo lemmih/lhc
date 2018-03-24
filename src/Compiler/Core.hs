@@ -9,12 +9,12 @@ import           Data.Binary
 import           Data.Derive.Binary
 import           Data.DeriveTH
 import           Language.Haskell.Exts.SrcLoc
-import           Language.Haskell.Scope            (GlobalName (..),
+import           Language.Haskell.Scope            (Entity (..), EntityKind(..),
                                                     QualifiedName (..))
 import           Language.Haskell.TypeCheck.Pretty
-import           Language.Haskell.TypeCheck.Types  (Coercion (..), Pred (..),
-                                                    Qual (..), TcType (..),
-                                                    TcVar (..), TcMetaVar(..))
+import           Language.Haskell.TypeCheck  (Predicate (..),
+                                                    Qualified (..), Type (..),
+                                                    TcVar (..))
 
 data Module = Module
     { coreForeigns  :: [Foreign]
@@ -42,7 +42,7 @@ instance Pretty Module where
 
 -- FIXME: Find a better name for this.
 data Decl = Decl
-  { declType :: TcType
+  { declType :: Type
   , declName :: Name
   , declBody :: Expr }
 
@@ -51,22 +51,22 @@ instance Pretty Decl where
         pretty name <+> colon <+> pretty ty <$$>
         pretty name <+> equals <$$> indent 2 (pretty expr)
 
-data NodeDefinition = NodeDefinition Name [TcType]
+data NodeDefinition = NodeDefinition Name [Type]
     deriving (Show)
 
 instance Pretty NodeDefinition where
     pretty (NodeDefinition name args) =
         text "node" <+> pretty name <+> hsep (map pretty args)
 
-data NewType = NewType Variable
+data NewType = IsNewType Variable
 
 instance Pretty NewType where
-    pretty (NewType con) =
+    pretty (IsNewType con) =
         text "newtype" <+> ppTypedVariable con
 
 data Variable = Variable
     { varName :: Name
-    , varType :: TcType
+    , varType :: Type
     } deriving ( Show, Eq, Ord )
 
 data Expr
@@ -81,9 +81,9 @@ data Expr
     | Let LetBind Expr
     | LetStrict Variable Expr Expr
     | Case Expr Variable (Maybe Expr) [Alt]
-    | Cast Expr TcType
+    | Cast Expr Type
     | Id
-    | WithCoercion Coercion Expr
+    -- | WithCoercion Coercion Expr
     deriving ( Show )
 
 rarrow :: Doc
@@ -126,11 +126,11 @@ instance Pretty Expr where
       Cast expr ty ->
         parens (pretty expr <+> text ":::" <+> pretty ty)
       Id -> text "id"
-      WithCoercion CoerceId e -> pretty e
-      WithCoercion (CoerceAp tys) e -> parensIf (p > 0) $
-        pretty e <+> fillSep (map (prettyPrec appPrecedence) tys)
-      WithCoercion c e -> parensIf (p > 0) $
-        pretty c <+> pretty e
+      -- WithCoercion CoerceId e -> pretty e
+      -- WithCoercion (CoerceAp tys) e -> parensIf (p > 0) $
+      --   pretty e <+> fillSep (map (prettyPrec appPrecedence) tys)
+      -- WithCoercion c e -> parensIf (p > 0) $
+      --   pretty c <+> pretty e
       WithExternal outV cName args st cont ->
         ppTypedVariable outV <+> text "←" <+>
           text "external" <+> text cName <+> ppVars args <$$>
@@ -209,27 +209,29 @@ instance Pretty Literal where
             LitChar c     -> text $ show c
             LitInt i      -> integer i
             LitString str -> text $ show str
+            _ -> text "{literal}"
 
 -- FIXME: Move orphan instance to their rightful modules.
 
-instance Binary TcMetaVar where
-    put = error "Binary.put not defined for TcMetaRef"
-    get = error "Binary.get not defined for TcMetaVar"
+-- instance Binary TcMetaVar where
+--     put = error "Binary.put not defined for TcMetaRef"
+--     get = error "Binary.get not defined for TcMetaVar"
 
 derive makeBinary ''SrcSpan
 derive makeBinary ''SrcSpanInfo
 derive makeBinary ''QualifiedName
-derive makeBinary ''GlobalName
-derive makeBinary ''Pred
-derive makeBinary ''Qual
+derive makeBinary ''EntityKind
+derive makeBinary ''Entity
+derive makeBinary ''Predicate
+derive makeBinary ''Qualified
 derive makeBinary ''TcVar
-derive makeBinary ''TcType
+derive makeBinary ''Type
 derive makeBinary ''Name
 derive makeBinary ''Variable
 derive makeBinary ''Literal
 derive makeBinary ''Pattern
 derive makeBinary ''LetBind
-derive makeBinary ''Coercion
+-- derive makeBinary ''Coercion
 derive makeBinary ''NodeDefinition
 derive makeBinary ''CType
 derive makeBinary ''Foreign

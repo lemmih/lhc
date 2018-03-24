@@ -1,23 +1,23 @@
 module Compiler.Core.NewType where
 
 import Compiler.Core
-import Language.Haskell.TypeCheck.Types
+import Language.Haskell.TypeCheck
 
 lower :: Module -> Module
 lower m = m
     { coreDecls = map decl (coreDecls m) }
   where
-    isNewtype name = name `elem` [ con | NewType con <- coreNewTypes m ]
+    isNewtype name = name `elem` [ con | IsNewType con <- coreNewTypes m ]
 
     decl (Decl ty name body) = Decl ty name (expr body)
     expr e =
       case e of
         Var{} -> e
-        WithCoercion (CoerceAp tys) (Con con)
-          | isNewtype con ->
-              case varType con of
-                TcForall vars _ | length vars == length tys -> Id
-                _ -> error $ "Weird newtype: " ++ show e
+        -- WithCoercion (CoerceAp tys) (Con con)
+        --   | isNewtype con ->
+        --       case varType con of
+        --         TcForall vars _ | length vars == length tys -> Id
+        --         _ -> error $ "Weird newtype: " ++ show e
         Con con
           | isNewtype con -> Id
           | otherwise     -> e
@@ -35,7 +35,7 @@ lower m = m
         Case scrut var defaultBranch alts -> Case (expr scrut) var (fmap expr defaultBranch) (map alt alts)
         Cast rest ty -> Cast (expr rest) ty
         Id -> e
-        WithCoercion coercion rest -> WithCoercion coercion (expr rest)
+        -- WithCoercion coercion rest -> WithCoercion coercion (expr rest)
     alt (Alt pattern branch) = Alt pattern (expr branch)
     letBind (NonRec bind rhs) = NonRec bind (expr rhs)
     letBind (Rec binds) = Rec [ (bind, expr rhs) | (bind, rhs) <- binds ]

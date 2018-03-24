@@ -69,8 +69,8 @@ uniqueExpr expr =
     Cast e ty ->
       Cast <$> uniqueExpr e <*> pure ty
     Id -> pure Id
-    WithCoercion c e ->
-      WithCoercion c <$> uniqueExpr e
+    -- WithCoercion c e ->
+    --   WithCoercion c <$> uniqueExpr e
 
 uniqueAlt :: Alt -> M Alt
 uniqueAlt (Alt pattern e) =

@@ -19,9 +19,8 @@ import qualified Data.Map                         as Map
 import qualified Data.Set                         as Set
 import Data.Maybe
 
-import           Language.Haskell.TypeCheck.Monad (mkBuiltIn)
-import           Language.Haskell.TypeCheck.Types (TcType (..), Qual(..),Coercion(..))
-import           Language.Haskell.Scope (QualifiedName)
+import qualified Language.Haskell.TypeCheck as TC (Type (..), Qualified(..), Coercion)
+import           Language.Haskell.Scope (QualifiedName(..))
 
 -- import Debug.Trace
 
@@ -51,12 +50,12 @@ convertModule m = setArities arities $ do
       | Core.Decl _ty fn expr <- coreDecls m
       , let arity = case expr of
                       Lam vars _ -> length vars
-                      WithCoercion _ (Lam vars _) -> length vars
+                      -- WithCoercion _ (Lam vars _) -> length vars
                       _ -> 0 ] ++
       [ (name, length args)
       | Core.NodeDefinition name args <- coreNodes m ] ++
       [ (Core.varName con, 1)
-      | Core.NewType con <- coreNewTypes m ]
+      | Core.IsNewType con <- coreNewTypes m ]
 
 data Env = Env
     { envArity    :: Map Name Int
@@ -144,31 +143,31 @@ convertVariable :: Core.Variable -> M Variable
 convertVariable var = return $
     Variable (Core.varName var) (convertTcType (Core.varType var))
 
-convertTcType :: TcType -> Type
+convertTcType :: TC.Type -> Type
 convertTcType tcTy =
   case tcTy of
-    TcApp (TcCon qname) sub
-        | qname == mkBuiltIn "LHC.Prim" "Addr"
+    TC.TyApp (TC.TyCon qname) sub
+        | qname == QualifiedName "LHC.Prim" "Addr"
             -> case convertTcType sub of
                  Primitive prim -> Primitive (CPointer prim)
                  _ -> error $ "CoreToBedrock: Addr must be primitive: " ++ show sub
-    TcCon qname
-        | qname == mkBuiltIn "LHC.Prim" "I8"
+    TC.TyCon qname
+        | qname == QualifiedName "LHC.Prim" "I8"
              -> Primitive I8
-    TcCon qname
-        | qname == mkBuiltIn "LHC.Prim" "I32"
+    TC.TyCon qname
+        | qname == QualifiedName "LHC.Prim" "I32"
              -> Primitive I32
-    TcCon qname
-        | qname == mkBuiltIn "LHC.Prim" "I64"
+    TC.TyCon qname
+        | qname == QualifiedName "LHC.Prim" "I64"
              -> Primitive I64
-    TcCon qname
-        | qname == mkBuiltIn "LHC.Prim" "RealWorld#"
+    TC.TyCon qname
+        | qname == QualifiedName "LHC.Prim" "RealWorld#"
          -> Primitive I64
-    TcFun{} -> NodePtr
-    TcRef{} -> NodePtr
-    TcCon{} -> NodePtr
-    TcApp{} -> NodePtr
-    TcUndefined -> NodePtr
+    TC.TyFun{} -> NodePtr
+    TC.TyRef{} -> NodePtr
+    TC.TyCon{} -> NodePtr
+    TC.TyApp{} -> NodePtr
+    TC.TyUndefined -> NodePtr
     _ -> NodePtr
     _ -> error $ "CoreToBedrock: Unknown type: " ++ show tcTy
 
@@ -206,44 +205,44 @@ setProgramExit block =
 --     Id
 --     WithCoercion Coercion Expr
 
-convertResultType :: [Variable] -> TcType -> M [Type]
+convertResultType :: [Variable] -> TC.Type -> M [Type]
 convertResultType args tcTy =
     case collect [] tcTy of
-      (TcCon qname, [sub])
-        | qname == mkBuiltIn "LHC.Prim" "Addr"
+      (TC.TyCon qname, [sub])
+        | qname == QualifiedName "LHC.Prim" "Addr"
             -> case convertTcType sub of
                  Primitive prim -> return [Primitive (CPointer prim)]
                  _ -> error $ "CoreToBedrock: Addr must be primitive: " ++ show sub
-      (TcCon qname, [])
-        | qname == mkBuiltIn "LHC.Prim" "I8"
+      (TC.TyCon qname, [])
+        | qname == QualifiedName "LHC.Prim" "I8"
              -> return [Primitive I8]
-      (TcCon qname, [])
-        | qname == mkBuiltIn "LHC.Prim" "I32"
+      (TC.TyCon qname, [])
+        | qname == QualifiedName "LHC.Prim" "I32"
              -> return [Primitive I32]
-      (TcCon qname, [])
-        | qname == mkBuiltIn "LHC.Prim" "I64"
+      (TC.TyCon qname, [])
+        | qname == QualifiedName "LHC.Prim" "I64"
              -> return [Primitive I64]
-      (TcCon qname, [])
-        | qname == mkBuiltIn "LHC.Prim" "RealWorld#"
+      (TC.TyCon qname, [])
+        | qname == QualifiedName "LHC.Prim" "RealWorld#"
              -> return [Primitive I64]
-      (TcCon qname, conArgs) -> do
+      (TC.TyCon qname, conArgs) -> do
         mbExpanded <- expandNewType qname conArgs
         case mbExpanded of
           Nothing -> return [NodePtr]
           Just ty -> convertResultType args ty
-      (TcFun _ a,[]) ->
+      (TC.TyFun _ a,[]) ->
         case args of
           [] -> return [NodePtr]
           (_:argss) -> convertResultType argss a
       -- TcForall _ (_ :=> ty) -> convertResultType ty
-      (TcUnboxedTuple tys,[]) -> concat <$> mapM (convertResultType []) tys
-      (TcForall _ ([] :=> ty), []) -> convertResultType args ty
+      (TC.TyUnboxedTuple tys,[]) -> concat <$> mapM (convertResultType []) tys
+      (TC.TyForall _ ([] TC.:=> ty), []) -> convertResultType args ty
       _ -> return [NodePtr]
   where
-    collect acc (TcApp a b) = collect (b:acc) a
+    collect acc (TC.TyApp a b) = collect (b:acc) a
     collect acc ty = (ty, reverse acc)
 
-expandNewType :: QualifiedName -> [TcType] -> M (Maybe TcType)
+expandNewType :: QualifiedName -> [TC.Type] -> M (Maybe TC.Type)
 expandNewType qname args = do
   newtypes <- asks envNewTypes
   return $ listToMaybe
@@ -255,24 +254,24 @@ expandNewType qname args = do
 -- newtype LHC.Prim.IO:∀ a. (LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)) →  LHC.Prim.IO a
 -- substitution:
 --   \[a] -> LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)
-newtypeSubstitution :: NewType -> (QualifiedName, [TcType] -> TcType)
-newtypeSubstitution (NewType var) =
+newtypeSubstitution :: NewType -> (QualifiedName, [TC.Type] -> TC.Type)
+newtypeSubstitution (IsNewType var) =
     split (Core.varType var)
   where
-    split (TcForall tcvars ([] :=> ty)) = split ty
-    split (TcFun a b) =
+    split (TC.TyForall tcvars ([] TC.:=> ty)) = split ty
+    split (TC.TyFun a b) =
       case collect [] b of
-        (TcCon newtypeName, conArgs) -> (newtypeName, \args -> subst (zip conArgs args) a)
+        (TC.TyCon newtypeName, conArgs) -> (newtypeName, \args -> subst (zip conArgs args) a)
         _ -> error "Weird newtype"
     subst s ty =
       case lookup ty s of
         Just ty' -> ty'
         Nothing -> case ty of
-          TcApp a b -> TcApp (subst s a) (subst s b)
-          TcFun a b -> TcFun (subst s a) (subst s b)
-          TcTuple ls -> TcTuple (map (subst s) ls)
+          TC.TyApp a b -> TC.TyApp (subst s a) (subst s b)
+          TC.TyFun a b -> TC.TyFun (subst s a) (subst s b)
+          TC.TyTuple ls -> TC.TyTuple (map (subst s) ls)
           _ -> ty
-    collect acc (TcApp a b) = collect (b:acc) a
+    collect acc (TC.TyApp a b) = collect (b:acc) a
     collect acc ty = (ty, reverse acc)
 
 -- XXX: Move this function.
@@ -296,8 +295,8 @@ convertDecl (Core.Decl ty name (Lam vars expr)) = do
                       else body
           }
   tell [fn]
-convertDecl (Core.Decl _ty name (WithCoercion _ expr)) =
-  convertDecl (Core.Decl _ty name expr)
+-- convertDecl (Core.Decl _ty name (WithCoercion _ expr)) =
+--   convertDecl (Core.Decl _ty name expr)
 convertDecl (Core.Decl ty name expr) = do
   body <- local (\env -> env{envRoot = name}) $
           convertExpr False expr (pure . Return)
@@ -326,35 +325,35 @@ setOrigin = local $ \env ->
   let Name orig ident _ = envRoot env
   in env { envLocation = orig ++ [ident] }
 
-applyCoercion :: Coercion -> TcType -> TcType
-applyCoercion CoerceId ty = ty
-applyCoercion (CoerceAbs vars) ty = error $ "Weird Ap coercion: " ++ show (vars, ty)
-applyCoercion (CoerceAp tys) (TcForall vars ([] :=> ty)) = worker (zip vars tys) ty
-  where
-    worker subst ty =
-      case ty of
-        TcForall{} -> error $ "applyCoercion: TcForall"
-        TcFun a b -> TcFun (worker subst a) (worker subst b)
-        TcApp a b -> TcApp (worker subst a) (worker subst b)
-        TcRef var ->
-          case lookup var subst of
-            Nothing -> ty
-            Just ty' -> ty
-        TcCon con -> TcCon con
-        TcMetaVar meta -> TcMetaVar meta
-        TcUnboxedTuple tys -> TcUnboxedTuple (map (worker subst) tys)
-        TcTuple tys -> TcTuple (map (worker subst) tys)
-        TcList ty -> TcList (worker subst ty)
-        TcUndefined -> TcUndefined
+-- applyCoercion :: Coercion -> TcType -> TcType
+-- applyCoercion CoerceId ty = ty
+-- applyCoercion (CoerceAbs vars) ty = error $ "Weird Ap coercion: " ++ show (vars, ty)
+-- applyCoercion (CoerceAp tys) (TcForall vars ([] :=> ty)) = worker (zip vars tys) ty
+--   where
+--     worker subst ty =
+--       case ty of
+--         TcForall{} -> error $ "applyCoercion: TcForall"
+--         TcFun a b -> TcFun (worker subst a) (worker subst b)
+--         TcApp a b -> TcApp (worker subst a) (worker subst b)
+--         TcRef var ->
+--           case lookup var subst of
+--             Nothing -> ty
+--             Just ty' -> ty
+--         TcCon con -> TcCon con
+--         TcMetaVar meta -> TcMetaVar meta
+--         TcUnboxedTuple tys -> TcUnboxedTuple (map (worker subst) tys)
+--         TcTuple tys -> TcTuple (map (worker subst) tys)
+--         TcList ty -> TcList (worker subst ty)
+--         TcUndefined -> TcUndefined
 
-collectApps :: Core.Expr -> (Core.Expr, Coercion, [Core.Expr])
+collectApps :: Core.Expr -> (Core.Expr, TC.Coercion, [Core.Expr])
 collectApps = worker []
   where
     worker acc expr =
         case expr of
             App a b -> worker (b:acc) a
-            WithCoercion c e -> (e, c, acc)
-            _ -> (expr, CoerceId, acc)
+            -- WithCoercion c e -> (e, c, acc)
+            _ -> (expr, id, acc)
 
 convertExpr :: Bool -> Core.Expr -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
 convertExpr lazy expr rest =
@@ -367,7 +366,7 @@ convertExpr lazy expr rest =
       convertExprs args $ \args' -> do
         Bind [tmp] (MkNode UnboxedTupleName args')
           <$> rest [tmp]
-    WithCoercion _ e -> convertExpr lazy e rest
+    -- WithCoercion _ e -> convertExpr lazy e rest
     _ | (Con con, coercion, args) <- collectApps expr ->
       convertExprs args $ \args' -> do
         tmp <- newVariable [] "con" NodePtr
@@ -420,8 +419,8 @@ convertExpr lazy expr rest =
             Bind tmp (Application fn args')
               <$> rest tmp
           Just arity | arity < length args' -> do
-            [fnRetTy] <- convertResultType (take arity args') (applyCoercion coercion $ Core.varType v)
-            finalTys <- convertResultType args' (applyCoercion coercion $ Core.varType v)
+            [fnRetTy] <- convertResultType (take arity args') ({-applyCoercion coercion $-} Core.varType v)
+            finalTys <- convertResultType args' ({-applyCoercion coercion $-} Core.varType v)
             tmp <- newVariable [] "ret" fnRetTy
             -- fetched <- newVariable [] "thunk" Node
             Bind [tmp] (Application fn (take arity args')) <$>

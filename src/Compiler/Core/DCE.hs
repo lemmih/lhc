@@ -41,7 +41,7 @@ moduleGraph m =
           concatMap alternativeDependencies alts
         Cast e _ty -> exprDependencies e
         Id -> []
-        WithCoercion _Coercion e -> exprDependencies e
+        -- WithCoercion _Coercion e -> exprDependencies e
     alternativeDependencies (Alt _pattern branch) = exprDependencies branch
     letBindDependencies (NonRec _var e) = exprDependencies e
     letBindDependencies (Rec binds) = concatMap (exprDependencies . snd) binds

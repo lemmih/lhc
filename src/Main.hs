@@ -3,15 +3,14 @@ module Main where
 import           Data.Graph                         (SCC (..), flattenSCC,
                                                      stronglyConnComp)
 import           Data.Tagged
-import           Language.Haskell.Exts.Annotated
+import  Language.Haskell.Exts
 import           Language.Haskell.TypeCheck.Pretty  (displayIO, pretty,
                                                      renderPretty)
 import           System.Exit
 import           System.FilePath
 import           System.IO                          (stdout)
 
-import           Language.Haskell.TypeCheck.Infer
-import           Language.Haskell.TypeCheck.Monad
+import           Language.Haskell.TypeCheck
 --import Language.Haskell.TypeCheck.Types
 import           Language.Haskell.Scope             hiding (Interface)
 
@@ -38,12 +37,12 @@ import qualified Distribution.ModuleName            as Dist
 import           Options.Applicative
 import           System.Directory
 
+import Distribution.Version
 import qualified Distribution.HaskellSuite.Compiler as Compiler
 import           Distribution.HaskellSuite.Packages
-import           Distribution.InstalledPackageInfo  (ExposedModule (..),
-                                                     InstalledPackageInfo,
-                                                     InstalledPackageInfo_ (..))
-import           Distribution.Package
+import           Distribution.InstalledPackageInfo  (ExposedModule (..), exposedModules, libraryDirs,
+                                                     InstalledPackageInfo)
+import           Distribution.Package (InstalledPackageId(..))
 import           Distribution.Simple.Compiler
 
 import           Paths_lhc
@@ -56,7 +55,7 @@ customCommands = hsubparser (buildCommand)
     buildCommand = command "build" (info build idm)
     build =
         compileExecutable
-        <$> (many $ InstalledPackageId <$> strOption (long "package-id"))
+        <$> pure [] -- (many $ undefined <$> strOption (long "package-id"))
         <*> (argument str (metavar "MODULE"))
 
 data LHC
@@ -67,7 +66,7 @@ lhcCompiler :: Compiler.Simple (StandardDB LHC)
 lhcCompiler =
     Compiler.simple
         "lhc"
-        version
+        (mkVersion' version)
         [Haskell2010]
         []
         compileLibrary
@@ -126,12 +125,13 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
             mapM_ print errs
             exitWith (ExitFailure 1)
           putStrLn "Typechecking..."
-          tiEnv' <- runTI tiEnv (tiModule m')
+          let Right (typedModule, tiEnv') = typecheck tiEnv m'
+          -- tiEnv' <- runTI tiEnv (tiModule m')
           let iface = mkInterface scopeIface tiEnv'
               ifaceFile = buildDir </> moduleFile m' <.> "hi"
           writeInterface ifaceFile iface
           putStrLn "Converting to core..."
-          let core = Haskell.convert tiEnv' m'
+          let core = Haskell.convert tiEnv' typedModule
               coreFile = buildDir </> moduleFile m' <.> "core"
               complete = Core.simplify $ Core.simplify $ NewType.lower $ Core.simplify $ Core.simplify $ core
               (_,etaAbs) = Core.simpleEta Core.emptySimpleEtaAnnotation complete
@@ -180,9 +180,9 @@ compileExecutable deps file = do
     mapM_ print errs
     putStrLn "Typechecking..."
     let env = addAllToTcEnv (map (fst . snd) ifaces) emptyTcEnv
-    env <- runTI env (tiModule m')
+    let Right (typedModule, env') = typecheck env m'
     putStrLn "Converting to core..."
-    let core = Haskell.convert env m'
+    let core = Haskell.convert env' typedModule
         libraryCore = mconcat (map (snd . snd) ifaces)
         entrypoint = Name ["Main"] "entrypoint" 0
         complete =

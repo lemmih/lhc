@@ -1,7 +1,7 @@
 module Compiler.Core.Simplify where
 
 import Compiler.Core
-import Language.Haskell.TypeCheck.Types
+import Language.Haskell.TypeCheck
 
 simplify :: Module -> Module
 simplify m = m
@@ -34,10 +34,10 @@ simplify m = m
             Case (expr scrut) var (fmap expr defaultBranch) (map alt alts)
         Cast rest ty -> Cast (expr rest) ty
         Id -> e
-        WithCoercion (CoerceAp []) rest -> expr rest
-        WithCoercion (CoerceAbs []) rest -> expr rest
-        WithCoercion CoerceId rest -> expr rest
-        WithCoercion coercion rest -> WithCoercion coercion (expr rest)
+        -- WithCoercion (CoerceAp []) rest -> expr rest
+        -- WithCoercion (CoerceAbs []) rest -> expr rest
+        -- WithCoercion CoerceId rest -> expr rest
+        -- WithCoercion coercion rest -> WithCoercion coercion (expr rest)
     alt (Alt pattern branch) = Alt pattern (expr branch)
     letBind (NonRec bind rhs) = NonRec bind (expr rhs)
     letBind (Rec binds) = Rec [ (bind, expr rhs) | (bind, rhs) <- binds ]

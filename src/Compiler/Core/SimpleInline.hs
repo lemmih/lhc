@@ -68,7 +68,7 @@ inlineDecl env decl = (decl', env')
 
 splitArguments :: Expr -> ([Variable], Expr)
 splitArguments (Lam vars e) = (vars, e)
-splitArguments (WithCoercion _ e) = splitArguments e
+-- splitArguments (WithCoercion _ e) = splitArguments e
 splitArguments e = ([], e)
 
 inlineExpr :: Expr -> M Expr
@@ -93,8 +93,8 @@ inlineExpr expr =
            <*> dropUsage (varName scrut) (mapM inlineAlt alts)
     Cast e ty ->
       Cast <$> inlineExpr e <*> pure ty
-    WithCoercion c e ->
-      WithCoercion c <$> inlineExpr e
+    -- WithCoercion c e ->
+    --   WithCoercion c <$> inlineExpr e
     _ | (Lam vars e, args) <- collectApp expr -> do
       let extraArgs = drop (length vars) args
       replaceMany (zip (map varName vars) args) $ do
@@ -171,7 +171,7 @@ collectApp = worker []
     worker acc expr =
       case expr of
         App a b -> worker (b:acc) a
-        WithCoercion _ e -> worker acc e
+        -- WithCoercion _ e -> worker acc e
         _ -> (expr, acc)
 
 inlineMaybe :: (a -> M a) -> Maybe a -> M (Maybe a)

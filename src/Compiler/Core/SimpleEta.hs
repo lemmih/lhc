@@ -59,9 +59,9 @@ instance Monoid Out where
 
 
 etaTopLevel :: SimpleEtaAnnotation -> Expr -> ([Variable], Expr)
-etaTopLevel anns (WithCoercion e (Lam vars expr)) =
-  let (vars', expr') = runM anns (etaExpr expr)
-  in (vars ++ vars', WithCoercion e (Lam (vars ++ vars') expr'))
+-- etaTopLevel anns (WithCoercion e (Lam vars expr)) =
+--   let (vars', expr') = runM anns (etaExpr expr)
+--   in (vars ++ vars', WithCoercion e (Lam (vars ++ vars') expr'))
 etaTopLevel anns (Lam vars expr) =
   let (vars', expr') = runM anns (etaExpr expr)
   in (vars ++ vars', Lam (vars ++ vars') expr')
@@ -99,7 +99,7 @@ etaExpr expr =
     Con{} -> pure expr
     UnboxedTuple{} -> pure expr
     Lit{} -> pure expr
-    WithCoercion c e -> WithCoercion c <$> etaExpr e
+    -- WithCoercion c e -> WithCoercion c <$> etaExpr e
 
     -- WithExternal Variable String [Variable] Variable Expr
     -- ExternalPure Variable String [Variable] Expr
@@ -152,5 +152,5 @@ collectApp = worker []
       case expr of
         Var v -> Just (v, reverse acc)
         App a b -> worker (b:acc) a
-        WithCoercion _ e -> worker acc e
+        -- WithCoercion _ e -> worker acc e
         _ -> Nothing
