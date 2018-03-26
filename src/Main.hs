@@ -125,22 +125,24 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
             mapM_ print errs
             exitWith (ExitFailure 1)
           putStrLn "Typechecking..."
-          let Right (typedModule, tiEnv') = typecheck tiEnv m'
-          -- tiEnv' <- runTI tiEnv (tiModule m')
-          let iface = mkInterface scopeIface tiEnv'
-              ifaceFile = buildDir </> moduleFile m' <.> "hi"
-          writeInterface ifaceFile iface
-          putStrLn "Converting to core..."
-          let core = Haskell.convert tiEnv' typedModule
-              coreFile = buildDir </> moduleFile m' <.> "core"
-              complete = Core.simplify $ Core.simplify $ NewType.lower $ Core.simplify $ Core.simplify $ core
-              (_,etaAbs) = Core.simpleEta Core.emptySimpleEtaAnnotation complete
-          -- print (pretty complete)
-          displayIO stdout (renderPretty 1 120 (pretty etaAbs))
-          encodeFile coreFile etaAbs
-          writeFile (coreFile <.> "pretty") (show $ pretty etaAbs)
-          writeIORef resolveEnvRef resolveEnv'
-          writeIORef tiEnvRef tiEnv'
+          case typecheck tiEnv m' of
+            Left err -> error (show err)
+            Right (typedModule, tiEnv') -> do
+              -- tiEnv' <- runTI tiEnv (tiModule m')
+              let iface = mkInterface scopeIface tiEnv'
+                  ifaceFile = buildDir </> moduleFile m' <.> "hi"
+              writeInterface ifaceFile iface
+              putStrLn "Converting to core..."
+              let core = Haskell.convert tiEnv' typedModule
+                  coreFile = buildDir </> moduleFile m' <.> "core"
+                  complete = Core.simplify $ Core.simplify $ NewType.lower $ Core.simplify $ Core.simplify $ core
+                  (_,etaAbs) = Core.simpleEta Core.emptySimpleEtaAnnotation complete
+              -- print (pretty complete)
+              displayIO stdout (renderPretty 1 120 (pretty etaAbs))
+              encodeFile coreFile etaAbs
+              writeFile (coreFile <.> "pretty") (show $ pretty etaAbs)
+              writeIORef resolveEnvRef resolveEnv'
+              writeIORef tiEnvRef tiEnv'
         CyclicSCC{} -> error "Recursive modules not handled yet."
 
 loadLibrary :: InstalledPackageInfo -> IO [(String, (Interface, Core.Module))]

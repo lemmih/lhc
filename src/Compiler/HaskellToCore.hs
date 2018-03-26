@@ -135,7 +135,15 @@ bindName hsName =
             tell $ mempty{envScope = mempty
                 { scopeVariables = Map.singleton entity name } }
             return name
-        _ -> error "bindName"
+        Scope.Binding entity -> do
+            let QualifiedName m ident = entityName entity
+            let name = Name [m] ident 0
+            tell $ mempty{envScope = mempty
+                { scopeVariables = Map.singleton entity name } }
+            return name
+        -- Scope.Binding _ -> error "bindName: Binding"
+        Scope.None -> error "bindName: None"
+        Scope.ScopeError err -> error $ "bindName: ScopeError " ++ show err
 
 bindVariable :: HS.Name Typed -> M Variable
 bindVariable hsName = do
@@ -146,16 +154,21 @@ bindVariable hsName = do
 lookupType :: HS.Name Typed -> M TC.Type
 lookupType hsName = do
     case nameInfo hsName of
-        Resolved gname -> do
+        Resolved entity -> do
             tcEnv <- asks scopeTcEnv
-            case Map.lookup gname (tcEnvValues tcEnv) of
+            case Map.lookup entity (tcEnvValues tcEnv) of
+                Nothing -> error "Missing type info"
+                Just ty -> return ty
+        Scope.Binding entity -> do
+            tcEnv <- asks scopeTcEnv
+            case Map.lookup entity (tcEnvValues tcEnv) of
                 Nothing -> error "Missing type info"
                 Just ty -> return ty
 
 bindConstructor :: HS.Name Typed -> Int -> M Name
 bindConstructor dataCon arity =
     case nameInfo dataCon of
-        Resolved entity -> do
+        Scope.Binding entity -> do
             let qname@(QualifiedName m ident) = entityName entity
             let n = Name [m] ident 0
             tell $ mempty{envScope = mempty
@@ -163,7 +176,9 @@ bindConstructor dataCon arity =
                 , scopeVariables = Map.singleton entity n
                 , scopeArity = Map.singleton entity arity } }
             return n
-        _ -> error "bindName"
+        Scope.Resolved _ -> error "bindConstructor: Resolved"
+        Scope.None -> error "bindConstructor: None"
+        Scope.ScopeError err -> error $ "bindConstructor: ScopeError " ++ show err
 
 resolveName :: HS.Name Typed -> M Name
 resolveName hsName =

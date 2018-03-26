@@ -1,13 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Compiler.Interface where
 
-import Compiler.Core ()
+import           Compiler.Core              ()
 import           Data.Binary
 import           Data.Derive.Binary
 import           Data.DeriveTH
-import qualified Data.Map                               as Map
-import           Language.Haskell.Scope                 (Entity (..))
-import qualified Language.Haskell.Scope                 as Scope
+import qualified Data.Map                   as Map
+import           Data.Maybe
+import           Language.Haskell.Scope     (Entity (..))
+import qualified Language.Haskell.Scope     as Scope
 import           Language.Haskell.TypeCheck as TC
 
 data Interface =
@@ -31,10 +32,10 @@ derive makeBinary ''Interface
 
 mkInterface :: Scope.Interface -> TcEnv -> Interface
 mkInterface scope env = Interface
-  { ifaceValues       =
+  { ifaceValues       = catMaybes
       [ case Map.lookup entity (tcEnvValues env) of
-          Nothing -> error "Compiler.Interface.mkInterface: missing type"
-          Just ty -> (entity, ty)
+          Nothing -> Nothing -- error $ "Compiler.Interface.mkInterface: missing type: " ++ show (entityName entity)
+          Just ty -> Just (entity, ty)
       | entity <- scope ]
   , ifaceTypes        = []
   , ifaceConstructors = []
@@ -48,7 +49,7 @@ addToTcEnv iface env = env
   { tcEnvValues = Map.union (Map.fromList (ifaceValues iface)) (tcEnvValues env) }
 
 addAllToTcEnv :: [Interface] -> TcEnv -> TcEnv
-addAllToTcEnv [] = id
+addAllToTcEnv []     = id
 addAllToTcEnv (x:xs) = addAllToTcEnv xs . addToTcEnv x
 
 writeInterface :: FilePath -> Interface -> IO ()
