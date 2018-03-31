@@ -359,7 +359,7 @@ locallyBlock block =
     Panic{} -> return block
 
 locallyAlternative :: Alternative -> LUniq Alternative
-locallyAlternative (Alternative pattern branch) = limitScope $
+locallyAlternative (Alternative pattern branch) = -- limitScope $
   Alternative
     <$> locallyPattern pattern
     <*> locallyBlock branch

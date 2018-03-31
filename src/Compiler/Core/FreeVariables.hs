@@ -41,6 +41,7 @@ freeVariablesExpr expr =
       Set.unions (map freeVariablesAlt alts)
     Cast e _ty -> freeVariablesExpr e
     Id{} -> Set.empty
+    WithProof p e -> freeVariablesExpr e
     -- WithCoercion _coercion e -> freeVariablesExpr e
 
 freeVariablesAlt :: Alt -> Set Name

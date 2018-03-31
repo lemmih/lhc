@@ -1,10 +1,13 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 module Compiler.Interface where
 
+import Data.Data
+import GHC.Generics
 import           Compiler.Core              ()
 import           Data.Binary
-import           Data.Derive.Binary
-import           Data.DeriveTH
+-- import           Data.Derive.Binary
+-- import           Data.DeriveTH
 import qualified Data.Map                   as Map
 import           Data.Maybe
 import           Language.Haskell.Scope     (Entity (..))
@@ -21,12 +24,14 @@ data Interface =
     -- ^ Constructors: (Interface, [ifaceValues, ...])
   , ifaceClasses      :: [(Entity, [Entity])]
     -- ^ Classes: (Show, [show, showList, showsPrec])
-  }
+  } deriving (Show, Data, Generic)
+
+instance Binary Interface
 
 {- Hm, I don't really want to use Data.Binary. And I definitely do not want
    to define instances for external types. Oh well. Lemmih 2014-11-9 -}
 
-derive makeBinary ''Interface
+-- derive makeBinary ''Interface
 
 
 
@@ -41,8 +46,9 @@ mkInterface scope env = Interface
   , ifaceConstructors = []
   , ifaceClasses      = [] }
 
+-- FIXME
 toScopeInterface :: Interface -> Scope.Interface
-toScopeInterface iface = [] -- FIXME
+toScopeInterface iface = map fst (ifaceValues iface)
 
 addToTcEnv :: Interface -> TcEnv -> TcEnv
 addToTcEnv iface env = env

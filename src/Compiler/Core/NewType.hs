@@ -35,6 +35,7 @@ lower m = m
         Case scrut var defaultBranch alts -> Case (expr scrut) var (fmap expr defaultBranch) (map alt alts)
         Cast rest ty -> Cast (expr rest) ty
         Id -> e
+        WithProof p e -> WithProof p (expr e)
         -- WithCoercion coercion rest -> WithCoercion coercion (expr rest)
     alt (Alt pattern branch) = Alt pattern (expr branch)
     letBind (NonRec bind rhs) = NonRec bind (expr rhs)

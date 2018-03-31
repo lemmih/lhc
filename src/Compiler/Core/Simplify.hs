@@ -34,6 +34,7 @@ simplify m = m
             Case (expr scrut) var (fmap expr defaultBranch) (map alt alts)
         Cast rest ty -> Cast (expr rest) ty
         Id -> e
+        WithProof _p e -> expr e -- WithProof p (expr e)
         -- WithCoercion (CoerceAp []) rest -> expr rest
         -- WithCoercion (CoerceAbs []) rest -> expr rest
         -- WithCoercion CoerceId rest -> expr rest

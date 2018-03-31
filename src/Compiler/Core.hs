@@ -1,20 +1,24 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 module Compiler.Core where
 
+import Data.Data
+import GHC.Generics
 import           Data.Bedrock                      (AvailableNamespace (..),
                                                     CType (..), Foreign,
                                                     Foreign (..), Name (..))
 import           Data.Bedrock.PrettyPrint          ()
 import           Data.Binary
-import           Data.Derive.Binary
-import           Data.DeriveTH
+-- import           Data.Derive.Binary
+-- import           Data.DeriveTH
 import           Language.Haskell.Exts.SrcLoc
 import           Language.Haskell.Scope            (Entity (..), EntityKind(..),
                                                     QualifiedName (..))
 import           Language.Haskell.TypeCheck.Pretty
 import           Language.Haskell.TypeCheck  (Predicate (..),
                                                     Qualified (..), Type (..),
-                                                    TcVar (..))
+                                                    TcVar (..), Proof(..))
 
 data Module = Module
     { coreForeigns  :: [Foreign]
@@ -22,7 +26,7 @@ data Module = Module
     , coreNodes     :: [NodeDefinition]
     , coreNewTypes  :: [NewType]
     , coreNamespace :: AvailableNamespace
-    }
+    } deriving (Show, Data, Generic)
 
 instance Monoid Module where
     mempty = Module [] [] [] [] (AvailableNamespace 0 0 0 0)
@@ -45,6 +49,7 @@ data Decl = Decl
   { declType :: Type
   , declName :: Name
   , declBody :: Expr }
+  deriving (Show, Data, Generic)
 
 instance Pretty Decl where
     pretty (Decl ty name expr) =
@@ -52,13 +57,13 @@ instance Pretty Decl where
         pretty name <+> equals <$$> indent 2 (pretty expr)
 
 data NodeDefinition = NodeDefinition Name [Type]
-    deriving (Show)
+    deriving (Show, Data, Generic)
 
 instance Pretty NodeDefinition where
     pretty (NodeDefinition name args) =
         text "node" <+> pretty name <+> hsep (map pretty args)
 
-data NewType = IsNewType Variable
+data NewType = IsNewType Variable deriving (Show, Data, Generic)
 
 instance Pretty NewType where
     pretty (IsNewType con) =
@@ -67,7 +72,7 @@ instance Pretty NewType where
 data Variable = Variable
     { varName :: Name
     , varType :: Type
-    } deriving ( Show, Eq, Ord )
+    } deriving ( Show, Eq, Ord, Data, Generic )
 
 data Expr
     = Var Variable
@@ -83,8 +88,9 @@ data Expr
     | Case Expr Variable (Maybe Expr) [Alt]
     | Cast Expr Type
     | Id
+    | WithProof Proof Expr
     -- | WithCoercion Coercion Expr
-    deriving ( Show )
+    deriving ( Show, Data, Generic )
 
 rarrow :: Doc
 rarrow = text "→ "
@@ -131,6 +137,8 @@ instance Pretty Expr where
       --   pretty e <+> fillSep (map (prettyPrec appPrecedence) tys)
       -- WithCoercion c e -> parensIf (p > 0) $
       --   pretty c <+> pretty e
+      WithProof proof e -> parensIf (p > 0) $
+        pretty proof <+> pretty e
       WithExternal outV cName args st cont ->
         ppTypedVariable outV <+> text "←" <+>
           text "external" <+> text cName <+> ppVars args <$$>
@@ -164,10 +172,10 @@ instance Pretty Variable where
 data LetBind
     = NonRec Variable Expr
     | Rec [(Variable, Expr)]
-    deriving ( Show )
+    deriving ( Show, Data, Generic )
 
 data Alt = Alt Pattern Expr
-    deriving ( Show )
+    deriving ( Show, Data, Generic )
 
 instance Pretty Alt where
     pretty (Alt pattern expr) =
@@ -178,7 +186,7 @@ data Pattern
     | LitPat Literal
     | UnboxedPat [Variable]
     -- | VarPat Variable
-    deriving ( Show )
+    deriving ( Show, Data, Generic )
 
 instance Pretty Pattern where
     pretty pattern =
@@ -201,7 +209,7 @@ data Literal
     | LitWord Integer
     | LitFloat Rational
     | LitDouble Rational
-    deriving ( Show )
+    deriving ( Show, Data, Generic )
 
 instance Pretty Literal where
     pretty lit =
@@ -217,27 +225,53 @@ instance Pretty Literal where
 --     put = error "Binary.put not defined for TcMetaRef"
 --     get = error "Binary.get not defined for TcMetaVar"
 
-derive makeBinary ''SrcSpan
-derive makeBinary ''SrcSpanInfo
-derive makeBinary ''QualifiedName
-derive makeBinary ''EntityKind
-derive makeBinary ''Entity
-derive makeBinary ''Predicate
-derive makeBinary ''Qualified
-derive makeBinary ''TcVar
-derive makeBinary ''Type
-derive makeBinary ''Name
-derive makeBinary ''Variable
-derive makeBinary ''Literal
-derive makeBinary ''Pattern
-derive makeBinary ''LetBind
--- derive makeBinary ''Coercion
-derive makeBinary ''NodeDefinition
-derive makeBinary ''CType
-derive makeBinary ''Foreign
-derive makeBinary ''Alt
-derive makeBinary ''Expr
-derive makeBinary ''Decl
-derive makeBinary ''AvailableNamespace
-derive makeBinary ''NewType
-derive makeBinary ''Module
+instance Binary SrcSpan
+instance Binary SrcSpanInfo
+instance Binary QualifiedName
+instance Binary EntityKind
+instance Binary Entity
+instance Binary Predicate
+instance Binary t => Binary (Qualified t)
+instance Binary TcVar
+instance Binary Type
+instance Binary Name
+instance Binary Variable
+instance Binary Literal
+instance Binary Pattern
+instance Binary LetBind
+instance Binary NodeDefinition
+instance Binary CType
+instance Binary Foreign
+instance Binary Alt
+instance Binary Proof
+instance Binary Expr
+instance Binary Decl
+instance Binary AvailableNamespace
+instance Binary NewType
+instance Binary Module
+
+-- derive makeBinary ''SrcSpan
+-- derive makeBinary ''SrcSpanInfo
+-- derive makeBinary ''QualifiedName
+-- derive makeBinary ''EntityKind
+-- derive makeBinary ''Entity
+-- derive makeBinary ''Predicate
+-- derive makeBinary ''Qualified
+-- derive makeBinary ''TcVar
+-- derive makeBinary ''Type
+-- derive makeBinary ''Name
+-- derive makeBinary ''Variable
+-- derive makeBinary ''Literal
+-- derive makeBinary ''Pattern
+-- derive makeBinary ''LetBind
+-- -- derive makeBinary ''Coercion
+-- derive makeBinary ''NodeDefinition
+-- derive makeBinary ''CType
+-- derive makeBinary ''Foreign
+-- derive makeBinary ''Alt
+-- derive makeBinary ''Proof
+-- derive makeBinary ''Expr
+-- derive makeBinary ''Decl
+-- derive makeBinary ''AvailableNamespace
+-- derive makeBinary ''NewType
+-- derive makeBinary ''Module

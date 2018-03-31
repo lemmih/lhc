@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 module Compiler.HaskellToCore
     ( convert
     ) where
@@ -312,74 +313,78 @@ convertDecl decl =
 
 convertDecl' :: HS.Decl Typed -> M [Decl]
 convertDecl' decl =
-    case decl of
-        HS.FunBind _ matches -> do
-            let name = matchInfo matches
-                fnArgNames = matchArgNames matches
-                arity = length fnArgNames
-            -- let Origin _ src = HS.ann name
-            -- coercion <- findCoercion src
-            ty <- lookupType name
-            let argTys = splitTy ty -- (applyCoercion coercion ty)
-            argNames <- forM fnArgNames $ \mbName ->
-              case mbName of
-                Nothing -> newName "arg"
-                Just name -> bindName name
-            let args = zipWith Variable argNames argTys
-            decl <- Decl
-                <$> pure ty
-                <*> bindName name
-                <*> ({-WithCoercion coercion .-} Lam args
-                        <$> convertMatches args matches)
-            return [decl]
-        HS.FunBind _ [HS.Match _ name pats rhs _] -> do
-            -- let Origin _ src = HS.ann name
-            -- coercion <- findCoercion src
-            decl <- Decl
-                <$> lookupType name
-                <*> bindName name
-                <*> ({-WithCoercion coercion <$> -} convertPats pats rhs)
-            return [decl]
-        HS.FunBind _ [HS.InfixMatch _ leftPat name rightPats rhs _] -> do
-            -- let Origin _ src = HS.ann name
-            -- coercion <- findCoercion src
-            decl <- Decl
-                <$> lookupType name
-                <*> bindName name
-                <*> ({-WithCoercion coercion
-                        <$> -} convertPats (leftPat:rightPats) rhs)
-            return [decl]
-        HS.PatBind _ (HS.PVar _ name) rhs _binds -> do
-            decl <- Decl
-                <$> lookupType name
-                <*> bindName name
-                <*> convertRhs rhs
-            return [decl]
-        HS.ForImp _ _conv _safety mbExternal name ty -> do
-            let external = fromMaybe (getNameIdentifier name) mbExternal
-            foreignTy <- lookupType name
-            decl <- Decl
-                <$> lookupType name
-                <*> bindName name
-                <*> convertExternal external foreignTy
+  case decl of
+    HS.FunBind tyDecl matches -> do
+      let mbProof =
+            case tyDecl of
+              TC.Coerced _ _ proof -> WithProof proof
+              TC.Scoped{} -> id
+      let name = matchInfo matches
+          fnArgNames = matchArgNames matches
+          -- arity = length fnArgNames
+      -- let Origin _ src = HS.ann name
+      -- coercion <- findCoercion src
+      ty <- lookupType name
+      let argTys = splitTy ty -- (applyCoercion coercion ty)
+      argNames <- forM fnArgNames $
+        \case
+          Nothing -> newName "arg"
+          Just name -> bindName name
+      let args = zipWith Variable argNames argTys
+      decl <- Decl
+          <$> pure ty
+          <*> bindName name
+          <*> (mbProof . Lam args
+                  <$> convertMatches args matches)
+      return [decl]
+    -- HS.FunBind _ [HS.Match _ name pats rhs _] -> do
+    --     -- let Origin _ src = HS.ann name
+    --     -- coercion <- findCoercion src
+    --     decl <- Decl
+    --         <$> lookupType name
+    --         <*> bindName name
+    --         <*> ({-WithCoercion coercion <$> -} convertPats pats rhs)
+    --     return [decl]
+    HS.FunBind _ [HS.InfixMatch _ leftPat name rightPats rhs _] -> do
+        -- let Origin _ src = HS.ann name
+        -- coercion <- findCoercion src
+        decl <- Decl
+            <$> lookupType name
+            <*> bindName name
+            <*> ({-WithCoercion coercion
+                    <$> -} convertPats (leftPat:rightPats) rhs)
+        return [decl]
+    HS.PatBind _ (HS.PVar _ name) rhs _binds -> do
+        decl <- Decl
+            <$> lookupType name
+            <*> bindName name
+            <*> convertRhs rhs
+        return [decl]
+    HS.ForImp _ _conv _safety mbExternal name ty -> do
+        let external = fromMaybe (getNameIdentifier name) mbExternal
+        foreignTy <- lookupType name
+        decl <- Decl
+            <$> lookupType name
+            <*> bindName name
+            <*> convertExternal external foreignTy
 
-            unless (isPrimitive external) $ do
-                let (argTypes, _isIO, retType) = ffiTypes foreignTy
-                pushForeign $ Foreign
-                    { foreignName = external
-                    , foreignReturn = toCType retType
-                    , foreignArguments = map toCType argTypes }
+        unless (isPrimitive external) $ do
+            let (argTypes, _isIO, retType) = ffiTypes foreignTy
+            pushForeign $ Foreign
+                { foreignName = external
+                , foreignReturn = toCType retType
+                , foreignArguments = map toCType argTypes }
 
-            return [decl]
+        return [decl]
 
-        HS.DataDecl _ HS.DataType{} _ctx _dhead qualCons _deriving -> do
-            mapM_ (convertQualCon False) qualCons
-            return []
-        HS.DataDecl _ HS.NewType{} _ctx _dhead qualCons _deriving -> do
-            mapM_ (convertQualCon True) qualCons
-            return []
-        HS.TypeSig{} -> return []
-        _ -> error $ "Compiler.HaskellToCore.convertDecl: " ++ show decl
+    HS.DataDecl _ HS.DataType{} _ctx _dhead qualCons _deriving -> do
+        mapM_ (convertQualCon False) qualCons
+        return []
+    HS.DataDecl _ HS.NewType{} _ctx _dhead qualCons _deriving -> do
+        mapM_ (convertQualCon True) qualCons
+        return []
+    HS.TypeSig{} -> return []
+    _ -> error $ "Compiler.HaskellToCore.convertDecl: " ++ show decl
 
 isPrimitive "realWorld" = True
 isPrimitive _ = False
@@ -662,19 +667,26 @@ primBindIO = Var (Variable name ty)
     ioB = io `TC.TyApp` TC.TyRef bRef
     ioAB = TC.TyRef aRef `TC.TyFun` ioB
 
+findProof :: HS.QName Typed -> Expr -> Expr
+findProof name =
+    case tyDecl of
+      TC.Coerced _ _ proof -> WithProof proof
+      TC.Scoped{} -> id
+  where
+    tyDecl =
+      case name of
+        HS.UnQual _ qname -> HS.ann qname
+        _ -> HS.ann name
+
 convertExp :: HS.Exp Typed -> M Expr
 convertExp expr =
     case expr of
         HS.Var _ name -> do
-            -- let Origin _ src = HS.ann name
-            -- coercion <- findCoercion src
-            var <- resolveQName name
-            return $ {-WithCoercion coercion-} (Var var)
+          var <- resolveQName name
+          return $ findProof name (Var var)
         HS.Con _ name -> do
-            -- let Origin _ src = HS.ann name
-            -- coercion <- findCoercion src
-            var <- resolveQName name
-            return $ {-WithCoercion coercion-} (Con var)
+          var <- resolveQName name
+          return $ findProof name (Con var)
         HS.App _ a b ->
             App
                 <$> convertExp a
@@ -682,17 +694,13 @@ convertExp expr =
         HS.InfixApp _ a (HS.QConOp _ con) b -> do
             ae <- convertExp a
             be <- convertExp b
-            -- let Origin _ src = HS.ann con
-            -- coercion <- findCoercion src
             var <- resolveQName con
-            pure $ App (App ({-WithCoercion coercion-} (Con var)) ae) be
-        HS.InfixApp _ a (HS.QVarOp _ var) b -> do
+            pure $ App (App (findProof con (Con var)) ae) be
+        HS.InfixApp _ a (HS.QVarOp _ name) b -> do
             ae <- convertExp a
             be <- convertExp b
-            -- let Origin _ src = HS.ann var
-            -- coercion <- findCoercion src
-            var <- resolveQName var
-            pure $ App (App ({-WithCoercion coercion-} (Var var)) ae) be
+            var <- resolveQName name
+            pure $ App (App (findProof name (Var var)) ae) be
         HS.Paren _ sub -> convertExp sub
         HS.Lambda _ pats sub ->
             Lam

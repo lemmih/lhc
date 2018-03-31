@@ -1,5 +1,9 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 module Data.Bedrock where
 
+import Data.Data
+import GHC.Generics
 import Test.QuickCheck (Arbitrary(..), listOf, elements, listOf1, oneof, suchThat)
 import Control.Applicative ((<$>), (<*>), pure )
 import qualified LLVM.AST.Type                   as LLVM
@@ -8,7 +12,7 @@ data Name = Name
   { nameModule     :: [String]
   , nameIdentifier :: String
   , nameUnique     :: Int
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Read, Eq, Ord, Data, Generic)
 type NodeSize = Int
 data Type
   = NodePtr
@@ -17,18 +21,18 @@ data Type
   | Primitive CType
   | LLVMPrimitive LLVM.Type
   | FramePtr
-  deriving (Show, Eq, Ord)
+  deriving (Show, Read, Eq, Ord, Data, Generic)
 data Variable = Variable
   { variableName :: Name
   , variableType :: Type
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Read, Eq, Ord, Data, Generic)
 
 data AvailableNamespace = AvailableNamespace
   { nsNextPointerId   :: Int
   , nsNextNodeId      :: Int
   , nsNextPrimitiveId :: Int
   , nsNextGlobalId    :: Int
-  } deriving (Show)
+  } deriving (Show, Read, Data, Generic)
 
 -- XXX: Rename to FFIType? ForeignType?
 data CType
@@ -41,13 +45,13 @@ data CType
   | CFunction CType [CType]
   -- CFloat
   -- CDouble
-  deriving (Show, Eq, Ord)
+  deriving (Show, Read, Eq, Ord, Data, Generic)
 
 data Foreign = Foreign
   { foreignName :: String
   , foreignReturn :: CType
   , foreignArguments :: [CType]
-  } deriving (Show)
+  } deriving (Show, Read, Data, Generic)
 
 data Module = Module
   { modForeigns :: [Foreign]
@@ -56,22 +60,22 @@ data Module = Module
   , functions  :: [Function]
   , modNamespace :: AvailableNamespace
   -- CAFs?
-  } deriving (Show)
+  } deriving (Show, Read, Data, Generic)
 
 data NodeName
   = ConstructorName Name Int
   | FunctionName Name Int
   | UnboxedTupleName
     -- ^ name of the function and the number of missing arguments.
-  deriving (Show, Eq, Ord)
+  deriving (Show, Read, Eq, Ord, Data, Generic)
 
 data NodeDefinition = NodeDefinition Name [Type]
-  deriving (Show)
+  deriving (Show, Read, Data, Generic)
 
 data Attribute
   = NoCPS
   | Internal
-  deriving (Show,Eq)
+  deriving (Show, Read, Eq, Data, Generic)
 
 data Function = Function
   { fnName       :: Name
@@ -79,25 +83,25 @@ data Function = Function
   , fnArguments  :: [Variable]
   , fnResults    :: [Type]
   , fnBody       :: Block
-  } deriving (Show)
+  } deriving (Show, Read, Data, Generic)
 
 data Pattern
   = NodePat NodeName [Variable]
   | LitPat Literal
   -- | UnboxedPat [Variable]
-  deriving (Show)
+  deriving (Show, Read, Data, Generic)
 data Alternative = Alternative Pattern Block
-  deriving (Show)
+  deriving (Show, Read, Data, Generic)
 
 data Literal
   = LiteralInt Integer -- compile error if Integer to too large
   | LiteralString String
-  deriving (Show, Eq)
+  deriving (Show, Read, Eq, Data, Generic)
 
 data MemAttributes = MemAttributes
   { memConstant :: Bool
   , memAliasGroup :: Maybe Int
-  } deriving (Show, Eq)
+  } deriving (Show, Read, Eq, Data, Generic)
 
 data Expression
   = Application Name [Variable]
@@ -137,7 +141,7 @@ data Expression
   | GCEnd
   | GCMark Variable
   | GCMarkNode Variable
-  deriving (Show)
+  deriving (Show, Read, Data, Generic)
 
 data Block
   = Case Variable (Maybe Block) [Alternative]
@@ -149,7 +153,7 @@ data Block
   | InvokeHandler Variable Variable
   | Exit
   | Panic String
-  deriving (Show)
+  deriving (Show, Read, Data, Generic)
 
 
 

@@ -19,7 +19,7 @@ import qualified Data.Map                         as Map
 import qualified Data.Set                         as Set
 import Data.Maybe
 
-import qualified Language.Haskell.TypeCheck as TC (Type (..), Qualified(..), Coercion)
+import qualified Language.Haskell.TypeCheck as TC (Type (..), Qualified(..), Proof)
 import           Language.Haskell.Scope (QualifiedName(..))
 
 -- import Debug.Trace
@@ -346,14 +346,16 @@ setOrigin = local $ \env ->
 --         TcList ty -> TcList (worker subst ty)
 --         TcUndefined -> TcUndefined
 
-collectApps :: Core.Expr -> (Core.Expr, TC.Coercion, [Core.Expr])
+collectApps :: Core.Expr -> (Core.Expr, Maybe TC.Proof, [Core.Expr])
 collectApps = worker []
   where
     worker acc expr =
         case expr of
             App a b -> worker (b:acc) a
+            WithProof _proof e -> worker acc e
+            -- WithProof proof e -> (e, Just proof, acc)
             -- WithCoercion c e -> (e, c, acc)
-            _ -> (expr, id, acc)
+            _ -> (expr, Nothing, acc)
 
 convertExpr :: Bool -> Core.Expr -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
 convertExpr lazy expr rest =
@@ -427,8 +429,8 @@ convertExpr lazy expr rest =
               -- Bind [fetched] (Bedrock.Fetch (MemAttributes False Nothing) tmp)
               applyMany finalTys tmp (drop arity args') rest
           Just arity -> do
-            tmp <- newVariable [] "thunk" Node
-            Bind [tmp] (MkNode (FunctionName fn (arity-length args')) args')
+            tmp <- newVariable [] "thunk" NodePtr
+            Bind [tmp] (Store (FunctionName fn (arity-length args')) args')
               <$> rest [tmp]
     Core.Lit (Core.LitString str) -> do
         tmp <- newVariable [] "lit" (Primitive (CPointer I8))
@@ -501,7 +503,7 @@ convertExpr lazy expr rest =
           name' <- convertVariable name
           Bind [name'] (TypeCast val) <$> convertExpr lazy e2 rest
 
-
+    WithProof _proof e -> convertExpr lazy e rest
 
     _ | lazy -> error $ "C->B convertExpr: " ++ show (lazy, expr)
     _ | not lazy ->

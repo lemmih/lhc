@@ -38,6 +38,7 @@ import           Options.Applicative
 import           System.Directory
 
 import Distribution.Version
+import Distribution.Types.UnitId
 import qualified Distribution.HaskellSuite.Compiler as Compiler
 import           Distribution.HaskellSuite.Packages
 import           Distribution.InstalledPackageInfo  (ExposedModule (..), exposedModules, libraryDirs,
@@ -55,7 +56,7 @@ customCommands = hsubparser (buildCommand)
     buildCommand = command "build" (info build idm)
     build =
         compileExecutable
-        <$> pure [] -- (many $ undefined <$> strOption (long "package-id"))
+        <$> (many $ mkUnitId <$> strOption (long "package-id"))
         <*> (argument str (metavar "MODULE"))
 
 data LHC

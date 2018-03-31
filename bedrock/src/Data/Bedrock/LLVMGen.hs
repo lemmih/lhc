@@ -1,29 +1,31 @@
 module Data.Bedrock.LLVMGen where
 
-{-
 import           Control.Monad.Identity
 import           Control.Monad.Reader
 import           Control.Monad.RWS
 import           Control.Monad.State
 import           Control.Monad.Writer
 import           Data.Char
-import           Data.List                          (nub)
-import           Data.Map                           (Map)
-import qualified Data.Map                           as Map
-import           Data.Set                           (Set)
-import qualified Data.Set                           as Set
+import           Data.List                  (nub)
+import           Data.Map                   (Map)
+import qualified Data.Map                   as Map
+import           Data.Set                   (Set)
+import qualified Data.Set                   as Set
+import           Data.String
 import           Data.Word
-import           LLVM.General.AST                   as LLVM
-import           LLVM.General.AST.CallingConvention as LLVM
-import qualified LLVM.General.AST.Constant          as Constant
-import           LLVM.General.AST.Global            as Global
-import           LLVM.General.AST.Linkage           as LLVM
-import           LLVM.General.AST.Visibility        as LLVM
+import           LLVM.AST                   as LLVM
+import           LLVM.AST.CallingConvention as LLVM
+import qualified LLVM.AST.Constant          as Constant
+import           LLVM.AST.Global            as Global
+import           LLVM.AST.Linkage           as LLVM
+import           LLVM.AST.Visibility        as LLVM
 
-import           Data.Bedrock                       (NodeName)
+import           Data.Bedrock               (NodeName)
+import qualified Data.Bedrock as Bedrock
 
 data Env = Env
     { envNodeMapping :: Map NodeName Integer
+    , envFunctionTypes :: Map Bedrock.Name LLVM.Type
     }
 
 type GenT m a = RWST Env [Definition] Word m a
@@ -71,11 +73,18 @@ resolveNodeName name = asks $ Map.findWithDefault err name . envNodeMapping
   where
     err = error $ "Data.Bedrock.LLVMGen.resolveNodeName: " ++ show name
 
+getFunctionType :: Monad m => Bedrock.Name -> GenT m LLVM.Type
+getFunctionType fn = do
+  m <- asks envFunctionTypes
+  case Map.lookup fn m of
+    Just ty -> return ty
+    Nothing -> error $ "Failed to find type for: " ++ show fn
+
 anonGlobal :: Monad m => Global -> GenT m Name
 anonGlobal global = do
   n <- get
   put $ n+1
-  let name = Name ("global_"++show n)
+  let name = Name (fromString $ "global_"++show n)
   newDefinition $ GlobalDefinition global{ name = name }
   return name
 
@@ -88,7 +97,7 @@ globalString str =
     , Global.type' = (ArrayType (fromIntegral (length str)+1) (IntegerType 8))
     , linkage = Internal
     , isConstant = True
-    , hasUnnamedAddr = True
+    , unnamedAddr = Just LocalAddr
     }
 
 
@@ -122,10 +131,10 @@ taggedName tag = lift $ do
     then do
       let n = genUnique st
       put st{genUnique = n+1}
-      return $ Name $ tag ++ "_" ++ show n
+      return $ Name $ fromString $ tag ++ "_" ++ show n
     else do
       put st{genScope = Set.insert tag (genScope st)}
-      return $ Name tag
+      return $ Name $ fromString tag
 
 
 
@@ -138,7 +147,7 @@ taggedName tag = lift $ do
 
 testModule :: GenModule ()
 testModule = do
-  let name = Name "blah"
+  let name = Name $ fromString "blah"
   blocks <- genBlocks testFn
   tell [GlobalDefinition $ functionDefaults
     { name = name
@@ -155,13 +164,12 @@ testFn :: GenBlocks Terminator
 testFn = do
   ptr <- anonInst $ GetElementPtr
           { inBounds = True
-          , address = LocalReference VoidType (Name "missing")
+          , address = LocalReference VoidType (Name $ fromString "missing")
           , indices = []
           , metadata = [] }
   ptr <- anonInst $ GetElementPtr
           { inBounds = True
-          , address = LocalReference VoidType (Name "missing")
+          , address = LocalReference VoidType (Name $ fromString "missing")
           , indices = []
           , metadata = [] }
   return $ Ret Nothing []
--}

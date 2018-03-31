@@ -118,7 +118,7 @@ stdPipeline =
         -- , "no-invoke"       :?> runGen . lowerInvoke
         , "no-allocs"       :> locallyUnique . runGen lowerAlloc
         , "no-gc"           :> locallyUnique . lowerGC fixedGC
-        , "no-globals"      :> locallyUnique . lowerGlobalRegisters
+        , "no-globals"      :> unique . lowerGlobalRegisters
         -- , "pretty"          :> locallyUnique
         ]
   where

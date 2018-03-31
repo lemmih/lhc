@@ -1,14 +1,7 @@
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 module Data.Bedrock.LLVM ( compile ) where
 
-import           Data.Bedrock                       as Bedrock
-
-compile :: Bedrock.Module -> FilePath -> IO ()
-compile = error "LLVM.compile not implemented"
-
-{-
 import           Control.Monad.Reader
 import qualified Data.Map                           as Map
 import qualified Data.Set                           as Set
@@ -19,27 +12,115 @@ import           Data.Bedrock.GlobalVariables       (allRegisters)
 import           Data.Bedrock.LLVMGen
 import           Data.List
 import           Data.Word
+import qualified Data.Text.Lazy.IO as T
 import           System.FilePath
 
-import           LLVM.General
-import           LLVM.General.AST                   as LLVM
-import           LLVM.General.AST.AddrSpace         as LLVM
-import           LLVM.General.AST.Attribute         as LLVM
-import           LLVM.General.AST.CallingConvention as LLVM
-import           LLVM.General.AST.Constant          ()
-import qualified LLVM.General.AST.Constant          as Constant
-import           LLVM.General.AST.DataLayout        as LLVM
-import           LLVM.General.AST.Global            as Global
-import           LLVM.General.AST.Linkage           as LLVM
-import           LLVM.General.AST.Visibility        as LLVM
-import           LLVM.General.Context
-import           LLVM.General.PrettyPrint           as LLVM
+import           LLVM.AST as LLVM
+import           LLVM.AST.DataLayout as LLVM
+import           LLVM.AST.AddrSpace as LLVM
+import           LLVM.AST.Name as LLVM
+import           LLVM.AST.Global as Global
+import           LLVM.AST.Linkage as LLVM
+import qualified LLVM.AST.Constant as Constant
+import           LLVM.AST.Visibility
+import           LLVM.AST.CallingConvention
+import           LLVM.AST.Attribute
+import           LLVM.Pretty as LLVM
+import Data.String
+
+compile :: Bedrock.Module -> FilePath -> IO ()
+compile bedrock path =
+  T.writeFile path (ppllvm (toLLVM bedrock))
+
+toLLVM :: Bedrock.Module -> LLVM.Module
+toLLVM bedrock = LLVM.Module
+    { moduleName = "main"
+    , moduleSourceFileName = "blank.hs"
+    , moduleDataLayout = Just dataLayout
+    , moduleTargetTriple = Nothing
+    , moduleDefinitions =
+        [ GlobalDefinition functionDefaults
+            { name = LLVM.Name (fromString foreignName)
+            , returnType = cTypeToLLVM foreignReturn
+            , parameters = ([ Parameter (cTypeToLLVM ty) (UnName 0) []
+                            | ty <- foreignArguments], False) }
+        | Foreign{..} <- modForeigns bedrock ] ++
+        [ GlobalDefinition globalVariableDefaults
+            { name = LLVM.Name (fromString $ "bedrock:"++reg)
+            , linkage = LLVM.Private
+            , visibility = Default
+            , threadLocalMode = Nothing
+            , addrSpace = AddrSpace 0
+            , unnamedAddr = Just LocalAddr
+            , isConstant = False
+            , Global.type' = PointerType (IntegerType 64) (AddrSpace 0)
+            , initializer = Just $ Constant.Null $ PointerType (IntegerType 64) (AddrSpace 0)
+            , section = Nothing }
+        | reg <- Set.toList $ allRegisters bedrock ] ++
+        defs
+    }
+  where
+    dataLayout = defaultDataLayout LittleEndian
+    defs = execGenModule (mkEnv bedrock) $ do
+            newDefinition $ GlobalDefinition functionDefaults
+                    { name = LLVM.Name "exit"
+                    , returnType = VoidType
+                    , parameters = ([ Parameter (IntegerType 32) (UnName 0) []], False)
+                    }
+            newDefinition $ GlobalDefinition functionDefaults
+                    { name = LLVM.Name "llvm.trap"
+                    , returnType = VoidType
+                    , parameters = ([], False)
+                    }
+            newDefinition $ GlobalDefinition functionDefaults
+                    { name = LLVM.Name "puts"
+                    , returnType = IntegerType 32
+                    , parameters = ([ Parameter (PointerType (IntegerType 8) (AddrSpace 0)) (UnName 0) []], False)
+                    }
+
+            mainDef
+            forM_ (functions bedrock) $ \Bedrock.Function{..} -> do
+                blocks <- genBlocks $ blockToLLVM fnBody
+                newDefinition $ GlobalDefinition functionDefaults
+                    { name = nameToLLVM fnName
+                    , returnType = typesToLLVM fnResults
+                    , parameters = ([ Parameter
+                                        (typeToLLVM variableType)
+                                        (nameToLLVM variableName)
+                                        []
+                                    | Variable{..} <- fnArguments ], False)
+                    , visibility = Default
+                    , linkage = LLVM.Internal
+                    , Global.callingConvention = Fast
+                    , basicBlocks = blocks
+                    , Global.functionAttributes = [Right NoUnwind]
+                    }
+    mainDef = do
+        let wordPtrTy = PointerType (IntegerType 64) (AddrSpace 0)
+            entryCall = Call
+                { tailCallKind = Nothing
+                , callingConvention = Fast
+                , returnAttributes = []
+                , function = Right $ ConstantOperand $ Constant.GlobalReference
+                                (FunctionType VoidType [] False)
+                                (nameToLLVM $ entryPoint bedrock)
+                , arguments =
+                    [ (ConstantOperand $ Constant.Null wordPtrTy, [])
+                    , (ConstantOperand $ Constant.Null wordPtrTy, []) ]
+                , functionAttributes = [Right NoUnwind, Right NoReturn]
+                , metadata = [] }
+        newDefinition $ GlobalDefinition functionDefaults
+            { name = LLVM.Name "main"
+            , returnType = IntegerType 32
+            , basicBlocks = [BasicBlock (UnName 0) [Do entryCall] (Do $ Unreachable [])] }
+
 
 mkEnv :: Bedrock.Module -> Env
 mkEnv bedrock = env
   where
     env = Env
-        { envNodeMapping = Map.fromList (zip allNodes [0..]) }
+        { envNodeMapping = Map.fromList (zip allNodes [0..])
+        , envFunctionTypes = Map.fromList fnTypes }
     allNodes =
         [ ConstructorName name blanks
         | NodeDefinition name args <- nodes bedrock
@@ -47,7 +128,12 @@ mkEnv bedrock = env
         [ FunctionName fnName blanks
         | Bedrock.Function{..} <- functions bedrock
         , blanks <- [0..length fnArguments] ]
-
+    fnTypes =
+      [ (fnName, FunctionType (typesToLLVM fnResults)
+                      [ typeToLLVM variableType
+                      | Variable{..} <- fnArguments ] False)
+      | Bedrock.Function{..} <- functions bedrock ]
+{-
 
 toLLVM :: Bedrock.Module -> LLVM.Module
 toLLVM bedrock = defaultModule
@@ -146,7 +232,7 @@ compile bedrock dst =
     return ()
 
 
-
+-}
 cTypeToLLVM :: CType -> LLVM.Type
 cTypeToLLVM cType =
     case cType of
@@ -179,8 +265,8 @@ bitSize _ = error "Data.Bedrock.LLVM.bitSize"
 
 nameToLLVM :: Bedrock.Name -> LLVM.Name
 nameToLLVM name | nameUnique name == 0 =
-  LLVM.Name $ intercalate "." (nameModule name ++ [nameIdentifier name])
-nameToLLVM name = LLVM.Name $ concat
+  LLVM.Name $ fromString $ intercalate "." (nameModule name ++ [nameIdentifier name])
+nameToLLVM name = LLVM.Name $ fromString $ concat
     [ intercalate "." (nameModule name ++ [nameIdentifier name])
     , "_"
     , show (nameUnique name) ]
@@ -197,17 +283,18 @@ traceLLVM msg = do
                         strGlobal
         , indices = [ConstantOperand $ Constant.Int 64 0, ConstantOperand $ Constant.Int 64 0]
         , metadata = [] }
-    doInst $ Call
+    anonInst $ Call
         { tailCallKind = Nothing
         , callingConvention = C
         , returnAttributes = []
         , function = Right $ ConstantOperand $ Constant.GlobalReference
-                        (IntegerType 32)
+                        (FunctionType (IntegerType 32) [PointerType (IntegerType 8) (AddrSpace 0)] False)
                         (LLVM.Name "puts")
         , arguments =
             [ (LocalReference (PointerType (IntegerType 8) (AddrSpace 0)) str, []) ]
         , functionAttributes = []
         , metadata = [] }
+    return ()
 
 patternTag :: Pattern -> String
 patternTag pat =
@@ -258,7 +345,7 @@ blockToLLVM = worker
               Nothing -> do
                 traceLLVM $ "Unreachable branch :("
                 doInst $ Call Nothing C [] (Right $ ConstantOperand $ Constant.GlobalReference
-                        VoidType
+                        (FunctionType VoidType [] False)
                         (LLVM.Name "llvm.trap")) [] [] []
                 return $ Ret Nothing []
               Just branch -> worker branch
@@ -284,7 +371,7 @@ blockToLLVM = worker
                 , callingConvention = Fast
                 , returnAttributes = []
                 , function = Right $ ConstantOperand $ Constant.GlobalReference
-                                VoidType
+                                (FunctionType VoidType [] False)
                                 (nameToLLVM fName)
                 , arguments =
                     [ (LocalReference
@@ -300,7 +387,7 @@ blockToLLVM = worker
                 , callingConvention = C
                 , returnAttributes = []
                 , function = Right $ ConstantOperand $ Constant.GlobalReference
-                                VoidType
+                                (FunctionType VoidType [] False)
                                 (LLVM.Name "exit")
                 , arguments = [ (ConstantOperand $ Constant.Int 32 0, []) ]
                 , functionAttributes = []
@@ -320,7 +407,7 @@ blockToLLVM = worker
                 , callingConvention = Fast
                 , returnAttributes = []
                 , function = Right $ LocalReference
-                                VoidType
+                                (FunctionType VoidType [] False)
                                 fnPtr
                 , arguments =
                     [ (LocalReference
@@ -337,7 +424,7 @@ blockToLLVM = worker
                 , callingConvention = C
                 , returnAttributes = []
                 , function = Right $ ConstantOperand $ Constant.GlobalReference
-                                VoidType
+                                (FunctionType VoidType [] False)
                                 (LLVM.Name "exit")
                 , arguments = [ (ConstantOperand $ Constant.Int 32 1, []) ]
                 , functionAttributes = []
@@ -376,8 +463,8 @@ blockToLLVM = worker
             , callingConvention = C
             , returnAttributes = []
             , function = Right (ConstantOperand $ Constant.GlobalReference
-                                    retTy
-                                    (LLVM.Name fName))
+                                    (FunctionType retTy [] False)
+                                    (LLVM.Name $ fromString fName))
             , arguments =
                 [ (LocalReference (typeToLLVM variableType) (nameToLLVM variableName), [])
                 | Variable{..} <- args ]
@@ -389,7 +476,7 @@ blockToLLVM = worker
             , callingConvention = Fast
             , returnAttributes = []
             , function = Right (ConstantOperand $ Constant.GlobalReference
-                                    retTy
+                                    (FunctionType retTy [] False)
                                     (nameToLLVM fName))
             , arguments =
                 [ (LocalReference (typeToLLVM variableType) (nameToLLVM variableName), [])
@@ -404,7 +491,7 @@ blockToLLVM = worker
             { volatile = False
             , address = ConstantOperand $ Constant.GlobalReference
                             (PointerType (typeToLLVM variableType) (AddrSpace 0))
-                            (LLVM.Name $ "bedrock:" ++ reg)
+                            (LLVM.Name $ fromString $ "bedrock:" ++ reg)
             , value = LocalReference (typeToLLVM variableType) (nameToLLVM variableName)
             , maybeAtomicity = Nothing
             , alignment = 1
@@ -414,7 +501,7 @@ blockToLLVM = worker
             { volatile = False
             , address = ConstantOperand $ Constant.GlobalReference
                             (PointerType retTy (AddrSpace 0))
-                            (LLVM.Name $ "bedrock:" ++ reg)
+                            (LLVM.Name $ fromString $ "bedrock:" ++ reg)
             , maybeAtomicity = Nothing
             , alignment = 1
             , metadata = [] }
@@ -470,11 +557,12 @@ blockToLLVM = worker
                             (nameToLLVM $ variableName ptr)
             , indices = [ConstantOperand $ Constant.Int 64 (fromIntegral offset)]
             , metadata = [] }
-    mkInst retTy (FunctionPointer fnName) =
-        return BitCast
-            { operand0 = ConstantOperand $ Constant.GlobalReference VoidType (nameToLLVM fnName)
-            , type' = retTy
-            , metadata = [] }
+    mkInst retTy (FunctionPointer fnName) = do
+      fnTy <- getFunctionType fnName
+      return BitCast
+          { operand0 = ConstantOperand $ Constant.GlobalReference (PointerType fnTy (AddrSpace 0)) (nameToLLVM fnName)
+          , type' = retTy
+          , metadata = [] }
     mkInst retTy (MkNode nodeName []) = do
         ident <- resolveNodeName nodeName
         return BitCast
@@ -520,6 +608,3 @@ castReference origType origName destType =
     cons (IntegerType a) (IntegerType b) | a > b = Trunc
     cons (IntegerType a) (IntegerType b) | a < b = ZExt
     cons _ _                                     = BitCast
-
-
--}

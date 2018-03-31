@@ -34,7 +34,6 @@ Executable lhc
                      tagged,
                      optparse-applicative,
                      binary,
-                     derive,
                      directory,
 
                      bedrock,
