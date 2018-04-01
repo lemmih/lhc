@@ -443,8 +443,6 @@ blockToLLVM = worker
             , maybeAtomicity = Nothing
             , alignment = 1
             , metadata = [] }
-    mkInst retTy (CCall "cast" [Variable{..}]) = return $
-        castReference (typeToLLVM variableType) (nameToLLVM variableName) retTy
     mkInst retTy (CCall "addrAdd#" [ptr, offset]) =
         return $ GetElementPtr
             { inBounds = True
