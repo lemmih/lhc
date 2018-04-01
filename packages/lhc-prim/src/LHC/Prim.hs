@@ -199,10 +199,6 @@ foreign import ccall unsafe le# :: I32 -> I32 -> I32
 
 -- <=
 (<=) :: Int -> Int -> Bool
--- le (I# a#) (I# b#) =
---   case le# a# b# of
---     '\0'# -> False
---     _     -> True
 I# a# <= I# b# =
   case le# a# b# of
     '\0'# -> False
