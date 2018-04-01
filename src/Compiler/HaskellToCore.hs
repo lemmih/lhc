@@ -386,7 +386,8 @@ convertDecl' decl =
     HS.TypeSig{} -> return []
     _ -> error $ "Compiler.HaskellToCore.convertDecl: " ++ show decl
 
-isPrimitive "realWorld" = True
+isPrimitive "realworld#" = True
+isPrimitive "cast" = True
 isPrimitive _ = False
 
 convertMatches :: [Variable] -> [HS.Match Typed] -> M Expr
@@ -547,6 +548,11 @@ convertType ty =
 -- \cint -> WithExternal cfun [cint] boxed
 convertExternal :: String -> TC.Type -> M Expr
 convertExternal "realworld#" _ty = return (Lit (LitInt 0))
+convertExternal "cast" ty = do
+    arg <- Variable <$> newName "arg" <*> pure argType
+    return $ Lam [arg] $ Cast (Var arg) retType
+  where
+    ([argType], _isIO, retType) = ffiTypes ty
 convertExternal cName ty
     | isIO = do
         args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t

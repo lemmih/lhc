@@ -481,6 +481,10 @@ convertExpr lazy expr rest =
                   Bind [tmp] (Bedrock.Fetch (MemAttributes False Nothing) val) <$>
                     Bedrock.Case tmp (Just defExpr) <$>
                         mapM convertAlt alts
+    Cast e ty | not lazy ->
+      convertExpr False e $ \[val] -> do
+        var <- deriveVariable val "val" (convertTcType ty)
+        Bind [var] (Bedrock.TypeCast val) <$> rest [var]
     WithExternal binder external args st scoped | not lazy -> do
       binder' <- convertVariable binder
       args' <- mapM convertVariable args
