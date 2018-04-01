@@ -192,6 +192,7 @@ compileExecutable deps file = do
             -- Core.deadCodeElimination entrypoint $
             -- Core.simpleInline $
             -- Core.unique $
+            snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
             Core.simplify $ Core.simplify $ Core.simplify $
             snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
             Core.deadCodeElimination entrypoint $
