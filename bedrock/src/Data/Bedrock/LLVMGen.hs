@@ -97,7 +97,7 @@ globalString str =
     , Global.type' = (ArrayType (fromIntegral (length str)+1) (IntegerType 8))
     , linkage = Internal
     , isConstant = True
-    , unnamedAddr = Just LocalAddr
+    , unnamedAddr = Just GlobalAddr
     }
 
 
