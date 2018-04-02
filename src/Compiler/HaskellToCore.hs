@@ -673,6 +673,16 @@ primBindIO = Var (Variable name ty)
     ioB = io `TC.TyApp` TC.TyRef bRef
     ioAB = TC.TyRef aRef `TC.TyFun` ioB
 
+unpackString :: Expr
+unpackString = Var (Variable name ty)
+  where
+    name = Name ["LHC.Prim"] "unpackString#" 0
+    ty = TC.TyApp addr i8 `TC.TyFun` TC.TyList char
+    addr = TC.TyCon (QualifiedName "LHC.Prim" "Addr")
+    i8 = TC.TyCon (QualifiedName "LHC.Prim" "I8")
+    char = TC.TyCon (QualifiedName "LHC.Prim" "Char")
+
+
 findProof :: HS.QName Typed -> Expr -> Expr
 findProof name =
     case tyDecl of
@@ -722,7 +732,7 @@ convertExp expr =
             pure $ Con charCon `App` Lit (LitChar c)
         HS.Lit _ (HS.Int _ i _) ->
             pure $ Con intCon `App` (Var i64toi32 `App` Lit (LitInt i))
-        HS.Lit _ lit -> pure $ Lit (convertLiteral lit)
+        HS.Lit _ lit -> pure $ convertLiteralToExpr lit
         HS.Tuple  _ HS.Unboxed exprs -> do
             args <- mapM convertExp exprs
             return $ UnboxedTuple args
@@ -832,6 +842,14 @@ convertAlt alt =
         --         <*> convertRhs rhs
         _ -> error $ "convertAlt: " ++ show alt
 
+convertLiteralToExpr :: HS.Literal Typed -> Expr
+convertLiteralToExpr lit =
+    case lit of
+        HS.PrimString _ str _ -> Lit $ LitString str
+        HS.PrimInt _ int _    -> Lit $ LitInt int
+        HS.PrimChar _ char _  -> Lit $ LitChar char
+        HS.String _ str _     -> App unpackString (Lit $ LitString str)
+        _ -> error $ "convertLiteral: " ++ show lit
 
 convertLiteral :: HS.Literal Typed -> Literal
 convertLiteral lit =

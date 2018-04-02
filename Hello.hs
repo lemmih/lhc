@@ -3,13 +3,13 @@ module Main (main) where
 
 import LHC.Prim
 
--- main :: IO ()
+main :: IO ()
 main = do
-  putStrLn (unpackString# "What is your name?"#)
+  putStrLn "What is your name?"
   name <- getLine
-  putStr (unpackString# "Hi "#)
+  putStr "Hi "
   putStr name
-  putStrLn (unpackString# "."#)
+  putStrLn "."
 
 entrypoint :: ()
 entrypoint = unsafePerformIO main
