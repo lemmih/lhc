@@ -39,7 +39,7 @@ mkInterface :: Scope.Interface -> TcEnv -> Interface
 mkInterface scope env = Interface
   { ifaceValues       = catMaybes
       [ case Map.lookup entity (tcEnvValues env) of
-          Nothing -> Nothing -- error $ "Compiler.Interface.mkInterface: missing type: " ++ show (entityName entity)
+          Nothing -> error $ "Compiler.Interface.mkInterface: missing type: " ++ show (entityName entity)
           Just ty -> Just (entity, ty)
       | entity <- scope ]
   , ifaceTypes        = []
