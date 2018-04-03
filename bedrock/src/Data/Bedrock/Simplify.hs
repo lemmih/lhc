@@ -77,6 +77,8 @@ simplifyBlock block =
                         <*> simplifyBlock rest
         Bind [] TypeCast{} rest ->
             simplifyBlock rest
+        Bind [] Literal{} rest ->
+            simplifyBlock rest
         Bind [dst] (TypeCast src) rest | variableType dst == variableType src ->
               bindVariable dst src (simplifyBlock rest)
         Bind binds simple rest ->

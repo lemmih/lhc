@@ -547,7 +547,7 @@ convertType ty =
 -- cfun :: CInt -> CInt
 -- \cint -> WithExternal cfun [cint] boxed
 convertExternal :: String -> TC.Type -> M Expr
-convertExternal "realworld#" _ty = return (Lit (LitInt 0))
+convertExternal "realworld#" _ty = return (Lit LitVoid)
 convertExternal "cast" ty = do
     arg <- Variable <$> newName "arg" <*> pure argType
     return $ Lam [arg] $ Cast (Var arg) retType

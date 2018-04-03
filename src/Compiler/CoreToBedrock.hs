@@ -162,7 +162,7 @@ convertTcType tcTy =
              -> Primitive I64
     TC.TyCon qname
         | qname == QualifiedName "LHC.Prim" "RealWorld#"
-         -> Primitive I64
+         -> Primitive CVoid
     TC.TyFun{} -> NodePtr
     TC.TyRef{} -> NodePtr
     TC.TyCon{} -> NodePtr
@@ -224,7 +224,7 @@ convertResultType args tcTy =
              -> return [Primitive I64]
       (TC.TyCon qname, [])
         | qname == QualifiedName "LHC.Prim" "RealWorld#"
-             -> return [Primitive I64]
+             -> return [Primitive CVoid]
       (TC.TyCon qname, conArgs) -> do
         mbExpanded <- expandNewType qname conArgs
         case mbExpanded of
@@ -440,6 +440,10 @@ convertExpr lazy expr rest =
         tmp <- newVariable [] "int" (Primitive I64)
         Bind [tmp] (Bedrock.Literal (LiteralInt int))
             <$> rest [tmp]
+    Core.Lit Core.LitVoid -> do
+        tmp <- newVariable [] "void" (Primitive CVoid)
+        Bind [tmp] (Bedrock.Literal (LiteralInt 0))
+            <$> rest [tmp]
     Lam v sub | lazy -> do
       v' <- mapM convertVariable v
       (node,nodeArgs) <- do
@@ -568,6 +572,7 @@ convertLiteral lit = pure $
         LitChar c -> LiteralInt (fromIntegral $ ord c)
         LitString s -> LiteralString s
         LitInt i -> LiteralInt i
+        LitVoid  -> LiteralInt 0
         -- LitWord Integer
         -- LitFloat Rational
         -- LitDouble Rational

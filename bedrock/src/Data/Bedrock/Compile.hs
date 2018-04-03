@@ -107,9 +107,9 @@ stdPipeline =
         , "inlined"         :> unique . simplifySteps 10
         -- , PerformHPT
         -- , "no-laziness"     :?> runGen . lowerEvalApply
-        -- , "no-void"         :> voidEliminate
         -- , "no-unknown-size" :?> runGen . lowerNodeSize
         , "no-laziness"     :> runGen Simple.lowerEvalApply
+        , "no-void"         :> simplify . voidEliminate
         , "no-unknown-size" :> runGen Simple.lowerNodeSize
 
         , "no-nodes"        :> simplify . unique . registerIntroduction

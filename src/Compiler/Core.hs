@@ -209,6 +209,7 @@ data Literal
     | LitWord Integer
     | LitFloat Rational
     | LitDouble Rational
+    | LitVoid
     deriving ( Show, Data, Generic )
 
 instance Pretty Literal where
@@ -217,6 +218,7 @@ instance Pretty Literal where
             LitChar c     -> text $ show c
             LitInt i      -> integer i
             LitString str -> text $ show str
+            LitVoid       -> text "void"
             _ -> text "{literal}"
 
 -- FIXME: Move orphan instance to their rightful modules.

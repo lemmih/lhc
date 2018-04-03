@@ -261,7 +261,7 @@ typeToLLVM ty =
 
 bitSize :: LLVM.Type -> Word32
 bitSize (IntegerType n) = n
-bitSize _ = error "Data.Bedrock.LLVM.bitSize"
+bitSize ty = error $ "Data.Bedrock.LLVM.bitSize: " ++ show ty
 
 nameToLLVM :: Bedrock.Name -> LLVM.Name
 nameToLLVM name | nameUnique name == 0 =
