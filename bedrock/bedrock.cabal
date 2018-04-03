@@ -33,6 +33,7 @@ library
                        Data.Bedrock.SimpleNodeSizing
                        Data.Bedrock.Simplify
                        Data.Bedrock.Simplify.LocalDCE
+                       Data.Bedrock.Simplify.DCE
                        Data.Bedrock.VoidElimination
                        Data.Bedrock.StackLayout
                        Data.Bedrock.LLVM

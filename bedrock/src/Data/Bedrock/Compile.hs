@@ -19,6 +19,7 @@ import           Data.Bedrock.RegisterIntroduction
 import           Data.Bedrock.Rename
 import           Data.Bedrock.Simplify
 import           Data.Bedrock.Simplify.LocalDCE
+import           Data.Bedrock.Simplify.DCE
 import           Data.Bedrock.VoidElimination
 import qualified Data.Bedrock.StackLayout as StackLayout
 import           Data.Bedrock
@@ -122,7 +123,7 @@ stdPipeline =
         -- , "pretty"          :> locallyUnique
         ]
   where
-    simplifySteps 0 = id
+    simplifySteps 0 = deadCodeElimination
     simplifySteps n = simplifySteps (n-1) . unique . localDCE . simplify . inline
         -- [ "rename"          :> simplify . unique
         -- , PerformHPT
