@@ -1,0 +1,25 @@
+resolver: lts-10.10
+
+packages:
+- '.'
+- bedrock
+
+- location:
+    git: https://github.com/haskell-suite/haskell-tc.git
+    commit: ee65a55e5e054b4e02ba2fe227240d21aa13cbd9
+  extra-dep: true
+
+- location:
+    git: https://github.com/haskell-suite/haskell-scope.git
+    commit: 5d77593110a0455745da4f376a5bcdb9e511784c
+  extra-dep: true
+
+extra-deps:
+- haskell-src-exts-1.20.2
+- haskell-packages-0.6.1
+- llvm-hs-pretty-0.2.0.0
+- llvm-hs-pure-6.0.0
+
+flags:
+  llvm-hs:
+    shared-llvm: true
