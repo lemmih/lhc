@@ -8,7 +8,7 @@ license:             PublicDomain
 author:              David Himmelstrup, Austin Seipp
 maintainer:          https://github.com/Lemmih/lhc/issues
 homepage:            https://github.com/Lemmih/lhc
-build-type:          Custom
+build-type:          Simple
 cabal-version:	     >= 1.10
 extra-source-files:
 data-files:
@@ -19,6 +19,18 @@ Source-repository head
 
 Executable lhc
  main-is:            Main.hs
+ other-modules:
+   Compiler.Core
+   Compiler.Core.DCE
+   Compiler.Core.FreeVariables
+   Compiler.Core.NewType
+   Compiler.Core.SimpleEta
+   Compiler.Core.SimpleInline
+   Compiler.Core.Simplify
+   Compiler.Core.Unique
+   Compiler.CoreToBedrock
+   Compiler.HaskellToCore
+   Compiler.Interface
  Hs-Source-Dirs:     src
  ghc-prof-options:   -auto-all
  build-depends:      base == 4.*,
