@@ -1,3 +1,11 @@
+{-|
+Void elimination removes all variables with the void type. This pass has to be
+run /after/ 'eval' and 'apply' has been lowered since those functions have to
+pretend void types actually exist.
+
+The imaginary 'RealWorld#' parameter of the IO monad is implemented as a void
+type.
+-}
 module Data.Bedrock.VoidElimination ( voidEliminate ) where
 
 import Data.Bedrock
@@ -89,6 +97,3 @@ isVoidType _ = False
 
 isVoidVariable :: Variable -> Bool
 isVoidVariable = isVoidType . variableType
-
-
-
