@@ -11,7 +11,7 @@ stack exec lhc
 ```
 
 ## Compilation pipeline and the relevant libraries:
-
+```
 ┌──────────────────┐
 │     Parsing      │
 │ haskell-src-exts │
@@ -40,3 +40,4 @@ stack exec lhc
  │ Generate LLVM │
  │    bedrock    │
  └───────────────┘
+```
