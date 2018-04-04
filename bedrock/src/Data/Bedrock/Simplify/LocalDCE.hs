@@ -68,6 +68,10 @@ dceBlock root block =
         <*> sequence
           [ Alternative pattern <$> dceBlock root branch
           | Alternative pattern branch <- alts ]
+    Bind [] expr rest -> do
+      let deps = freeVariablesSimple expr Set.empty
+      useMany [root] (Set.toList deps)
+      Bind [] expr <$> dceBlock root rest
     Bind vars expr rest -> do
       let deps = freeVariablesSimple expr Set.empty
       useMany vars (Set.toList deps)
@@ -96,4 +100,6 @@ isSimple :: Expression -> Bool
 isSimple Store{} = True
 isSimple Literal{} = True
 isSimple TypeCast{} = True
+isSimple Undefined{} = True
+isSimple Address{} = True
 isSimple _ = False

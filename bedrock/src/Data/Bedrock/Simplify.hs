@@ -1,17 +1,18 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Bedrock.Simplify ( simplify, mergeAllocsModule ) where
 
-import           Control.Applicative ( Applicative, (<$>), (<*>), pure)
+import           Control.Applicative  (Applicative, pure, (<$>), (<*>))
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Data.Map               (Map)
-import qualified Data.Map               as Map
+import           Data.Map             (Map)
+import qualified Data.Map             as Map
 
 import           Data.Bedrock
 import           Data.Bedrock.Misc
 
 data Env = Env
     { envRenaming  :: Map Variable Variable
+    , envAddresses :: Map Variable (Variable, Int)
     , envConstant  :: Map Variable (NodeName, [Variable])
     , envStores    :: Map Variable (NodeName, [Variable])
     }
@@ -26,9 +27,10 @@ simplify m = runM (simplifyModule m)
     runM action = evalState (runReaderT (unM action) env) st
     st = modNamespace m
     env = Env
-        { envRenaming = Map.empty
-        , envConstant = Map.empty
-        , envStores   = Map.empty }
+        { envRenaming  = Map.empty
+        , envAddresses = Map.empty
+        , envConstant  = Map.empty
+        , envStores    = Map.empty }
 
 simplifyModule :: Module -> M Module
 simplifyModule m = do
@@ -81,6 +83,14 @@ simplifyBlock block =
             simplifyBlock rest
         Bind [dst] (TypeCast src) rest | variableType dst == variableType src ->
               bindVariable dst src (simplifyBlock rest)
+        Bind [dst] (Address src idx) rest -> do
+          src' <- resolve src
+          bindAddress dst src' idx $
+            Bind [dst] <$> lookupIndexed src' idx Address <*> simplifyBlock rest
+        Bind [] (Write dst idx src) rest -> do
+          dst' <- resolve dst
+          src' <- resolve src
+          Bind [] <$> lookupIndexed dst' idx (\d i -> Write d i src') <*> simplifyBlock rest
         Bind binds simple rest ->
             Bind binds
                 <$> simplifyExpression simple
@@ -99,6 +109,7 @@ simplifyBlock block =
         TailCall fnName vars -> TailCall fnName <$> mapM resolve vars
         Exit -> pure Exit
         Panic msg -> pure $ Panic msg
+        Invoke cont vars -> Invoke <$> resolve cont <*> mapM resolve vars
         _ -> return block
 
 simplifyAlternative :: Alternative -> M Alternative
@@ -126,6 +137,9 @@ simplifyExpression expr =
         TypeCast var -> TypeCast <$> resolve var
         CCall fn vars -> CCall fn <$> mapM resolve vars
         Store node vars -> Store node <$> mapM resolve vars
+        Write v1 idx v2 -> Write <$> resolve v1 <*> pure idx <*> resolve v2
+        Address v idx -> Address <$> resolve v <*> pure idx
+
         _ -> pure expr
 
 
@@ -205,10 +219,10 @@ bindVariable old new fn = do
         (\env -> env{
             envRenaming = Map.insert old new' (envRenaming env),
             envStores = case Map.lookup old (envStores env) of
-              Nothing -> envStores env
+              Nothing   -> envStores env
               Just node -> Map.insert new' node (envStores env),
             envConstant = case Map.lookup old (envConstant env) of
-                Nothing -> envConstant env
+                Nothing   -> envConstant env
                 Just node -> Map.insert new' node (envConstant env)
           })
         fn
@@ -222,6 +236,17 @@ lookupConstant var = do
 bindConstant :: Variable -> NodeName -> [Variable] -> M a -> M a
 bindConstant var node vars = local $ \env ->
     env{ envConstant = Map.insert var (node, vars) (envConstant env) }
+
+bindAddress :: Variable -> Variable -> Int  -> M a -> M a
+bindAddress dst src idx = local $ \env ->
+  env{ envAddresses = Map.insert dst (src,idx) (envAddresses env) }
+
+lookupIndexed :: Variable -> Int -> (Variable -> Int -> Expression) -> M Expression
+lookupIndexed src idx fn = do
+  addrs <- asks envAddresses
+  case Map.lookup src addrs of
+    Just (orig, prevIdx) -> fn <$> resolve orig <*> pure (prevIdx+idx)
+    Nothing              -> fn <$> resolve src <*> pure idx
 
 lookupStore :: Variable -> M (Maybe (NodeName, [Variable]))
 lookupStore var = do

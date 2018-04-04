@@ -120,6 +120,7 @@ stdPipeline =
         , "no-allocs"       :> locallyUnique . runGen lowerAlloc
         , "no-gc"           :> locallyUnique . lowerGC fixedGC
         , "no-globals"      :> unique . lowerGlobalRegisters
+        , "pretty"          :> unique . localDCE . simplify . simplify
         -- , "pretty"          :> locallyUnique
         ]
   where
