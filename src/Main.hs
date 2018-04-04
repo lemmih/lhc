@@ -164,11 +164,13 @@ loadLibrary pkgInfo =
 -- merge with library core files
 -- convert to bedrock
 compileExecutable :: [InstalledPackageId] -> FilePath -> IO ()
-compileExecutable deps file = do
-    putStrLn $ "Loading deps: " ++ show deps
-    pkgs <- readPackagesInfo
-                (Proxy :: Proxy (StandardDB LHC))
-                [GlobalPackageDB, UserPackageDB] deps
+compileExecutable _deps file = do
+    -- putStrLn $ "Loading deps: " ++ show deps
+    db <- userDB
+    pkgs <- readPackageDB Don'tInitDB (db :: StandardDB LHC)
+    -- pkgs <- readPackagesInfo
+    --             (Proxy :: Proxy (StandardDB LHC))
+    --             [GlobalPackageDB, UserPackageDB] deps
     ifaces <- concat <$> mapM loadLibrary pkgs
     let scope =
             [ (modName, toScopeInterface iface)
