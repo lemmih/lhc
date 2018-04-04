@@ -89,7 +89,7 @@ data Expr
     | Cast Expr Type
     | Id
     | WithProof Proof Expr
-    -- | WithCoercion Coercion Expr
+    -- WithCoercion Coercion Expr
     deriving ( Show, Data, Generic )
 
 rarrow :: Doc
@@ -185,7 +185,7 @@ data Pattern
     = ConPat Variable [Variable]
     | LitPat Literal
     | UnboxedPat [Variable]
-    -- | VarPat Variable
+    -- VarPat Variable
     deriving ( Show, Data, Generic )
 
 instance Pretty Pattern where

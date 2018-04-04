@@ -88,7 +88,7 @@ data Function = Function
 data Pattern
   = NodePat NodeName [Variable]
   | LitPat Literal
-  -- | UnboxedPat [Variable]
+  -- UnboxedPat [Variable]
   deriving (Show, Read, Data, Generic)
 data Alternative = Alternative Pattern Block
   deriving (Show, Read, Data, Generic)
