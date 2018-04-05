@@ -2,6 +2,13 @@ sudo: false
 
 language: generic
 
+addons:
+  apt:
+    sources:
+      - llvm-toolchain-6.0
+    packages:
+      - llvm
+
 cache:
   directories:
     - $HOME/.stack
@@ -18,3 +25,4 @@ script:
   - stack setup
   - stack build
   - stack clean
+  - lli --version
