@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/Lemmih/lhc.svg?branch=master)](https://travis-ci.org/Lemmih/lhc)
+
 # LHC
 
 LHC is a Haskell2010 compiler composed from smaller, reusable libraries.
