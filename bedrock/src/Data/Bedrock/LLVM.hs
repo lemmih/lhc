@@ -367,7 +367,7 @@ blockToLLVM = worker
         TailCall fName args -> do
             -- traceLLVM $ "TailCall: " ++ show fName
             doInst $ Call
-                { tailCallKind = Just Tail
+                { tailCallKind = Just MustTail
                 , callingConvention = Fast
                 , returnAttributes = []
                 , function = Right $ ConstantOperand $ Constant.GlobalReference
@@ -403,7 +403,7 @@ blockToLLVM = worker
                             (map (typeToLLVM . variableType) args)
                             False) (AddrSpace 0))
             doInst $ Call
-                { tailCallKind = Just Tail
+                { tailCallKind = Just MustTail
                 , callingConvention = Fast
                 , returnAttributes = []
                 , function = Right $ LocalReference
