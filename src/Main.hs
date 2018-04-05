@@ -3,7 +3,7 @@ module Main where
 import           Data.Graph                         (SCC (..), flattenSCC,
                                                      stronglyConnComp)
 import           Data.Tagged
-import  Language.Haskell.Exts
+import           Language.Haskell.Exts
 import           Language.Haskell.TypeCheck.Pretty  (displayIO, pretty,
                                                      renderPretty)
 import           System.Exit
@@ -18,9 +18,9 @@ import qualified Compiler.Core                      as Core
 import qualified Compiler.Core.DCE                  as Core
 import qualified Compiler.Core.NewType              as NewType
 import qualified Compiler.Core.SimpleEta            as Core
-import qualified Compiler.Core.Unique               as Core
-import qualified Compiler.Core.Simplify             as Core
 import qualified Compiler.Core.SimpleInline         as Core
+import qualified Compiler.Core.Simplify             as Core
+import qualified Compiler.Core.Unique               as Core
 import qualified Compiler.CoreToBedrock             as Core
 import qualified Compiler.HaskellToCore             as Haskell
 import           Compiler.Interface
@@ -37,14 +37,16 @@ import qualified Distribution.ModuleName            as Dist
 import           Options.Applicative
 import           System.Directory
 
-import Distribution.Version
-import Distribution.Types.UnitId
 import qualified Distribution.HaskellSuite.Compiler as Compiler
 import           Distribution.HaskellSuite.Packages
-import           Distribution.InstalledPackageInfo  (ExposedModule (..), exposedModules, libraryDirs,
-                                                     InstalledPackageInfo)
-import           Distribution.Package (InstalledPackageId(..))
+import           Distribution.InstalledPackageInfo  (ExposedModule (..),
+                                                     InstalledPackageInfo,
+                                                     exposedModules,
+                                                     libraryDirs)
+import           Distribution.Package               (InstalledPackageId (..))
 import           Distribution.Simple.Compiler
+import           Distribution.Types.UnitId
+import           Distribution.Version
 
 import           Paths_lhc
 
@@ -85,7 +87,7 @@ moduleFile m =
 moduleDependencies :: Module a -> (String, [String])
 moduleDependencies (Module _ mbHead _pragma imports _decls) =
   (case mbHead of
-    Nothing -> "Main"
+    Nothing                                                -> "Main"
     Just (ModuleHead _ (ModuleName _ name) _warn _exports) -> name
   , [ modName
     | importDecl <- imports
@@ -132,6 +134,7 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
               -- tiEnv' <- runTI tiEnv (tiModule m')
               let iface = mkInterface scopeIface tiEnv'
                   ifaceFile = buildDir </> moduleFile m' <.> "hi"
+              createDirectoryIfMissing True (buildDir </> moduleFile m')
               writeInterface ifaceFile iface
               putStrLn "Converting to core..."
               let core = Haskell.convert tiEnv' typedModule
@@ -139,7 +142,7 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
                   complete = Core.simplify $ Core.simplify $ NewType.lower $ Core.simplify $ Core.simplify $ core
                   (_,etaAbs) = Core.simpleEta Core.emptySimpleEtaAnnotation complete
               -- print (pretty complete)
-              displayIO stdout (renderPretty 1 120 (pretty etaAbs))
+              -- displayIO stdout (renderPretty 1 120 (pretty etaAbs))
               encodeFile coreFile etaAbs
               writeFile (coreFile <.> "pretty") (show $ pretty etaAbs)
               writeIORef resolveEnvRef resolveEnv'
@@ -182,7 +185,9 @@ compileExecutable _deps file = do
     putStrLn "Origin analysis..."
     let (resolveEnv, errs, m') = resolve scopeEnv m
         Just _scopeIface = lookupInterface (getModuleName m) resolveEnv
-    mapM_ print errs
+    unless (null errs) $ do
+      mapM_ print errs
+      exitWith (ExitFailure 1)
     putStrLn "Typechecking..."
     let env = addAllToTcEnv (map (fst . snd) ifaces) emptyTcEnv
     let Right (typedModule, env') = typecheck env m'
@@ -200,9 +205,9 @@ compileExecutable _deps file = do
             Core.deadCodeElimination entrypoint $
             NewType.lower $ mappend libraryCore core
     -- print (pretty complete)
-    displayIO stdout (renderPretty 1 100 (pretty complete))
+    -- displayIO stdout (renderPretty 1 100 (pretty complete))
 
     let bedrock = Core.convert complete
-    print (ppModule bedrock)
+    -- print (ppModule bedrock)
     Bedrock.compileModule bedrock file
     return ()
