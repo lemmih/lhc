@@ -17,3 +17,4 @@ before_install:
 script:
   - stack setup
   - stack build
+  - stack clean
