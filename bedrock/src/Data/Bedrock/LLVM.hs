@@ -36,7 +36,7 @@ toLLVM :: Bedrock.Module -> LLVM.Module
 toLLVM bedrock = LLVM.Module
     { moduleName = "main"
     , moduleSourceFileName = "blank.hs"
-    , moduleDataLayout = Just dataLayout
+    , moduleDataLayout = Nothing -- Just dataLayout
     , moduleTargetTriple = Nothing
     , moduleDefinitions =
         [ GlobalDefinition functionDefaults
@@ -367,7 +367,7 @@ blockToLLVM = worker
         TailCall fName args -> do
             -- traceLLVM $ "TailCall: " ++ show fName
             doInst $ Call
-                { tailCallKind = Just MustTail
+                { tailCallKind = Just Tail
                 , callingConvention = Fast
                 , returnAttributes = []
                 , function = Right $ ConstantOperand $ Constant.GlobalReference
@@ -403,7 +403,7 @@ blockToLLVM = worker
                             (map (typeToLLVM . variableType) args)
                             False) (AddrSpace 0))
             doInst $ Call
-                { tailCallKind = Just MustTail
+                { tailCallKind = Just Tail
                 , callingConvention = Fast
                 , returnAttributes = []
                 , function = Right $ LocalReference

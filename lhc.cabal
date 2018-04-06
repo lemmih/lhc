@@ -65,9 +65,14 @@ test-suite spec
   hs-source-dirs: test
   build-depends:
     base,
+    directory,
     parsec,
+    process,
+    filepath,
     bedrock,
     haskell-tc,
     hspec,
+    hspec-contrib,
+    HUnit,
     QuickCheck >= 2.1.0
   default-language: Haskell2010
