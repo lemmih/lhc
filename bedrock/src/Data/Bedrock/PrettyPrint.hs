@@ -25,15 +25,14 @@ instance Pretty Type where
   pretty NodePtr        = Doc.char '*'
   pretty Node           = Doc.char '%'
   pretty (StaticNode n) = Doc.char '%' <> Doc.int n <> Doc.char '%'
-  pretty (Primitive IWord) = Doc.char '#'
-  pretty (Primitive ty) = pretty ty <> char '|'
+  pretty IWord          = Doc.char '#'
+  pretty (Primitive ty) = pretty ty
   pretty FramePtr       = Doc.red (Doc.char '@')
 
 instance Pretty CType where
   pretty I8 = text "i8"
   pretty I32 = text "i32"
   pretty I64 = text "i64"
-  pretty IWord = text "word"
   pretty (CPointer ty) = pretty ty <> Doc.char '*'
   pretty (CFunction retTy argTys) =
     pretty retTy <> Doc.parens (ppList (map pretty argTys))
@@ -44,6 +43,8 @@ instance Pretty NodeDefinition where
     text "node" <+> ppNode (ConstructorName name 0) (map pretty args)
 
 instance Pretty Variable where
+  pretty Variable{ variableName = name, variableType = Primitive ty } =
+    pretty ty <> char '|' <> pretty name
   pretty Variable{ variableName = name, variableType = ty } =
     pretty ty <> pretty name
 

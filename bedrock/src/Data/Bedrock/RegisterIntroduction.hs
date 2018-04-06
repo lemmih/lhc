@@ -53,7 +53,7 @@ lower old action =
         StaticNode n -> do
             newNames <- replicateM n (newName (Just Node) (variableName old))
             let newVars =
-                    [ Variable name (Primitive IWord) | name <- newNames ]
+                    [ Variable name IWord | name <- newNames ]
             local (\env -> env{envRegisters = Map.insert old newVars (envRegisters env)})
                 action
         Node -> error $ "RegisterIntroduction: Found node: " ++ show old
@@ -80,7 +80,7 @@ resolveArgs fn vars = do
     return (take n $ resolved ++ repeat undefinedVariable)
 
 undefinedVariable :: Variable
-undefinedVariable = Variable (Name [] "undefined" 0) (Primitive IWord)
+undefinedVariable = Variable (Name [] "undefined" 0) IWord
 
 uniqModule :: Module -> Uniq Module
 uniqModule m =

@@ -24,6 +24,7 @@ newIDByType ns ty =
             ( nsNextNodeId ns
             , incGlobal ns{nsNextNodeId = nsNextNodeId ns + 1})
         Primitive{}  -> newGlobalID ns
+        IWord{}      -> newGlobalID ns
             {-( nsNextPrimitiveId ns
             , incGlobal ns{nsNextPrimitiveId = nsNextPrimitiveId ns + 1})-}
   where
@@ -54,5 +55,3 @@ anyMemory = MemAttributes{ memConstant = False, memAliasGroup = Nothing }
 constantMemory :: MemAttributes
 constantMemory =
     MemAttributes { memConstant = True, memAliasGroup = Nothing }
-
-

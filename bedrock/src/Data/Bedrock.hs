@@ -90,6 +90,7 @@ data Type
   = NodePtr
   | Node
   | StaticNode NodeSize
+  | IWord
   | Primitive CType
   | LLVMPrimitive LLVM.Type
   | FramePtr
@@ -111,7 +112,6 @@ data CType
   = I8
   | I32
   | I64
-  | IWord
   | CPointer CType
   | CVoid
   | CFunction CType [CType]
@@ -248,7 +248,8 @@ instance Arbitrary Type where
     [ elements
       [ NodePtr
       , Node
-      , FramePtr ]
+      , FramePtr
+      , IWord ]
     , StaticNode <$> fmap abs arbitrary
     , Primitive <$> arbitrary ]
 
@@ -262,7 +263,6 @@ instance Arbitrary CType where
       [ I8
       , I32
       , I64
-      , IWord
       , CVoid ]
     ]
 

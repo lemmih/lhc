@@ -47,7 +47,7 @@ cpsBlock origin frameVar block =
         Bind binds simple rest ->
             cpsExpresion origin frameVar binds simple rest
         Return args -> do
-            node <- newVariable "contNode" (Primitive IWord)
+            node <- newVariable "contNode" IWord
             let size = case fnResults origin of
                         [StaticNode n] -> n
                         _ -> length args
@@ -120,7 +120,7 @@ cpsExpresion origin frameVar binds simple rest =
   where
     mkContinuation use = do
 
-        fnPtr <- newVariable "fnPtr" (Primitive $ CPointer (CFunction CVoid [CPointer IWord]))
+        fnPtr <- newVariable "fnPtr" (Primitive $ CPointer (CFunction CVoid [CPointer I8]))
 
         framePtr <- newVariable "bedrock.stackframe.cont" FramePtr
 
@@ -169,4 +169,3 @@ frameSize block =
         TailCall{} -> 0
         Exit -> 0
         _ -> error "Data.Bedrock.Exceptions.frameSize"
-

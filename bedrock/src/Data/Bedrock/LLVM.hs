@@ -239,7 +239,6 @@ cTypeToLLVM cType =
         I8 -> IntegerType 8
         I32 -> IntegerType 32
         I64 -> IntegerType 64
-        IWord -> IntegerType 64
         CPointer subTy -> PointerType (cTypeToLLVM subTy) (AddrSpace 0)
         CVoid -> VoidType
         CFunction retTy argTys ->
@@ -256,6 +255,7 @@ typeToLLVM ty =
         NodePtr -> PointerType (IntegerType 64) (AddrSpace 0)
         Node -> IntegerType 64
         StaticNode{} -> IntegerType 64
+        IWord -> IntegerType 64
         Primitive cType -> cTypeToLLVM cType
         FramePtr -> PointerType (IntegerType 64) (AddrSpace 0)
 

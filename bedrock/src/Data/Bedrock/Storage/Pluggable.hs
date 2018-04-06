@@ -111,7 +111,7 @@ lowerExpression binds simple rest sm =
             error "Storage.Pluggable: Can't deal with GCMarkNode"
         _ -> ret simple
   where
-    size = Variable (Name [] "size" 0) (Primitive IWord)
+    size = Variable (Name [] "size" 0) IWord
     ret s = Bind binds s rest
 
 -----------------------------------------------------------
@@ -136,4 +136,3 @@ pushFunction fn = modify $ \st ->
 pushForeign :: Foreign -> GC ()
 pushForeign f = modify $ \st ->
     st{ gcNewForeigns = f : gcNewForeigns st }
-

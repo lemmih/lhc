@@ -144,7 +144,7 @@ transformExpresion origin binds simple rest =
         Alloc n -> do
             continueName <- tagName "with_mem" (fnName origin)
             divertName <- tagName "without_mem" (fnName origin)
-            check <- newVariable "check" (Primitive IWord)
+            check <- newVariable "check" IWord
             let scope = Set.toList (freeVariables rest)
             markedScope <- mapM (tagVariable "marked") scope
             let continue = TailCall continueName scope
@@ -261,4 +261,3 @@ scavenge idx =
 
 {- Generational semi-space
 -}
-
