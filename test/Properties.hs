@@ -1,19 +1,11 @@
 module Properties (parsePrettyPrintProps) where
 
-import           Data.Bedrock
 import           Data.Bedrock.Parse
 import           Data.Bedrock.PrettyPrint
 import           Language.Haskell.TypeCheck.Pretty (pretty)
-import           System.Directory
-import           System.Exit
-import           System.FilePath
-import           System.Process
 import           Test.Hspec
-import           Test.Hspec.Contrib.HUnit
-import           Test.Hspec.QuickCheck
-import           Test.HUnit
 import           Test.QuickCheck
-import           Text.ParserCombinators.Parsec
+import           Text.ParserCombinators.Parsec     (runParser)
 
 parsePrettyPrintProps :: Spec
 parsePrettyPrintProps = do

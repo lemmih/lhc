@@ -1,12 +1,13 @@
 module UnitTests (unitTestFolder) where
 
-import           Control.Monad
-import           Data.Maybe
+import           Control.Monad    (forM)
+import           Data.Maybe       (catMaybes)
 import           System.Directory
 import           System.Exit
 import           System.FilePath
 import           System.Process
-import           Test.HUnit (Test(..), Assertion, assertFailure, assertString, assertEqual)
+import           Test.HUnit       (Assertion, Test (..), assertEqual,
+                                   assertFailure, assertString)
 
 unitTestFolder :: FilePath -> IO Test
 unitTestFolder path = do
