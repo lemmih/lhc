@@ -1,4 +1,4 @@
-module Main where
+module Main (main) where
 
 import           Data.Graph                         (SCC (..), flattenSCC,
                                                      stronglyConnComp)
@@ -11,7 +11,6 @@ import           System.FilePath
 import           System.IO                          (stdout)
 
 import           Language.Haskell.TypeCheck
---import Language.Haskell.TypeCheck.Types
 import           Language.Haskell.Scope             hiding (Interface)
 
 import qualified Compiler.Core                      as Core
@@ -58,7 +57,8 @@ customCommands = hsubparser (buildCommand)
     buildCommand = command "build" (info build idm)
     build =
         compileExecutable
-        <$> (many $ mkUnitId <$> strOption (long "package-id"))
+        <$> switch (long "verbose")
+        <*> switch (long "keep-intermediate-files")
         <*> (argument str (metavar "MODULE"))
 
 data LHC
@@ -166,8 +166,8 @@ loadLibrary pkgInfo =
 -- convert to core
 -- merge with library core files
 -- convert to bedrock
-compileExecutable :: [InstalledPackageId] -> FilePath -> IO ()
-compileExecutable _deps file = do
+compileExecutable :: Bool -> Bool -> FilePath -> IO ()
+compileExecutable verbose keepIntermediateFiles file = do
     -- putStrLn $ "Loading deps: " ++ show deps
     db <- userDB
     pkgs <- readPackageDB Don'tInitDB (db :: StandardDB LHC)
@@ -180,18 +180,18 @@ compileExecutable _deps file = do
             | (modName, (iface, _core)) <- ifaces ]
         scopeEnv = fromInterfaces scope
 
-    putStrLn "Parsing file..."
+    when verbose $ putStrLn "Parsing file..."
     ParseOk m <- parseFile file
-    putStrLn "Origin analysis..."
+    when verbose $ putStrLn "Origin analysis..."
     let (resolveEnv, errs, m') = resolve scopeEnv m
         Just _scopeIface = lookupInterface (getModuleName m) resolveEnv
     unless (null errs) $ do
       mapM_ print errs
       exitWith (ExitFailure 1)
-    putStrLn "Typechecking..."
+    when verbose $ putStrLn "Typechecking..."
     let env = addAllToTcEnv (map (fst . snd) ifaces) emptyTcEnv
     let Right (typedModule, env') = typecheck env m'
-    putStrLn "Converting to core..."
+    when verbose $ putStrLn "Converting to core..."
     let core = Haskell.convert env' typedModule
         libraryCore = mconcat (map (snd . snd) ifaces)
         entrypoint = Name ["Main"] "entrypoint" 0
@@ -209,5 +209,5 @@ compileExecutable _deps file = do
 
     let bedrock = Core.convert complete
     -- print (ppModule bedrock)
-    Bedrock.compileModule bedrock file
+    Bedrock.compileModule keepIntermediateFiles verbose bedrock file
     return ()

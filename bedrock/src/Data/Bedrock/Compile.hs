@@ -73,9 +73,9 @@ runPipeline keepIntermediateFiles verbose title m0 =
     hpt0 = runHPT m0
     dstFile n tag = title <.> show n <.> tag <.> "rock"
 
-compileModule :: Module -> FilePath -> IO ()
-compileModule m path = do
-    result <- runPipeline True True (takeBaseName path) m stdPipeline
+compileModule :: KeepIntermediateFiles -> Verbose -> Module -> FilePath -> IO ()
+compileModule keepIntermediateFiles verbose m path = do
+    result <- runPipeline keepIntermediateFiles verbose (takeBaseName path) m stdPipeline
     LLVM.compile result (replaceExtension path "ll")
 
 compileFromFile :: FilePath -> IO ()
