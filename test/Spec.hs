@@ -40,7 +40,8 @@ spec = do
 
 compileHaskell :: FilePath -> IO ()
 compileHaskell path = do
-  (code, _stdout, _stderr) <- readProcessWithExitCode "stack" ["exec","--","lhc","build",path] ""
+  (code, _stdout, stderr) <- readProcessWithExitCode "stack" ["exec","--","lhc","build",path] ""
+  assertString stderr
   assertExitCode "Compilation failed" code
 
 executeHaskell :: FilePath -> String -> String -> IO ()
