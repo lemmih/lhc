@@ -1,8 +1,9 @@
 [![Build Status](https://travis-ci.org/Lemmih/lhc.svg?branch=master)](https://travis-ci.org/Lemmih/lhc)
 
-# LHC
+# About LHC
 
-LHC is a Haskell2010 compiler composed from smaller, reusable libraries.
+The LHC Haskell Compiler aims at compiling Haskell2010 to LLVM IR using
+the [HaskellSuite](https://github.com/haskell-suite) of libraries.
 
 ## Setup
 
