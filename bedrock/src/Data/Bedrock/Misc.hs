@@ -25,6 +25,7 @@ newIDByType ns ty =
             , incGlobal ns{nsNextNodeId = nsNextNodeId ns + 1})
         Primitive{}  -> newGlobalID ns
         IWord{}      -> newGlobalID ns
+        -- LLVMPrimitive{} -> 
             {-( nsNextPrimitiveId ns
             , incGlobal ns{nsNextPrimitiveId = nsNextPrimitiveId ns + 1})-}
   where

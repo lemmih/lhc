@@ -2,7 +2,6 @@
 module Data.Bedrock.Simplify.DCE (deadCodeElimination) where
 
 import Data.Bedrock
-import Data.List
 import Data.Graph
 import Data.Maybe
 
@@ -22,7 +21,7 @@ deadCodeElimination m =
         , fromJust (toVertex name) `elem` live]
       }
   where
-    (graph, fromVertex, toVertex) = graphFromEdges (moduleGraph m)
+    (graph, _fromVertex, toVertex) = graphFromEdges (moduleGraph m)
     live = reachable graph (fromJust $ toVertex $ entryPoint m)
 
 moduleGraph :: Module -> [(Name, Name, [Name])]
@@ -57,4 +56,5 @@ moduleGraph m =
         MkNode (FunctionName fn _) _ -> [fn]
         _ -> []
 
+mkForeign :: String -> Name
 mkForeign str = Name ["foreign"] str 0

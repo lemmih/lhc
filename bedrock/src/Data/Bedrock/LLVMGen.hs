@@ -12,7 +12,6 @@ import qualified Data.Map                   as Map
 import           Data.Set                   (Set)
 import qualified Data.Set                   as Set
 import           Data.String
-import           Data.Word
 import           LLVM.AST                   as LLVM
 import           LLVM.AST.CallingConvention as LLVM
 import qualified LLVM.AST.Constant          as Constant

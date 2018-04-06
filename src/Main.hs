@@ -1,14 +1,12 @@
 module Main (main) where
 
-import           Data.Graph                         (SCC (..), flattenSCC,
+import           Data.Graph                         (SCC (..),
                                                      stronglyConnComp)
 import           Data.Tagged
 import           Language.Haskell.Exts
-import           Language.Haskell.TypeCheck.Pretty  (displayIO, pretty,
-                                                     renderPretty)
+import           Language.Haskell.TypeCheck.Pretty  (pretty)
 import           System.Exit
 import           System.FilePath
-import           System.IO                          (stdout)
 
 import           Language.Haskell.TypeCheck
 import           Language.Haskell.Scope             hiding (Interface)
@@ -17,21 +15,17 @@ import qualified Compiler.Core                      as Core
 import qualified Compiler.Core.DCE                  as Core
 import qualified Compiler.Core.NewType              as NewType
 import qualified Compiler.Core.SimpleEta            as Core
-import qualified Compiler.Core.SimpleInline         as Core
 import qualified Compiler.Core.Simplify             as Core
-import qualified Compiler.Core.Unique               as Core
 import qualified Compiler.CoreToBedrock             as Core
 import qualified Compiler.HaskellToCore             as Haskell
 import           Compiler.Interface
 import           Control.Monad
 import           Data.Bedrock                       (Name (..))
 import qualified Data.Bedrock.Compile               as Bedrock
-import           Data.Bedrock.PrettyPrint
 import           Data.Binary
 import           Data.IORef
 import           Data.List                          (intercalate)
 import           Data.Monoid                        (mconcat)
-import           Data.Proxy
 import qualified Distribution.ModuleName            as Dist
 import           Options.Applicative
 import           System.Directory
@@ -42,9 +36,6 @@ import           Distribution.InstalledPackageInfo  (ExposedModule (..),
                                                      InstalledPackageInfo,
                                                      exposedModules,
                                                      libraryDirs)
-import           Distribution.Package               (InstalledPackageId (..))
-import           Distribution.Simple.Compiler
-import           Distribution.Types.UnitId
 import           Distribution.Version
 
 import           Paths_lhc
@@ -52,6 +43,7 @@ import           Paths_lhc
 main :: IO ()
 main = Compiler.customMain customCommands lhcCompiler
 
+customCommands :: Parser (IO ())
 customCommands = hsubparser (buildCommand)
   where
     buildCommand = command "build" (info build idm)
@@ -81,6 +73,7 @@ moduleFile m =
     case m of
         Module _ (Just (ModuleHead _ (ModuleName _ modName) _ _)) _ _ _ ->
             replace '.' pathSeparator modName
+        _ -> error "Urk"
   where
     replace a b lst = [ if c == a then b else c | c <- lst ]
 

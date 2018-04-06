@@ -169,7 +169,7 @@ convertTcType tcTy =
     TC.TyApp{} -> NodePtr
     TC.TyUndefined -> NodePtr
     _ -> NodePtr
-    _ -> error $ "CoreToBedrock: Unknown type: " ++ show tcTy
+    -- _ -> error $ "CoreToBedrock: Unknown type: " ++ show tcTy
 
 setProgramExit :: Block -> Block
 setProgramExit block =
@@ -263,6 +263,7 @@ newtypeSubstitution (IsNewType var) =
       case collect [] b of
         (TC.TyCon newtypeName, conArgs) -> (newtypeName, \args -> subst (zip conArgs args) a)
         _ -> error "Weird newtype"
+    split _ = error "Urk: Weird newtype"
     subst s ty =
       case lookup ty s of
         Just ty' -> ty'
@@ -363,12 +364,6 @@ convertExpr lazy expr rest =
     UnboxedTuple args -> do
       tmp <- newVariable [] "unboxed" Node
       convertExprs args rest
-    UnboxedTuple args -> do
-      tmp <- newVariable [] "unboxed" Node
-      convertExprs args $ \args' -> do
-        Bind [tmp] (MkNode UnboxedTupleName args')
-          <$> rest [tmp]
-    -- WithCoercion _ e -> convertExpr lazy e rest
     _ | (Con con, coercion, args) <- collectApps expr ->
       convertExprs args $ \args' -> do
         tmp <- newVariable [] "con" NodePtr
@@ -393,7 +388,7 @@ convertExpr lazy expr rest =
               <$> rest [tmp]
           Nothing | null args -> do
             rest [v']
-          Nothing -> do
+          _Nothing -> do
             body <- do
               tmp <- deriveVariable v' "eval" NodePtr
               Bind [tmp] (Eval v') <$>
@@ -455,9 +450,9 @@ convertExpr lazy expr rest =
     Core.Case scrut var Nothing [Core.Alt (Core.UnboxedPat binds) branch]  ->
       convertExpr False scrut $ \vals -> do
         binds' <- mapM convertVariable binds
-        let worker [] [] = convertExpr False branch rest
-            worker (x:xs) (y:ys) = Bind [x] (TypeCast y) <$> worker xs ys
-        worker binds' vals
+        let worker [] = convertExpr False branch rest
+            worker ((x,y):xs) = Bind [x] (TypeCast y) <$> worker xs
+        worker (zip binds' vals)
     Core.Case scrut var Nothing alts | not lazy ->
       convertExpr False scrut $ \[val] ->
         if variableType val == NodePtr
@@ -514,7 +509,7 @@ convertExpr lazy expr rest =
     WithProof _proof e -> convertExpr lazy e rest
 
     _ | lazy -> error $ "C->B convertExpr: " ++ show (lazy, expr)
-    _ | not lazy ->
+    _ -> -- not lazy
       convertExpr True expr $ \[val] -> do
       tmp <- deriveVariable val "eval" NodePtr
       Bind [tmp] (Eval val)
@@ -573,6 +568,7 @@ convertLiteral lit = pure $
         LitString s -> LiteralString s
         LitInt i -> LiteralInt i
         LitVoid  -> LiteralInt 0
+        _ -> error "Urk: literals"
         -- LitWord Integer
         -- LitFloat Rational
         -- LitDouble Rational

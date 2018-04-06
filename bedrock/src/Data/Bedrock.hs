@@ -76,9 +76,9 @@ module Data.Bedrock where
 import           Control.Applicative (pure, (<$>), (<*>))
 import           Data.Data
 import           GHC.Generics
-import qualified LLVM.AST.Type       as LLVM
+-- import qualified LLVM.AST.Type       as LLVM
 import           Test.QuickCheck     (Arbitrary (..), elements, listOf, listOf1,
-                                      oneof, suchThat)
+                                      oneof, suchThat, Gen)
 
 data Name = Name
   { nameModule     :: [String]
@@ -92,7 +92,7 @@ data Type
   | StaticNode NodeSize
   | IWord
   | Primitive CType
-  | LLVMPrimitive LLVM.Type
+  -- | LLVMPrimitive LLVM.Type
   | FramePtr
   deriving (Show, Read, Eq, Ord, Data, Generic)
 data Variable = Variable
@@ -317,6 +317,7 @@ instance Arbitrary MemAttributes where
     <$> arbitrary
     <*> arbitrary
 
+plainIdentifier :: Gen String
 plainIdentifier = listOf1 (elements ['a'..'z'])
 
 instance Arbitrary Expression where

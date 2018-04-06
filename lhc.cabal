@@ -31,6 +31,7 @@ Executable lhc
    Compiler.CoreToBedrock
    Compiler.HaskellToCore
    Compiler.Interface
+   Paths_lhc
  Hs-Source-Dirs:     src
  ghc-prof-options:   -auto-all
  build-depends:      base == 4.*,
@@ -55,7 +56,9 @@ Executable lhc
 
 
  ghc-options:        -fwarn-unused-imports -fwarn-unused-binds
-                     -fwarn-incomplete-patterns
+                     -fwarn-incomplete-patterns -fwarn-missing-signatures
+                     -fwarn-tabs
+                     -Werror
  Default-language:   Haskell2010
  Extensions:
 

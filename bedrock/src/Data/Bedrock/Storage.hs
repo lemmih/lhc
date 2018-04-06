@@ -2,7 +2,6 @@
 module Data.Bedrock.Storage
     ( lowerAlloc ) where
 
-import           Control.Applicative    (pure, (<$>), (<*>))
 import           Control.Monad.State
 import qualified Data.Map               as Map
 import qualified Data.Set               as Set
@@ -152,13 +151,13 @@ transformExpresion origin binds simple rest =
                 zippedScope = zip scope markedScope
                 markScope (var, markedVar) = Bind [markedVar] $
                     case variableType var of
-                        NodePtr   -> GCMark var
-                        Node{}    -> GCMarkNode var
-                        -- Application gcMarkNodeName [var]
-                        Primitive{}-> TypeCast var
+                        NodePtr     -> GCMark var
+                        Node{}      -> GCMarkNode var
+                        Primitive{} -> TypeCast var
+                        IWord{}     -> TypeCast var
                         -- This shouldn't really happen
                         StaticNode{} -> GCMarkNode var
-                        FramePtr  -> GCMark var
+                        FramePtr     -> GCMark var
 
                 divertBody =
                     Bind [] GCBegin $

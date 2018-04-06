@@ -1,13 +1,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Bedrock.Rename (unique, locallyUnique) where
 
-import           Control.Applicative  (Applicative, pure, (<$>), (<*>))
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.List            (elemIndex)
 import           Data.Map             (Map)
 import qualified Data.Map             as Map
-import           Data.Monoid
 
 import           Data.Bedrock
 import           Data.Bedrock.Misc
@@ -354,9 +352,9 @@ locallyBlock block =
       Invoke
         <$> locallyResolveVariable fn
         <*> mapM locallyResolveVariable args
-    -- InvokeHandler Variable Variable
     Exit -> return block
     Panic{} -> return block
+    InvokeHandler{} -> return block
 
 locallyAlternative :: Alternative -> LUniq Alternative
 locallyAlternative (Alternative pattern branch) = -- limitScope $
@@ -448,3 +446,4 @@ locallyExpression expr =
     GCEnd -> pure expr
     GCMark arg -> GCMark <$> locallyResolveVariable arg
     GCMarkNode arg -> GCMarkNode <$> locallyResolveVariable arg
+    Catch{} -> pure expr

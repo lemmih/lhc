@@ -78,10 +78,6 @@ runM anns action =
     vars = case out of Empty -> []; Limit lst -> lst
     env = (anns, vars)
 
-withArgumments :: Name -> [Variable] -> M a -> M a
-withArgumments fn args =
-  local (\(anns, vars) -> (Map.insert fn args anns, vars))
-
 lookupArguments :: Name -> M [Variable]
 lookupArguments fn = asks $ \(anns, _) ->
   Map.findWithDefault [] fn anns

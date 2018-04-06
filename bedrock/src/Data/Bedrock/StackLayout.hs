@@ -6,14 +6,11 @@ module Data.Bedrock.StackLayout
 import           Control.Applicative    (Applicative, pure, (<$>), (<*>))
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Data.Map               (Map)
-import qualified Data.Map               as Map
-import qualified Data.Set as Set
-import Data.List
-import Data.Ord
+import           Data.List
+import           Data.Ord
+import qualified Data.Set               as Set
 
 import           Data.Bedrock
-import           Data.Bedrock.Misc
 import           Data.Bedrock.Transform (freeVariables)
 
 data Env = Env
@@ -65,17 +62,13 @@ lowerBlock block =
       Exit -> pure Exit
       Panic msg -> pure $ Panic msg
       Return vars -> pure $ Return vars
-      -- _ -> return block
+      Raise{} -> pure block
+      Invoke{} -> pure block
+      InvokeHandler{} -> pure block
 
 lowerAlternative :: Alternative -> M Alternative
 lowerAlternative (Alternative pattern branch) =
     Alternative pattern <$> lowerBlock branch
-
-
-lowerExpression :: Expression -> M Expression
-lowerExpression expr =
-    case expr of
-        _ -> pure expr
 
 
 --------------------------------------------------------
@@ -97,7 +90,7 @@ allotStackPositions free action = do
       action newAllotted
 
 saveVariables :: [(Variable, Int)] -> M Block -> M Block
-saveVariables [] fn = fn
+saveVariables [] fn           = fn
 saveVariables ((var,n):xs) fn = Bind [] (Save var n) <$> saveVariables xs fn
 
 restoreVariables :: [(Variable,Int)] -> M Block -> M Block

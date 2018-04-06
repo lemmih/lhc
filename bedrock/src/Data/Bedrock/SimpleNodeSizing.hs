@@ -1,14 +1,11 @@
+{-# LANGUAGE PatternGuards #-}
 module Data.Bedrock.SimpleNodeSizing (lowerNodeSize) where
 
 import           Control.Monad
 import           Control.Monad.State
-import qualified Data.IntSet            as IntSet
 import qualified Data.Map               as Map
-import qualified Data.Vector            as Vectorg
 
 import           Data.Bedrock
-import           Data.Bedrock.HPT
-import           Data.Bedrock.Misc
 import           Data.Bedrock.Transform
 
 lowerNodeSize :: Gen ()

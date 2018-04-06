@@ -5,29 +5,27 @@ import           System.FilePath
 import           Text.ParserCombinators.Parsec     (parseFromFile)
 import           Text.Printf
 
-import           Data.Bedrock.EvalApply
-import qualified Data.Bedrock.SimpleEvalApply as Simple
 import           Data.Bedrock.Exceptions
 import           Data.Bedrock.GlobalVariables
 import           Data.Bedrock.HPT
+import qualified Data.Bedrock.SimpleEvalApply      as Simple
 -- import           Data.Bedrock.Invoke
+import           Data.Bedrock
+import           Data.Bedrock.InlineByCost
 import           Data.Bedrock.LLVM                 as LLVM
 import           Data.Bedrock.Parse
-import           Data.Bedrock.InlineByCost
 import           Data.Bedrock.PrettyPrint
 import           Data.Bedrock.RegisterIntroduction
 import           Data.Bedrock.Rename
+import qualified Data.Bedrock.SimpleNodeSizing     as Simple
 import           Data.Bedrock.Simplify
-import           Data.Bedrock.Simplify.LocalDCE
 import           Data.Bedrock.Simplify.DCE
-import           Data.Bedrock.VoidElimination
-import qualified Data.Bedrock.StackLayout as StackLayout
-import           Data.Bedrock
-import           Data.Bedrock.NodeSizing
-import qualified Data.Bedrock.SimpleNodeSizing as Simple
+import           Data.Bedrock.Simplify.LocalDCE
+import qualified Data.Bedrock.StackLayout          as StackLayout
 import           Data.Bedrock.Storage
 import           Data.Bedrock.Storage.Fixed
 import           Data.Bedrock.Storage.Pluggable
+import           Data.Bedrock.VoidElimination
 
 -- Compile options
 type KeepIntermediateFiles = Bool

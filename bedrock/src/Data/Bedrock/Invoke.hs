@@ -1,18 +1,17 @@
 module Data.Bedrock.Invoke
     ( lowerInvoke ) where
 
-import           Control.Applicative     (pure, (<$>), (<*>))
 import           Control.Monad.State
+import qualified Data.IntSet             as IntSet
+import           Data.List
 import qualified Data.Map                as Map
-import qualified  Data.IntSet as IntSet
 import qualified Data.Vector             as Vector
-import Data.List
 
 import           Data.Bedrock
+import           Data.Bedrock.Exceptions (isCatchFrame)
 import           Data.Bedrock.HPT
 import           Data.Bedrock.Misc
 import           Data.Bedrock.Transform
-import           Data.Bedrock.Exceptions (isCatchFrame)
 
 
 -- Lower calls to @Invoke and @InvokeHandler
@@ -145,6 +144,3 @@ traverseAlternative hpt origin alternative =
     case alternative of
         Alternative pattern branch ->
             Alternative pattern <$> traverseBlock hpt origin branch
-
-
-

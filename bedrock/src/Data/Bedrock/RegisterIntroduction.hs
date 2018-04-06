@@ -240,3 +240,7 @@ uniqExpression expr =
         Address{} -> pure expr
         ReadRegister{} -> pure expr
         WriteRegister{} -> pure expr
+        BumpHeapPtr{} -> pure expr
+        FunctionPointer{} -> pure expr
+        Save{} -> pure expr
+        Restore{} -> pure expr

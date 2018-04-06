@@ -44,8 +44,9 @@ import           Data.Bedrock.Rename
 
 import           Data.Bedrock.PrettyPrint     ()
 
-import Debug.Trace
+-- import Debug.Trace
 
+(!!!) :: Vector p -> Int -> String -> p
 vector !!! idx = \ident ->
     if Vector.length vector <= idx
     then error $ "Invalid index: " ++ ident ++ ": " ++ show (Vector.length vector, idx)
@@ -290,6 +291,7 @@ sizeOfVariable hpt var =
         StaticNode n -> n
         Primitive CVoid -> 0
         Primitive{}  -> 1
+        IWord        -> 1
   where
     objects = (hptNodeScope hpt !!! variableIndex var) "objects"
 
@@ -510,6 +512,7 @@ hptAlternative origin scrut (Alternative pattern branch) = do
                 let vals = IntSet.toList (extract objects name nth)
                 case variableType arg of
                     Primitive{} -> return ()
+                    IWord       -> return ()
                     NodePtr   ->
                         forM_ vals $ \ptr -> do
                             setOfPtrs <- getPtrScope' ptr
@@ -666,6 +669,7 @@ hptExpression origin binds simple =
                 ConstructorName name _ -> do
                     args <- getNodeArgumentRegisters name
                     forM_ (zip vars args) $ uncurry hptCopyVariables
+                UnboxedTupleName -> return ()
         Fetch _constant ptrRef | [node] <- binds ->
             eachIteration $
                 setNodeScope node =<< getHeapSetObjects =<< getPtrScope ptrRef
@@ -820,3 +824,4 @@ analyseUsage m =
             GCEnd{}                -> return ()
             GCMark var             -> push var
             GCMarkNode var         -> push var
+            _                      -> return ()

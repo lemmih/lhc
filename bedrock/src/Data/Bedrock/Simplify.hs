@@ -227,8 +227,8 @@ bindVariable old new fn = do
           })
         fn
 
-lookupConstant :: Variable -> M (Maybe (NodeName, [Variable]))
-lookupConstant var = do
+_lookupConstant :: Variable -> M (Maybe (NodeName, [Variable]))
+_lookupConstant var = do
     var' <- resolve var
     m <- asks envConstant
     return $ Map.lookup var' m

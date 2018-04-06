@@ -3,14 +3,10 @@ module Compiler.Core.Unique
 
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import           Data.Graph
 import           Control.Monad.Reader
 import           Control.Monad.State
 
 import           Compiler.Core
-import           Compiler.Core.FreeVariables
 import           Data.Bedrock                (Name(..))
 
 
@@ -69,8 +65,7 @@ uniqueExpr expr =
     Cast e ty ->
       Cast <$> uniqueExpr e <*> pure ty
     Id -> pure Id
-    -- WithCoercion c e ->
-    --   WithCoercion c <$> uniqueExpr e
+    WithProof p e -> WithProof p <$> uniqueExpr e
 
 uniqueAlt :: Alt -> M Alt
 uniqueAlt (Alt pattern e) =

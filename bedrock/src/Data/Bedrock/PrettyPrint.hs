@@ -2,10 +2,10 @@
 module Data.Bedrock.PrettyPrint where
 
 import           Data.List
-import           Text.PrettyPrint.ANSI.Leijen (Doc, char, int, text, (<+>),
-                                               (<>), list, parens)
-import qualified Text.PrettyPrint.ANSI.Leijen as Doc
 import           Language.Haskell.TypeCheck.Pretty
+import           Text.PrettyPrint.ANSI.Leijen      (Doc, char, int, text, (<+>),
+                                                    (<>))
+import qualified Text.PrettyPrint.ANSI.Leijen      as Doc
 
 import           Data.Bedrock
 
@@ -51,7 +51,7 @@ instance Pretty Variable where
 ppLiteral :: Literal -> Doc
 ppLiteral literal =
   case literal of
-    LiteralInt i -> Doc.integer i
+    LiteralInt i      -> Doc.integer i
     LiteralString str -> Doc.text (show str)
 
 ppNode :: NodeName -> [Doc] -> Doc
@@ -84,7 +84,7 @@ instance Pretty MemAttributes where
   pretty MemAttributes{ memConstant = constant, memAliasGroup = g} =
     if constant then ppSyntax "constant" else Doc.empty <+>
     case g of
-      Nothing -> Doc.empty
+      Nothing    -> Doc.empty
       Just group -> ppSyntax "alias" <> Doc.char ':' <> Doc.int group
 
 ppExpression :: Expression -> Doc
@@ -203,11 +203,11 @@ ppFnName :: Name -> Doc
 ppFnName = Doc.blue . pretty
 
 ppTypes :: [Type] -> Doc
-ppTypes [] = text "void"
+ppTypes []  = text "void"
 ppTypes lst = Doc.hsep $ map pretty lst
 
 instance Pretty Attribute where
-  pretty NoCPS = text "NoCPS"
+  pretty NoCPS    = text "NoCPS"
   pretty Internal = text "Internal"
 
 ppFunction :: Function -> Doc

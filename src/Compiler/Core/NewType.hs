@@ -1,7 +1,6 @@
-module Compiler.Core.NewType where
+module Compiler.Core.NewType (lower) where
 
 import Compiler.Core
-import Language.Haskell.TypeCheck
 
 lower :: Module -> Module
 lower m = m

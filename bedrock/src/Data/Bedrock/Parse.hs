@@ -1,6 +1,5 @@
 module Data.Bedrock.Parse where
 
-import           Control.Applicative                    (pure, (<$>), (<*>))
 import           Control.Monad                          (guard)
 import           Data.Char
 import           Data.Maybe

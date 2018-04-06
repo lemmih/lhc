@@ -2,15 +2,11 @@ module Data.Bedrock.SimpleEvalApply (lowerEvalApply) where
 
 import           Control.Monad
 import           Control.Monad.State
-import qualified Data.IntSet            as IntSet
 import qualified Data.Map               as Map
 import           Data.Set               (Set)
 import qualified Data.Set               as Set
-import qualified Data.Vector            as Vectorg
 
 import           Data.Bedrock
-import           Data.Bedrock.HPT
-import           Data.Bedrock.Misc
 import           Data.Bedrock.Transform
 
 {-
@@ -98,6 +94,7 @@ mkApplyFn ((retTys, arg), nodeNames) = do
     worker (ConstructorName con n) args = Store (ConstructorName con (n-1)) args
     worker (FunctionName fn 1) args = Application fn args
     worker (FunctionName fn n) args = Store (FunctionName fn (n-1)) args
+    worker UnboxedTupleName _ = error "Urk: UnboxedTupleName"
 
 applyPairs :: Gen [(([Type], Type), [(NodeName, [Type])])]
 applyPairs = do

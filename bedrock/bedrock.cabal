@@ -52,8 +52,11 @@ library
                        filepath, QuickCheck, text,
                        haskell-tc
 
-  ghc-options:         -fwarn-incomplete-patterns -fwarn-unused-binds
-                       -fwarn-unused-imports
+  ghc-options:        -fwarn-unused-imports -fwarn-unused-binds
+                      -fwarn-incomplete-patterns -fwarn-missing-signatures
+                      -fwarn-tabs
+                      -Werror
+
 
 executable bedrock
   main-is:             cli/Main.hs

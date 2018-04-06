@@ -1,35 +1,30 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase                 #-}
 module Compiler.HaskellToCore
     ( convert
     ) where
 
 import           Control.Monad.Reader
-import           Control.Monad.RWS                (RWS, execRWS)
+import           Control.Monad.RWS          (RWS, execRWS)
 import           Control.Monad.State
-import           Control.Monad.Writer             (MonadWriter (..))
-import           Data.List                        (transpose)
-import           Data.Map                         (Map)
-import qualified Data.Map                         as Map
+import           Control.Monad.Writer       (MonadWriter (..))
+import           Data.List                  (transpose)
+import           Data.Map                   (Map)
+import qualified Data.Map                   as Map
 import           Data.Maybe
-import qualified Data.Set                         as Set
-import qualified Language.Haskell.Exts  as HS
+import qualified Language.Haskell.Exts      as HS
 
 import           Compiler.Core
-import           Data.Bedrock                     (AvailableNamespace (..),
-                                                   CType (..), Foreign (..),
-                                                   Name (..), Type (..))
+import           Data.Bedrock               (AvailableNamespace (..),
+                                             CType (..), Foreign (..),
+                                             Name (..))
 import           Data.Bedrock.Misc
-import           Language.Haskell.Scope           (Entity (..),
-                                                   NameInfo (..),
-                                                   QualifiedName (..))
-import qualified Language.Haskell.Scope           as Scope
+import           Language.Haskell.Scope     (Entity (..), NameInfo (..),
+                                             QualifiedName (..))
+import qualified Language.Haskell.Scope     as Scope
 import           Language.Haskell.TypeCheck (TcEnv (..))
-import           Language.Haskell.TypeCheck (Coercion (..), Qualified (..),
-                                                   TcVar(..),Predicate(..), Typed)
+import           Language.Haskell.TypeCheck (Qualified (..), TcVar (..), Typed)
 import qualified Language.Haskell.TypeCheck as TC
-
-import           Debug.Trace
 
 data Scope = Scope
     { scopeVariables    :: Map Entity Name
@@ -125,7 +120,7 @@ nameInfo :: HS.Annotated ast => ast Typed -> Scope.NameInfo
 nameInfo ast =
   case HS.ann ast of
     TC.Coerced info _src _proof -> info
-    TC.Scoped info _src -> info
+    TC.Scoped info _src         -> info
 
 bindName :: HS.Name Typed -> M Name
 bindName hsName =
@@ -165,6 +160,7 @@ lookupType hsName = do
             case Map.lookup entity (tcEnvValues tcEnv) of
                 Nothing -> error "Missing type info"
                 Just ty -> return ty
+        _ -> error "Urk"
 
 bindConstructor :: HS.Name Typed -> Int -> M Name
 bindConstructor dataCon arity =
@@ -192,7 +188,7 @@ resolveName hsName =
         --     asks $ Map.findWithDefault scopeError gname . scopeVariables
         --Scope.Global gname ->
         --    asks $ Map.findWithDefault scopeError gname . scopeConstructors
-        _ -> error "resolveName"
+        _ -> scopeError
   where
     scopeError = error $ "resolveName: Not in scope: " ++
                     getNameIdentifier hsName
@@ -218,12 +214,6 @@ resolveQName qname =
         HS.Special _ HS.Cons{}    -> return consCon
         -- HS.Special _ HS.ListCon{} -> return nilCon
         _ -> error $ "HaskellToCore.resolveQName: " ++ show qname
-
-unQName :: HS.QName Typed -> HS.Name Typed
-unQName qname =
-    case qname of
-        HS.Qual _ _ name -> name
-        HS.UnQual _ name -> name
 
 -- XXX: Ugly, ugly code.
 -- resolveQGlobalName :: HS.QName Origin -> M Name
@@ -300,12 +290,12 @@ matchArgNames :: [HS.Match Typed] -> [Maybe (HS.Name Typed)]
 matchArgNames = map collapse . transpose . map worker
   where
     collapse = listToMaybe . catMaybes
-    worker (HS.Match _ _ pats _ _) = map fromPat pats
+    worker (HS.Match _ _ pats _ _)          = map fromPat pats
     worker (HS.InfixMatch _ pat _ pats _ _) = map fromPat (pat:pats)
-    fromPat (HS.PVar _ name) = Just name
+    fromPat (HS.PVar _ name)     = Just name
     fromPat (HS.PAsPat _ name _) = Just name
-    fromPat (HS.PParen _ pat) = fromPat pat
-    fromPat _ = Nothing
+    fromPat (HS.PParen _ pat)    = fromPat pat
+    fromPat _                    = Nothing
 
 convertDecl :: HS.Decl Typed -> M ()
 convertDecl decl =
@@ -318,7 +308,7 @@ convertDecl' decl =
       let mbProof =
             case tyDecl of
               TC.Coerced _ _ proof -> WithProof proof
-              TC.Scoped{} -> id
+              TC.Scoped{}          -> id
       let name = matchInfo matches
           fnArgNames = matchArgNames matches
           -- arity = length fnArgNames
@@ -337,23 +327,6 @@ convertDecl' decl =
           <*> (mbProof . Lam args
                   <$> convertMatches args matches)
       return [decl]
-    -- HS.FunBind _ [HS.Match _ name pats rhs _] -> do
-    --     -- let Origin _ src = HS.ann name
-    --     -- coercion <- findCoercion src
-    --     decl <- Decl
-    --         <$> lookupType name
-    --         <*> bindName name
-    --         <*> ({-WithCoercion coercion <$> -} convertPats pats rhs)
-    --     return [decl]
-    HS.FunBind _ [HS.InfixMatch _ leftPat name rightPats rhs _] -> do
-        -- let Origin _ src = HS.ann name
-        -- coercion <- findCoercion src
-        decl <- Decl
-            <$> lookupType name
-            <*> bindName name
-            <*> ({-WithCoercion coercion
-                    <$> -} convertPats (leftPat:rightPats) rhs)
-        return [decl]
     HS.PatBind _ (HS.PVar _ name) rhs _binds -> do
         decl <- Decl
             <$> lookupType name
@@ -386,9 +359,10 @@ convertDecl' decl =
     HS.TypeSig{} -> return []
     _ -> error $ "Compiler.HaskellToCore.convertDecl: " ++ show decl
 
+isPrimitive :: String -> Bool
 isPrimitive "realworld#" = True
-isPrimitive "cast" = True
-isPrimitive _ = False
+isPrimitive "cast"       = True
+isPrimitive _            = False
 
 convertMatches :: [Variable] -> [HS.Match Typed] -> M Expr
 convertMatches args [] = error "Compiler.HaskellToCore.convertMatches"
@@ -407,6 +381,7 @@ convertMatches args (HS.Match _ _ pats rhs mbBinds:xs)
         e <- convertAltPats (zip args pats) (Just $ Var restBranch) =<<
                 convertRhs rhs
         return $ Let (NonRec restBranch rest) e
+convertMatches args _ = error "Urk"
 
 convertAltPats :: [(Variable, HS.Pat Typed)] -> Maybe Expr -> Expr -> M Expr
 convertAltPats conds failBranch successBranch =
@@ -435,14 +410,14 @@ convertConDecl isNewtype con =
         HS.ConDecl _ name tys -> do
 
             u <- newUnique
-            let mkCon = Name [] ("mk" ++ getNameIdentifier name) u
+            -- let mkCon = Name [] ("mk" ++ getNameIdentifier name) u
 
             conName <- bindConstructor name (length tys)
 
             argNames <- replicateM (length tys) (newName "arg")
             ty <- lookupType name
             let con = Variable conName ty
-            let args = zipWith Variable argNames (splitTy ty)
+            -- let args = zipWith Variable argNames (splitTy ty)
             -- pushDecl $ Decl ty mkCon (Lam args $ Con conName args)
 
             -- pushNode $ NodeDefinition conName (init $ splitTy ty)
@@ -453,9 +428,10 @@ convertConDecl isNewtype con =
         _ -> error "convertCon"
 
 -- XXX: Temporary measure. 2014-07-11
+splitTy :: TC.Type -> [TC.Type]
 splitTy (TC.TyForall _ (_ :=> ty)) = splitTy ty
-splitTy (TC.TyFun a b) = a : splitTy b
-splitTy ty = [ty]
+splitTy (TC.TyFun a b)             = a : splitTy b
+splitTy ty                         = [ty]
 
 -- applyCoercion :: Coercion -> TcType -> TcType
 -- applyCoercion (CoerceAbs new) (TcForall old (ctx :=> ty)) =
@@ -512,32 +488,6 @@ toCType ty =
 --         HS.UnBangedTy _ ty -> convertType ty
 --         HS.BangedTy _ ty -> convertType ty
 --         _ -> error "convertBangType"
-
-convertType :: HS.Type Typed -> M Type
-convertType ty =
-    case ty of
-        --HS.TyCon _ qname
-        --    | toGlobalName qname == GlobalName "Main" "I8"
-        --    -> pure $ Primitive I8
-        --    | toGlobalName qname == GlobalName "Main" "I32"
-        --    -> pure $ Primitive I32
-        --    | toGlobalName qname == GlobalName "Main" "I64"
-        --    -> pure $ Primitive I64
-        --    | toGlobalName qname == GlobalName "Main" "RealWorld"
-        --    -> pure NodePtr -- $ Primitive CVoid
-        --HS.TyApp _ (HS.TyCon _ qname) sub
-        --    | toGlobalName qname == GlobalName "Main" "Addr"
-        --    -> do
-        --        subTy <- convertType sub
-        --        case subTy of
-        --            Primitive p -> pure $ Primitive (CPointer p)
-        --            _ -> error "Addr to non-primitive type"
-        HS.TyParen _ sub ->
-            convertType sub
-        HS.TyVar{} -> pure NodePtr
-        HS.TyCon{} -> pure NodePtr
-        HS.TyFun{} -> pure NodePtr
-        _ -> error $ "convertType: " ++ show ty -- pure NodePtr
 
 
 -- cfun :: Addr I8 -> IO ()
@@ -616,18 +566,11 @@ ffiTypes = worker []
             _ -> (reverse acc, False, ty)
             --_ -> error "ffiArguments"
 
-convertPats :: [HS.Pat Typed] -> HS.Rhs Typed -> M Expr
-convertPats [] rhs = convertRhs rhs
-convertPats pats rhs =
-    Lam <$> sequence [ bindVariable name
-                    | HS.PVar _ name <- pats ]
-        <*> (convertRhs rhs)
-
 convertRhs :: HS.Rhs Typed -> M Expr
 convertRhs rhs =
     case rhs of
         HS.UnGuardedRhs _ expr -> convertExp expr
-        _ -> error "convertRhs"
+        _                      -> error "convertRhs"
 
 convertStmts :: [HS.Stmt Typed] -> M Expr
 convertStmts [] = error "convertStmts: Empty list"
@@ -635,7 +578,7 @@ convertStmts [end] =
     case end of
         -- HS.Generator _ pat expr
         HS.Qualifier _ expr -> convertExp expr
-        _ -> error $ "convertStmts: " ++ show end
+        _                   -> error $ "convertStmts: " ++ show end
 convertStmts (x:xs) =
     case x of
         HS.Generator _ (HS.PVar _ name) expr -> do
@@ -649,6 +592,7 @@ convertStmts (x:xs) =
             rest <- convertStmts xs
             -- coercion <- findCoercion src
             return $ {-WithCoercion coercion-} primThenIO `App` expr' `App` rest
+        _ -> error "Urk: statement"
 
 primThenIO :: Expr
 primThenIO = Var (Variable name ty)
@@ -657,7 +601,6 @@ primThenIO = Var (Variable name ty)
     ty = TC.TyForall [aRef, bRef] ([] :=> (ioA `TC.TyFun` ioB `TC.TyFun` ioB))
     aRef = TcVar "a" []
     bRef = TcVar "b" []
-    io = TC.TyCon (QualifiedName "LHC.Prim" "IO")
     ioA = io `TC.TyApp` TC.TyRef aRef
     ioB = io `TC.TyApp` TC.TyRef bRef
 
@@ -668,7 +611,6 @@ primBindIO = Var (Variable name ty)
     ty = TC.TyForall [aRef, bRef] ([] :=> (ioA `TC.TyFun` ioAB `TC.TyFun` ioB))
     aRef = TcVar "a" []
     bRef = TcVar "b" []
-    io = TC.TyCon (QualifiedName "LHC.Prim" "IO")
     ioA = io `TC.TyApp` TC.TyRef aRef
     ioB = io `TC.TyApp` TC.TyRef bRef
     ioAB = TC.TyRef aRef `TC.TyFun` ioB
@@ -687,12 +629,12 @@ findProof :: HS.QName Typed -> Expr -> Expr
 findProof name =
     case tyDecl of
       TC.Coerced _ _ proof -> WithProof proof
-      TC.Scoped{} -> id
+      TC.Scoped{}          -> id
   where
     tyDecl =
       case name of
         HS.UnQual _ qname -> HS.ann qname
-        _ -> HS.ann name
+        _                 -> HS.ann name
 
 convertExp :: HS.Exp Typed -> M Expr
 convertExp expr =
@@ -761,20 +703,21 @@ convertAlts scrut (HS.Alt _ pat rhs Nothing:alts) = do
         else do
             e <- convertAltPat scrut (Just $ Var restBranch) pat =<< convertRhs rhs
             return $ Let (NonRec restBranch rest) e
+convertAlts _ _ = error "Urk: alt"
 
 isSimplePat :: HS.Pat Typed -> Bool
 isSimplePat pat =
     case pat of
-        HS.PApp _ name pats -> all isPVar pats
+        HS.PApp _ name pats     -> all isPVar pats
         HS.PInfixApp _ a name b -> all isPVar [a,b]
-        HS.PVar{} -> True
-        HS.PLit{} -> True
-        HS.PParen _ pat' -> isSimplePat pat'
-        HS.PList _ pats -> all isPVar pats
-        _ -> False
+        HS.PVar{}               -> True
+        HS.PLit{}               -> True
+        HS.PParen _ pat'        -> isSimplePat pat'
+        HS.PList _ pats         -> all isPVar pats
+        _                       -> False
   where
     isPVar HS.PVar{} = True
-    isPVar _ = False
+    isPVar _         = False
 
 convertAltPat :: Variable -> Maybe Expr -> HS.Pat Typed -> Expr -> M Expr
 convertAltPat scrut failBranch pat successBranch =
@@ -821,8 +764,8 @@ convertAltPat scrut failBranch pat successBranch =
             return $ Case (Var scrut) scrut failBranch [alt]
         _ -> error $ "Compiler.HaskellToCore.convertAltPat: " ++ show pat
 
-convertAlt :: HS.Alt Typed -> M Alt
-convertAlt alt =
+_convertAlt :: HS.Alt Typed -> M Alt
+_convertAlt alt =
     case alt of
         HS.Alt _ (HS.PApp _ name pats) rhs Nothing -> do
             args <- sequence [ Variable <$> bindName var <*> lookupType var
@@ -849,7 +792,7 @@ convertLiteralToExpr lit =
         HS.PrimInt _ int _    -> Lit $ LitInt int
         HS.PrimChar _ char _  -> Lit $ LitChar char
         HS.String _ str _     -> App unpackString (Lit $ LitString str)
-        _ -> error $ "convertLiteral: " ++ show lit
+        _                     -> error $ "convertLiteral: " ++ show lit
 
 convertLiteral :: HS.Literal Typed -> Literal
 convertLiteral lit =
@@ -857,13 +800,13 @@ convertLiteral lit =
         HS.PrimString _ str _ -> LitString str
         HS.PrimInt _ int _    -> LitInt int
         HS.PrimChar _ char _  -> LitChar char
-        _ -> error $ "convertLiteral: " ++ show lit
+        _                     -> error $ "convertLiteral: " ++ show lit
 
-toEntity :: HS.QName Typed -> Entity
-toEntity qname =
+_toEntity :: HS.QName Typed -> Entity
+_toEntity qname =
     case nameInfo qname of
         Resolved entity -> entity
-        _ -> error $ "toGlobalName: " ++ show qname
+        _               -> error $ "toGlobalName: " ++ show qname
 
 exprType :: Expr -> M TC.Type
 exprType expr =
@@ -872,9 +815,9 @@ exprType expr =
         App a b -> do
             aType <- exprType a
             case aType of
-                TC.TyFun _ ret -> return ret
+                TC.TyFun _ ret                       -> return ret
                 TC.TyForall _ (_ :=> TC.TyFun _ ret) -> return ret
-                _ -> return TC.TyUndefined
+                _                                    -> return TC.TyUndefined
         -- WithCoercion _ e -> exprType e
         Let _ e -> exprType e
         LetStrict _ _ e -> exprType e
@@ -894,7 +837,7 @@ getNameIdentifier (HS.Symbol _ symbol) = symbol
 
 
 -- LHC.Prim builtins
-
+i32, i64, realWorld, io, int32, charTy, intTy :: TC.Type
 i32 = TC.TyCon $ QualifiedName "LHC.Prim" "I32"
 i64 = TC.TyCon $ QualifiedName "LHC.Prim" "I64"
 realWorld = TC.TyCon $ QualifiedName "LHC.Prim" "RealWorld#"
@@ -904,37 +847,43 @@ charTy = TC.TyCon $ QualifiedName "LHC.Prim" "Char"
 intTy = TC.TyCon $ QualifiedName "LHC.Prim" "Int"
 
 -- data Int = I# I32
+intCon :: Variable
 intCon = Variable (Name ["LHC.Prim"] "I#" 0)
   (i32 `TC.TyFun` intTy)
 
 -- data Char = C# I32
+charCon :: Variable
 charCon = Variable (Name ["LHC.Prim"] "C#" 0)
   (i32 `TC.TyFun` charTy)
 
 -- data List a = Nil | Cons a (List a)
+nilCon :: Variable
 nilCon = Variable (Name ["LHC.Prim"] "Nil" 0)
     (TC.TyForall [a] ([] :=> TC.TyList (TC.TyRef a)))
   where
     a = TcVar "a" []
 
 -- data List a = Nil | Cons a (List a)
+consCon :: Variable
 consCon = Variable (Name ["LHC.Prim"] "Cons" 0)
     (TC.TyForall [a] ([] :=> (TC.TyRef a `TC.TyFun` TC.TyList (TC.TyRef a) `TC.TyFun` TC.TyList (TC.TyRef a))))
   where
     a = TcVar "a" []
 
 -- data Unit = Unit
+unitCon :: Variable
 unitCon = Variable (Name ["LHC.Prim"] "Unit" 0)
   (TC.TyTuple [])
 
 -- newtype IO a = IO (RealWorld# -> (# RealWorld#, a #))
-ioCon :: Variable
-ioCon = Variable (Name ["LHC.Prim"] "IO" 0)
+_ioCon :: Variable
+_ioCon = Variable (Name ["LHC.Prim"] "IO" 0)
     $ TC.TyForall [a] ([] :=> ((realWorld `TC.TyFun` TC.TyUnboxedTuple [realWorld, TC.TyRef a]) `TC.TyFun` TC.TyApp io (TC.TyRef a)))
   where
     a = TcVar "a" []
   -- (RealWorld# -> (# RealWorld#, retType #)) -> IO retType
 
+int32Con, i32toi64, i64toi32 :: Variable
 -- data Int32 = Int32 I32
 int32Con = Variable (Name ["LHC.Prim"] "Int32" 0)
   (i32 `TC.TyFun` int32)

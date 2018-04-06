@@ -1,32 +1,28 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
 module Data.Bedrock.LLVM ( compile ) where
 
 import           Control.Monad.Reader
-import qualified Data.Map                           as Map
-import qualified Data.Set                           as Set
+import qualified Data.Map                     as Map
+import qualified Data.Set                     as Set
 
-import           Control.Monad.Except
-import           Data.Bedrock                       as Bedrock
-import           Data.Bedrock.GlobalVariables       (allRegisters)
+import           Data.Bedrock                 as Bedrock
+import           Data.Bedrock.GlobalVariables (allRegisters)
 import           Data.Bedrock.LLVMGen
 import           Data.List
+import qualified Data.Text.Lazy.IO            as T
 import           Data.Word
-import qualified Data.Text.Lazy.IO as T
-import           System.FilePath
 
-import           LLVM.AST as LLVM
-import           LLVM.AST.DataLayout as LLVM
-import           LLVM.AST.AddrSpace as LLVM
-import           LLVM.AST.Name as LLVM
-import           LLVM.AST.Global as Global
-import           LLVM.AST.Linkage as LLVM
-import qualified LLVM.AST.Constant as Constant
-import           LLVM.AST.Visibility
-import           LLVM.AST.CallingConvention
+import           Data.String
+import           LLVM.AST                     as LLVM
+import           LLVM.AST.AddrSpace           as LLVM
 import           LLVM.AST.Attribute
-import           LLVM.Pretty as LLVM
-import Data.String
+import           LLVM.AST.CallingConvention
+import qualified LLVM.AST.Constant            as Constant
+import           LLVM.AST.Global              as Global
+import           LLVM.AST.Linkage             as LLVM
+import           LLVM.AST.Visibility
+import           LLVM.Pretty                  as LLVM
 
 compile :: Bedrock.Module -> FilePath -> IO ()
 compile bedrock path =
@@ -36,7 +32,7 @@ toLLVM :: Bedrock.Module -> LLVM.Module
 toLLVM bedrock = LLVM.Module
     { moduleName = "main"
     , moduleSourceFileName = "blank.hs"
-    , moduleDataLayout = Nothing -- Just dataLayout
+    , moduleDataLayout = Nothing
     , moduleTargetTriple = Nothing
     , moduleDefinitions =
         [ GlobalDefinition functionDefaults
@@ -60,7 +56,6 @@ toLLVM bedrock = LLVM.Module
         defs
     }
   where
-    dataLayout = defaultDataLayout LittleEndian
     defs = execGenModule (mkEnv bedrock) $ do
             newDefinition $ GlobalDefinition functionDefaults
                     { name = LLVM.Name "exit"
@@ -245,23 +240,23 @@ cTypeToLLVM cType =
             FunctionType (cTypeToLLVM retTy) (map cTypeToLLVM argTys) False
 
 typesToLLVM :: [Bedrock.Type] -> LLVM.Type
-typesToLLVM [] = VoidType
+typesToLLVM []   = VoidType
 typesToLLVM [ty] = typeToLLVM ty
-typesToLLVM lst = StructureType False (map typeToLLVM lst)
+typesToLLVM lst  = StructureType False (map typeToLLVM lst)
 
 typeToLLVM :: Bedrock.Type -> LLVM.Type
 typeToLLVM ty =
     case ty of
-        NodePtr -> PointerType (IntegerType 64) (AddrSpace 0)
-        Node -> IntegerType 64
-        StaticNode{} -> IntegerType 64
-        IWord -> IntegerType 64
+        NodePtr         -> PointerType (IntegerType 64) (AddrSpace 0)
+        Node            -> IntegerType 64
+        StaticNode{}    -> IntegerType 64
+        IWord           -> IntegerType 64
         Primitive cType -> cTypeToLLVM cType
-        FramePtr -> PointerType (IntegerType 64) (AddrSpace 0)
+        FramePtr        -> PointerType (IntegerType 64) (AddrSpace 0)
 
 bitSize :: LLVM.Type -> Word32
 bitSize (IntegerType n) = n
-bitSize ty = error $ "Data.Bedrock.LLVM.bitSize: " ++ show ty
+bitSize ty              = error $ "Data.Bedrock.LLVM.bitSize: " ++ show ty
 
 nameToLLVM :: Bedrock.Name -> LLVM.Name
 nameToLLVM name | nameUnique name == 0 =
@@ -302,8 +297,8 @@ patternTag pat =
     NodePat nodeName [] ->
       case nodeName of
         ConstructorName name missing -> ppPartial name missing
-        FunctionName name missing -> ppPartial name missing
-        UnboxedTupleName -> "(# #)"
+        FunctionName name missing    -> ppPartial name missing
+        UnboxedTupleName             -> "(# #)"
     LitPat (LiteralInt i) -> "literal " ++ show i
     _ -> ""
   where
@@ -601,8 +596,8 @@ castReference origType origName destType =
         destType
         []
   where
-    cons PointerType{} IntegerType{}             = PtrToInt
-    cons IntegerType{} PointerType{}             = IntToPtr
+    cons PointerType{} IntegerType{}     = PtrToInt
+    cons IntegerType{} PointerType{}     = IntToPtr
     cons (IntegerType a) (IntegerType b) | a > b = Trunc
     cons (IntegerType a) (IntegerType b) | a < b = ZExt
-    cons _ _                                     = BitCast
+    cons _ _                             = BitCast

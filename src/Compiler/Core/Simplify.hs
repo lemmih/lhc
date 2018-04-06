@@ -1,7 +1,6 @@
-module Compiler.Core.Simplify where
+module Compiler.Core.Simplify (simplify) where
 
 import Compiler.Core
-import Language.Haskell.TypeCheck
 
 simplify :: Module -> Module
 simplify m = m

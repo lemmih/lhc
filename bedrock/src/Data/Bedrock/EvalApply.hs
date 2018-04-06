@@ -1,7 +1,6 @@
 {-# LANGUAGE Haskell2010 #-}
 module Data.Bedrock.EvalApply ( lowerEvalApply ) where
 
-import           Control.Applicative    (pure, (<$>), (<*>))
 import           Control.Monad
 import           Control.Monad.State
 import qualified Data.IntSet            as IntSet
@@ -89,6 +88,7 @@ mkEvalBody hpt retSize var = do
             Alternative (NodePat name args) $
             Bind [ret] (MkNode name args) $
             Return [ret]
+        mkAlt UnboxedTupleName = error "Urk: UnboxedTupleName"
     return (arg, preEvalObject, body)
 
 mkEval :: HPTResult -> Function -> Variable -> Variable -> Block -> Gen Block

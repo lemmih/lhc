@@ -1,11 +1,11 @@
 -- Dead Code Elimination
 module Compiler.Core.DCE (deadCodeElimination) where
 
-import Data.Bedrock (Name)
-import Compiler.Core
-import Data.List
-import Data.Graph
-import Data.Maybe
+import           Compiler.Core
+import           Data.Bedrock  (Name)
+import           Data.Graph
+import           Data.List
+import           Data.Maybe
 
 deadCodeElimination :: Name -> Module -> Module
 deadCodeElimination entrypoint m =
@@ -15,7 +15,7 @@ deadCodeElimination entrypoint m =
         , fromJust (toVertex name) `elem` live ]
       }
   where
-    (graph, fromVertex, toVertex) = graphFromEdges (moduleGraph m)
+    (graph, _fromVertex, toVertex) = graphFromEdges (moduleGraph m)
     live = reachable graph (fromJust $ toVertex entrypoint)
 
 moduleGraph :: Module -> [(Name, Name, [Name])]
