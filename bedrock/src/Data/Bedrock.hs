@@ -104,7 +104,7 @@ data AvailableNamespace = AvailableNamespace
   , nsNextNodeId      :: Int
   , nsNextPrimitiveId :: Int
   , nsNextGlobalId    :: Int
-  } deriving (Show, Read, Data, Generic)
+  } deriving (Show, Read, Eq, Data, Generic)
 
 -- XXX: Rename to FFIType? ForeignType?
 data CType
@@ -123,7 +123,7 @@ data Foreign = Foreign
   { foreignName      :: String
   , foreignReturn    :: CType
   , foreignArguments :: [CType]
-  } deriving (Show, Read, Data, Generic)
+  } deriving (Show, Read, Eq, Data, Generic)
 
 data Module = Module
   { modForeigns  :: [Foreign]
@@ -132,7 +132,7 @@ data Module = Module
   , functions    :: [Function]
   , modNamespace :: AvailableNamespace
   -- CAFs?
-  } deriving (Show, Read, Data, Generic)
+  } deriving (Show, Read, Eq, Data, Generic)
 
 data NodeName
   = ConstructorName Name Int
@@ -142,7 +142,7 @@ data NodeName
   deriving (Show, Read, Eq, Ord, Data, Generic)
 
 data NodeDefinition = NodeDefinition Name [Type]
-  deriving (Show, Read, Data, Generic)
+  deriving (Show, Read, Eq, Data, Generic)
 
 data Attribute
   = NoCPS
@@ -155,15 +155,15 @@ data Function = Function
   , fnArguments  :: [Variable]
   , fnResults    :: [Type]
   , fnBody       :: Block
-  } deriving (Show, Read, Data, Generic)
+  } deriving (Show, Read, Eq, Data, Generic)
 
 data Pattern
   = NodePat NodeName [Variable]
   | LitPat Literal
   -- UnboxedPat [Variable]
-  deriving (Show, Read, Data, Generic)
+  deriving (Show, Read, Eq, Data, Generic)
 data Alternative = Alternative Pattern Block
-  deriving (Show, Read, Data, Generic)
+  deriving (Show, Read, Eq, Data, Generic)
 
 data Literal
   = LiteralInt Integer -- compile error if Integer to too large
@@ -213,7 +213,7 @@ data Expression
   | GCEnd
   | GCMark Variable
   | GCMarkNode Variable
-  deriving (Show, Read, Data, Generic)
+  deriving (Show, Read, Eq, Data, Generic)
 
 data Block
   = Case Variable (Maybe Block) [Alternative]
@@ -225,7 +225,7 @@ data Block
   | InvokeHandler Variable Variable
   | Exit
   | Panic String
-  deriving (Show, Read, Data, Generic)
+  deriving (Show, Read, Eq, Data, Generic)
 
 
 

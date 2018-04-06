@@ -27,7 +27,7 @@ instance Pretty Type where
   pretty (StaticNode n) = Doc.char '%' <> Doc.int n <> Doc.char '%'
   pretty (Primitive IWord) = Doc.char '#'
   pretty (Primitive ty) = pretty ty <> char '|'
-  pretty FramePtr       = Doc.red (Doc.char '*')
+  pretty FramePtr       = Doc.red (Doc.char '@')
 
 instance Pretty CType where
   pretty I8 = text "i8"
@@ -232,5 +232,3 @@ ppModule m =
   Doc.vsep (map pretty (nodes m)) Doc.<$$>
   ppEntryPoint (entryPoint m) Doc.<$$>
   Doc.vsep (map ppFunction (functions m))
-
-

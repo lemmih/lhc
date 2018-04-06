@@ -58,3 +58,16 @@ Executable lhc
                      -fwarn-incomplete-patterns
  Default-language:   Haskell2010
  Extensions:
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  hs-source-dirs: test
+  build-depends:
+    base,
+    parsec,
+    bedrock,
+    haskell-tc,
+    hspec,
+    QuickCheck >= 2.1.0
+  default-language: Haskell2010

@@ -55,17 +55,24 @@ parseModulePrefix = try $ do
 
 parseName :: Parser Name
 parseName = do
-  Name <$> (try $ parseModulePrefix `endBy` dot) <*> identifier <*> pure 0
-  <|>
-    do
-  prefix <- parseModulePrefix `sepBy1` dot
-  pure $ Name (init prefix) (last prefix) 0
+  identifiers <- identifier `sepBy` dot
+  n <- do
+    symbol "^"
+    fromIntegral <$> natural
+    <|> pure 0
+  return $ Name (init identifiers) (last identifiers) n
 
 parseType :: Parser Type
 parseType = choice
   [ symbol "*" >> return NodePtr
+  , try $ do
+      symbol "%"
+      n <- natural
+      symbol "%"
+      return $ StaticNode (fromIntegral n)
   , symbol "%" >> return Node
   , symbol "#" >> return (Primitive IWord)
+  , symbol "@" >> return FramePtr
   , Primitive <$> parseCType ]
   <?> "type"
 
@@ -296,7 +303,7 @@ parseModule = do
     , entryPoint = fromMaybe noEntryPoint $ listToMaybe
       [ e | TopEntryPoint e <- topLevel ]
     , functions = [ f | TopFunction f <- topLevel ]
-    , modNamespace = error "next free unique not defined"
+    , modNamespace = AvailableNamespace 0 0 0 0
     }
   where
     noEntryPoint = error "No entrypoint defined."
