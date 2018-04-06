@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE LambdaCase         #-}
 {-|
 Bedrock is a strict, first-order language designed for graph reduction.
 
@@ -77,8 +78,7 @@ import           Control.Applicative (pure, (<$>), (<*>))
 import           Data.Data
 import           GHC.Generics
 -- import qualified LLVM.AST.Type       as LLVM
-import           Test.QuickCheck     (Arbitrary (..), elements, listOf, listOf1,
-                                      oneof, suchThat, Gen)
+import           Test.QuickCheck hiding (Function)
 
 data Name = Name
   { nameModule     :: [String]
@@ -256,15 +256,26 @@ instance Arbitrary Type where
 instance Arbitrary Variable where
   arbitrary = Variable <$> arbitrary <*> arbitrary
 
+recursive :: Gen a -> Gen a -> Gen a
+recursive deep shallow =
+  sized $ \case
+    0 -> shallow
+    n -> resize (n`div`2) $ oneof [deep, shallow]
+
 instance Arbitrary CType where
-  arbitrary = oneof
-    [ CPointer <$> arbitrary
-    , elements
-      [ I8
-      , I32
-      , I64
-      , CVoid ]
-    ]
+  arbitrary =
+    recursive
+      (CFunction <$> base <*> arbitrary)
+      base
+    where
+      base =
+        recursive
+          (CPointer <$> base)
+          (elements
+            [ I8
+            , I32
+            , I64
+            , CVoid ])
 
 instance Arbitrary Foreign where
   arbitrary = Foreign

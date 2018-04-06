@@ -1,5 +1,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Data.Bedrock.PrettyPrint where
+module Data.Bedrock.PrettyPrint
+  ( Pretty(..)
+  , module Data.Bedrock.PrettyPrint
+  ) where
 
 import           Data.List
 import           Language.Haskell.TypeCheck.Pretty
@@ -40,7 +43,7 @@ instance Pretty CType where
 
 instance Pretty NodeDefinition where
   pretty (NodeDefinition name args) =
-    text "node" <+> ppNode (ConstructorName name 0) (map pretty args)
+    text "node" <+> Doc.blue (pretty name) <> Doc.parens (ppList (map pretty args))
 
 instance Pretty Variable where
   pretty Variable{ variableName = name, variableType = Primitive ty } =
@@ -227,9 +230,9 @@ instance Pretty Foreign where
     text (foreignName f) <>
     Doc.parens (ppList (map pretty $ foreignArguments f))
 
-ppModule :: Module -> Doc
-ppModule m =
-  Doc.vsep (map pretty (modForeigns m)) Doc.<$$>
-  Doc.vsep (map pretty (nodes m)) Doc.<$$>
-  ppEntryPoint (entryPoint m) Doc.<$$>
-  Doc.vsep (map ppFunction (functions m))
+instance Pretty Module where
+  pretty m =
+    Doc.vsep (map pretty (modForeigns m)) Doc.<$$>
+    Doc.vsep (map pretty (nodes m)) Doc.<$$>
+    ppEntryPoint (entryPoint m) Doc.<$$>
+    Doc.vsep (map ppFunction (functions m))

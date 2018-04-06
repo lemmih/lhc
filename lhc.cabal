@@ -80,6 +80,7 @@ test-suite spec
     hspec,
     hspec-contrib,
     HUnit,
-    QuickCheck >= 2.1.0
+    QuickCheck >= 2.1.0,
+    ansi-wl-pprint
   default-language: Haskell2010
   ghc-options: -Wall -Werror

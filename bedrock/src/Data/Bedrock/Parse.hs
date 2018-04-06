@@ -1,6 +1,6 @@
 module Data.Bedrock.Parse where
 
-import           Control.Monad                          (guard)
+import           Control.Monad                          (guard, msum)
 import           Data.Char
 import           Data.Maybe
 import           Text.ParserCombinators.Parsec
@@ -75,9 +75,30 @@ parseType = choice
   , Primitive <$> parseCType ]
   <?> "type"
 
+-- i8 i32 i64 void i64*
+parseCType :: Parser CType
+parseCType = msum
+    [ try $ CFunction <$> base <*> parens (commaSep parseCType)
+    , base
+    ]
+  where
+    base = do
+      ty <- prim
+      p <- length <$> many (symbol "*")
+      return $ foldr (.) id (replicate p CPointer) ty
+    prim = choice
+      [ reserved "i8" >> return I8
+      , reserved "i32" >> return I32
+      , reserved "i64" >> return I64
+      , reserved "void" >> return CVoid
+      ]
+
 parseVariable :: Parser Variable
 parseVariable = do
   ty <- parseType
+  case ty of
+    Primitive{} -> char '|' *> return ()
+    _           -> return ()
   name <- parseName
   return Variable{ variableName = name, variableType = ty }
 
@@ -85,7 +106,7 @@ parseNodeDefinition :: Parser NodeDefinition
 parseNodeDefinition = do
   reserved "node"
   name <- parseConstructor
-  args <- many parseType
+  args <- parens (commaSep parseType)
   return $ NodeDefinition name args
 
 parseAttribute :: Parser Attribute
@@ -104,7 +125,7 @@ parseFunction = do
 parseConstructor :: Parser Name
 parseConstructor = try (do
   name <- parseName
-  guard (isUpper (head (nameIdentifier name)))
+  -- guard (isUpper (head (nameIdentifier name)))
   return name)
   <?> "constructor"
 
@@ -252,20 +273,6 @@ parseEntryPoint = do
   reserved "entrypoint"
   symbol ":"
   parseName
-
--- i8 i32 i64 void i64*
-parseCType :: Parser CType
-parseCType = do
-  ty <- prim
-  p <- length <$> many (symbol "*")
-  return $ foldr (.) id (replicate p CPointer) ty
-  where
-    prim = choice
-      [ reserved "i8" >> return I8
-      , reserved "i32" >> return I32
-      , reserved "i64" >> return I64
-      , reserved "void" >> return CVoid
-      ]
 
 parseForeignName :: Parser String
 parseForeignName = identifier

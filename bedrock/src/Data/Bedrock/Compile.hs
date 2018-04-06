@@ -66,7 +66,7 @@ runPipeline keepIntermediateFiles verbose title m0 =
             printf "[%d] Running step %s\n" (n::Int) (show tag)
         let m' = action m
         when keepIntermediateFiles $
-            writeFile (dstFile n tag) (show $ ppModule m')
+            writeFile (dstFile n tag) (show $ pretty m')
         return m'
     hpt0 = runHPT m0
     dstFile n tag = title <.> show n <.> tag <.> "rock"

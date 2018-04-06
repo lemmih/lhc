@@ -2,19 +2,21 @@ module Properties (parsePrettyPrintProps) where
 
 import           Data.Bedrock.Parse
 import           Data.Bedrock.PrettyPrint
-import           Language.Haskell.TypeCheck.Pretty (pretty)
 import           Test.Hspec
 import           Test.QuickCheck
-import           Text.ParserCombinators.Parsec     (runParser)
+import           Text.ParserCombinators.Parsec (Parser, runParser)
+import           Text.PrettyPrint.ANSI.Leijen  (plain)
+
+parseTest :: (Eq a, Pretty a) => Parser a -> a -> Bool
+parseTest p x = runParser p () "test input" (show (plain $ pretty x)) == Right x
 
 parsePrettyPrintProps :: Spec
 parsePrettyPrintProps = do
   describe "Parse/PrettyPrint" $ do
-    it "Name" $ property $
-      \x -> runParser parseName () "test" (show (pretty x)) == Right x
-    xit "Type" $ property $
-      \x -> runParser parseType () "test" (show (pretty x)) == Right x
-    xit "Foreign" $ property $
-      \x -> runParser parseForeign () "test" (show (pretty x)) == Right x
-    xit "Module" $ property $
-      \x -> runParser parseModule () "test" (show (ppModule x)) == Right x
+    it "Name"     $ property $ parseTest parseName
+    it "CType"    $ property $ parseTest parseCType
+    it "Type"     $ property $ parseTest parseType
+    it "Variable" $ property $ parseTest parseVariable
+    it "Foreign"  $ property $ parseTest parseForeign
+    it "NodeDefinition" $ property $ parseTest parseNodeDefinition
+    -- xit "Module" $ property $ parseTest parseModule
