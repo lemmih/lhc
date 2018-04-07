@@ -8,7 +8,7 @@ Parsing our Haskell code with `haskell-src-exts` is the first step in our
 pipeline. We'll use `Haskell.Language.Exts.parseFile` to turn this source file
 into an AST:
 
-```
+```haskell
 {-# LANGUAGE MagicHash #-}
 module Main (main) where
 
@@ -37,7 +37,7 @@ which bindings. For this, we'll use `haskell-scope` which turns a
 
 `Origin` contains a `NameInfo` which tells us where each identifier is used:
 
-```
+```haskell
 data Origin = Origin NameInfo SrcSpanInfo
 data NameInfo
   = Resolved Entity
@@ -55,7 +55,7 @@ correct.
 
 To understand the output of the type-checker, consider the following example:
 
-```
+```haskell
 x = length "Hello world"
 ```
 
@@ -64,7 +64,7 @@ turns its type `forall a. [a] -> Int` into `[Char] -> Int` to match the string
 argument. In this case the proof is rather simple but they can become quite
 complicated once higher-rank types come into play.
 
-```
+```haskell
 x :: Int
 x = (length :: forall a. [a] -> Int) @Char "Hello world"
 ```
@@ -80,7 +80,7 @@ We end up with a lazy, functional language that looks like a plain version of
 Haskell. At this point we also perform a few optimizations designed to improve
 the readability of the generated code.
 
-```
+```haskell
 [library code has been omitted]
 Main.main : LHC.Prim.IO ()
 Main.main =
@@ -92,7 +92,7 @@ Main.main =
           LHC.Prim.s)) LHC.Prim.s
 Main.entrypoint : ()
 Main.entrypoint =
-  LHC.Prim.unsafePerformIO Main.main[0] Running step "rename"
+  LHC.Prim.unsafePerformIO
 ```
 
 ## Step 5: High level intermediate language
