@@ -102,23 +102,23 @@ compileWithOpts keepIntermediateFiles verbose path m = do
 
 stdPipeline :: Pipeline
 stdPipeline =
-        [ "rename"          :> simplify . unique
-        , "inlined"         :> unique . simplifySteps 10
+        [ "rename"          :> locallyUnique . simplify . unique
+        , "inlined"         :> locallyUnique . simplifySteps 10 . unique
         -- , PerformHPT
         -- , "no-laziness"     :?> runGen . lowerEvalApply
         -- , "no-unknown-size" :?> runGen . lowerNodeSize
-        , "no-laziness"     :> runGen Simple.lowerEvalApply
-        , "no-void"         :> simplify . voidEliminate
-        , "no-unknown-size" :> runGen Simple.lowerNodeSize
+        , "no-laziness"     :> locallyUnique . runGen Simple.lowerEvalApply
+        , "no-void"         :> locallyUnique . simplify . voidEliminate
+        , "no-unknown-size" :> locallyUnique . runGen Simple.lowerNodeSize
 
-        , "no-nodes"        :> simplify . unique . registerIntroduction
-        , "no-stack"        :> StackLayout.lower
-        , "no-stack"        :> mergeAllocsModule . locallyUnique . runGen cpsTransformation
+        , "no-nodes"        :> locallyUnique . simplify . unique . registerIntroduction
+        , "no-stack"        :> locallyUnique . StackLayout.lower
+        , "no-stack"        :> locallyUnique . mergeAllocsModule . locallyUnique . runGen cpsTransformation
         -- , "no-invoke"       :?> runGen . lowerInvoke
         , "no-allocs"       :> locallyUnique . runGen lowerAlloc
         , "no-gc"           :> locallyUnique . lowerGC fixedGC
-        , "no-globals"      :> unique . lowerGlobalRegisters
-        , "pretty"          :> unique . localDCE . simplify . simplify
+        , "no-globals"      :> locallyUnique . lowerGlobalRegisters
+        , "pretty"          :> locallyUnique . unique . localDCE . simplify . simplify
         -- , "pretty"          :> locallyUnique
         ]
   where

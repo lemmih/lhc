@@ -118,109 +118,109 @@ foreign i8 indexI8#(i8*)
 foreign i8* addrAdd#(i8*, i64)
 foreign i32 getchar()
 node LHC.Prim.Int32(i32)
-node LHC.Prim.C#^1(i32)
-node LHC.Prim.Unit^2()
-node LHC.Prim.Nil^3()
-node LHC.Prim.Cons^4(*, *)
-entrypoint: Main.entrypoint^17
+node LHC.Prim.C#(i32)
+node LHC.Prim.Unit()
+node LHC.Prim.Nil()
+node LHC.Prim.Cons(*, *)
+entrypoint: Main.entrypoint
 
-void * LHC.Prim.c_putchar^5 i32|arg^18 void|s^19 =
-  i32|primOut^20 = @ccall putchar(i32|arg^18)
-  *con = @store (LHC.Prim.Int32 i32|primOut^20)
-  @return void|s^19, *con
+void * LHC.Prim.c_putchar i32|arg void|s =
+  i32|primOut = @ccall putchar(i32|arg)
+  *con = @store (LHC.Prim.Int32 i32|primOut)
+  @return void|s, *con
 
-void * LHC.Prim.c_getchar^6 void|s^22 =
-  i32|primOut^23 = @ccall getchar()
-  *con^1 = @store (LHC.Prim.Int32 i32|primOut^23)
-  @return void|s^22, *con^1
+void * LHC.Prim.c_getchar void|s =
+  i32|primOut = @ccall getchar()
+  *con = @store (LHC.Prim.Int32 i32|primOut)
+  @return void|s, *con
 
-void * LHC.Prim.getChar.lambda^7 *LHC.Prim.c^2 void|LHC.Prim.s^26 =
-  *LHC.Prim.c.eval^3 = @eval *LHC.Prim.c^2
-  %LHC.Prim.c.eval.node = @fetch   *LHC.Prim.c.eval^3
-  LHC.Prim.Int32 i32|LHC.Prim.c#^29 ←  %LHC.Prim.c.eval.node
-  *con^4 = @store (LHC.Prim.C#^1 i32|LHC.Prim.c#^29)
-  @return void|LHC.Prim.s^26, *con^4
+void * LHC.Prim.getChar.lambda *LHC.Prim.c void|LHC.Prim.s =
+  *LHC.Prim.c.eval = @eval *LHC.Prim.c
+  %LHC.Prim.c.eval.node = @fetch   *LHC.Prim.c.eval
+  LHC.Prim.Int32 i32|LHC.Prim.c# ←  %LHC.Prim.c.eval.node
+  *con = @store (LHC.Prim.C# i32|LHC.Prim.c#)
+  @return void|LHC.Prim.s, *con
 
-void * LHC.Prim.getChar^8 void|LHC.Prim.s^31 =
-  void|ret.apply^32, *ret.apply^5 = LHC.Prim.c_getchar^6(void|LHC.Prim.s^31)
-  @tail LHC.Prim.getChar.lambda^7(*ret.apply^5, void|ret.apply^32)
+void * LHC.Prim.getChar void|LHC.Prim.s =
+  void|ret.apply, *ret.apply^1 = LHC.Prim.c_getchar(void|LHC.Prim.s)
+  @tail LHC.Prim.getChar.lambda(*ret.apply^1, void|ret.apply)
 
-void * LHC.Prim.getLine.lambda^9 *LHC.Prim.c^6 *LHC.Prim.cs^7 void|LHC.Prim.s^36 =
-  *con^8 = @store (LHC.Prim.Cons^4 *LHC.Prim.c^6 *LHC.Prim.cs^7)
-  @return void|LHC.Prim.s^36, *con^8
+void * LHC.Prim.getLine.lambda *LHC.Prim.c *LHC.Prim.cs void|LHC.Prim.s =
+  *con = @store (LHC.Prim.Cons *LHC.Prim.c *LHC.Prim.cs)
+  @return void|LHC.Prim.s, *con
 
-void * LHC.Prim.getLine.lambda^10 *LHC.Prim.c^9 void|LHC.Prim.s^39 =
-  *LHC.Prim.c.eval^10 = @eval *LHC.Prim.c^9
-  %LHC.Prim.c.eval.node^1 = @fetch   *LHC.Prim.c.eval^10
-  LHC.Prim.C#^1 i32|LHC.Prim.c#^42 ←  %LHC.Prim.c.eval.node^1
-  case i32|LHC.Prim.c#^42 of
+void * LHC.Prim.getLine.lambda^1 *LHC.Prim.c void|LHC.Prim.s =
+  *LHC.Prim.c.eval = @eval *LHC.Prim.c
+  %LHC.Prim.c.eval.node = @fetch   *LHC.Prim.c.eval
+  LHC.Prim.C# i32|LHC.Prim.c# ←  %LHC.Prim.c.eval.node
+  case i32|LHC.Prim.c# of
     10 →
-      *con^12 = @store (LHC.Prim.Nil^3)
-      @return void|LHC.Prim.s^39, *con^12
+      *con = @store (LHC.Prim.Nil)
+      @return void|LHC.Prim.s, *con
     DEFAULT →
-      void|ret.apply^43, *ret.apply^11 = LHC.Prim.getLine^11(void|LHC.Prim.s^39)
-      @tail LHC.Prim.getLine.lambda^9(*LHC.Prim.c^9, *ret.apply^11, void|ret.apply^43)
+      void|ret.apply, *ret.apply^1 = LHC.Prim.getLine(void|LHC.Prim.s)
+      @tail LHC.Prim.getLine.lambda(*LHC.Prim.c, *ret.apply^1, void|ret.apply)
 
-void * LHC.Prim.getLine^11 void|LHC.Prim.s^46 =
-  void|ret.apply^47, *ret.apply^13 = LHC.Prim.getChar^8(void|LHC.Prim.s^46)
-  @tail LHC.Prim.getLine.lambda^10(*ret.apply^13, void|ret.apply^47)
+void * LHC.Prim.getLine void|LHC.Prim.s =
+  void|ret.apply, *ret.apply^1 = LHC.Prim.getChar(void|LHC.Prim.s)
+  @tail LHC.Prim.getLine.lambda^1(*ret.apply^1, void|ret.apply)
 
-void * LHC.Prim.putStr^12 *LHC.Prim.lst^14 void|LHC.Prim.s^50 =
-  *LHC.Prim.lst.eval^15 = @eval *LHC.Prim.lst^14
-  %LHC.Prim.lst.eval.node^2 = @fetch   *LHC.Prim.lst.eval^15
-  case %LHC.Prim.lst.eval.node^2 of
-    LHC.Prim.Nil^3 →
-      *con^16 = @store (LHC.Prim.Unit^2)
-      @return void|LHC.Prim.s^50, *con^16
-    LHC.Prim.Cons^4 *LHC.Prim.head^17 *LHC.Prim.tail^18 →
-      *LHC.Prim.head.eval^19 = @eval *LHC.Prim.head^17
-      %LHC.Prim.head.eval.node^3 = @fetch   *LHC.Prim.head.eval^19
-      LHC.Prim.C#^1 i32|LHC.Prim.char^58 ←  %LHC.Prim.head.eval.node^3
-      void|ret.apply^59, *ret.apply^20 = LHC.Prim.c_putchar^5(i32|LHC.Prim.char^58, void|LHC.Prim.s^50)
-      @tail LHC.Prim.putStr^12(*LHC.Prim.tail^18, void|ret.apply^59)
+void * LHC.Prim.putStr *LHC.Prim.lst void|LHC.Prim.s =
+  *LHC.Prim.lst.eval = @eval *LHC.Prim.lst
+  %LHC.Prim.lst.eval.node = @fetch   *LHC.Prim.lst.eval
+  case %LHC.Prim.lst.eval.node of
+    LHC.Prim.Nil →
+      *con = @store (LHC.Prim.Unit)
+      @return void|LHC.Prim.s, *con
+    LHC.Prim.Cons *LHC.Prim.head *LHC.Prim.tail →
+      *LHC.Prim.head.eval = @eval *LHC.Prim.head
+      %LHC.Prim.head.eval.node = @fetch   *LHC.Prim.head.eval
+      LHC.Prim.C# i32|LHC.Prim.char ←  %LHC.Prim.head.eval.node
+      void|ret.apply, *ret.apply^1 = LHC.Prim.c_putchar(i32|LHC.Prim.char, void|LHC.Prim.s)
+      @tail LHC.Prim.putStr(*LHC.Prim.tail, void|ret.apply)
 
-* LHC.Prim.unpackString#^13 i8*|LHC.Prim.ptr^61 =
-  i8|primOut^62 = @ccall indexI8#(i8*|LHC.Prim.ptr^61)
-  i64|arg.val^63 = @cast(i8|primOut^62)
-  case i64|arg.val^63 of
+* LHC.Prim.unpackString# i8*|LHC.Prim.ptr =
+  i8|primOut = @ccall indexI8#(i8*|LHC.Prim.ptr)
+  i64|arg.val = @cast(i8|primOut)
+  case i64|arg.val of
     0 →
-      *con^24 = @store (LHC.Prim.Nil^3)
-      @return *con^24
+      *con^2 = @store (LHC.Prim.Nil)
+      @return *con^2
     DEFAULT →
-      i32|arg.val^64 = @cast(i64|arg.val^63)
-      *con^21 = @store (LHC.Prim.C#^1 i32|arg.val^64)
-      i64|int^66 = @literal 1
-      i8*|primOut^67 = @ccall addrAdd#(i8*|LHC.Prim.ptr^61, i64|int^66)
-      *thunk^22 = @store (LHC.Prim.unpackString#^13 i8*|primOut^67)
-      *con^23 = @store (LHC.Prim.Cons^4 *con^21 *thunk^22)
-      @return *con^23
+      i32|arg.val^1 = @cast(i64|arg.val)
+      *con = @store (LHC.Prim.C# i32|arg.val^1)
+      i64|int = @literal 1
+      i8*|primOut^1 = @ccall addrAdd#(i8*|LHC.Prim.ptr, i64|int)
+      *thunk = @store (LHC.Prim.unpackString# i8*|primOut^1)
+      *con^1 = @store (LHC.Prim.Cons *con *thunk)
+      @return *con^1
 
-void * LHC.Prim.putStrLn^14 *LHC.Prim.msg^25 void|LHC.Prim.s^72 =
-  i8*|lit^73 = @literal "\n"
-  *thunk^26 = @store (LHC.Prim.unpackString#^13 i8*|lit^73)
-  void|ret.apply^75, *ret.apply^27 = LHC.Prim.putStr^12(*LHC.Prim.msg^25, void|LHC.Prim.s^72)
-  @tail LHC.Prim.putStr^12(*thunk^26, void|ret.apply^75)
+void * LHC.Prim.putStrLn *LHC.Prim.msg void|LHC.Prim.s =
+  i8*|lit = @literal "\n"
+  *thunk = @store (LHC.Prim.unpackString# i8*|lit)
+  void|ret.apply, *ret.apply^1 = LHC.Prim.putStr(*LHC.Prim.msg, void|LHC.Prim.s)
+  @tail LHC.Prim.putStr(*thunk, void|ret.apply)
 
-void * Main.main.lambda^15 *Main.name^28 void|LHC.Prim.s^78 =
-  i8*|lit^79 = @literal "Hi "
-  *thunk^29 = @store (LHC.Prim.unpackString#^13 i8*|lit^79)
-  i8*|lit^81 = @literal "."
-  *thunk^30 = @store (LHC.Prim.unpackString#^13 i8*|lit^81)
-  void|ret.apply^83, *ret.apply^31 = LHC.Prim.putStr^12(*thunk^29, void|LHC.Prim.s^78)
-  void|ret.apply^85, *ret.apply^32 = LHC.Prim.putStr^12(*Main.name^28, void|ret.apply^83)
-  @tail LHC.Prim.putStrLn^14(*thunk^30, void|ret.apply^85)
+void * Main.main.lambda *Main.name void|LHC.Prim.s =
+  i8*|lit = @literal "Hi "
+  *thunk = @store (LHC.Prim.unpackString# i8*|lit)
+  i8*|lit^1 = @literal "."
+  *thunk^1 = @store (LHC.Prim.unpackString# i8*|lit^1)
+  void|ret.apply, *ret.apply^1 = LHC.Prim.putStr(*thunk, void|LHC.Prim.s)
+  void|ret.apply^2, *ret.apply^3 = LHC.Prim.putStr(*Main.name, void|ret.apply)
+  @tail LHC.Prim.putStrLn(*thunk^1, void|ret.apply^2)
 
-void * Main.main^16 void|LHC.Prim.s^87 =
-  i8*|lit^88 = @literal "What is your name?"
-  *thunk^33 = @store (LHC.Prim.unpackString#^13 i8*|lit^88)
-  void|ret.apply^90, *ret.apply^34 = LHC.Prim.putStrLn^14(*thunk^33, void|LHC.Prim.s^87)
-  void|ret.apply^92, *ret.apply^35 = LHC.Prim.getLine^11(void|ret.apply^90)
-  @tail Main.main.lambda^15(*ret.apply^35, void|ret.apply^92)
+void * Main.main void|LHC.Prim.s =
+  i8*|lit = @literal "What is your name?"
+  *thunk = @store (LHC.Prim.unpackString# i8*|lit)
+  void|ret.apply, *ret.apply^1 = LHC.Prim.putStrLn(*thunk, void|LHC.Prim.s)
+  void|ret.apply^2, *ret.apply^3 = LHC.Prim.getLine(void|ret.apply)
+  @tail Main.main.lambda(*ret.apply^3, void|ret.apply^2)
 
-* Main.entrypoint^17  =
-  void|void^94 = @literal 0
-  void|ret.apply^95, *ret.apply^36 = Main.main^16(void|void^94)
-  *LHC.Prim.val.eval^37 = @eval *ret.apply^36
+* Main.entrypoint  =
+  void|void = @literal 0
+  void|ret.apply, *ret.apply^1 = Main.main(void|void)
+  *LHC.Prim.val.eval = @eval *ret.apply^1
 ```
 
 ## Step 6: Remove `@eval` and `@apply` primitives
@@ -236,58 +236,173 @@ After the transformation, all calls to `@eval` have been replaced by a real
 
 ```
 [code omitted]
-* eval *arg^1 =
-  %obj^2 = @fetch   *arg^1
-  case %obj^2 of
-    LHC.Prim.unpackString#^13 i8*|arg^4 →
-      *new^3 = LHC.Prim.unpackString#^13(i8*|arg^4)
-      @return *new^3
-    Main.entrypoint^17 →
-      *new^5 = Main.entrypoint^17()
-      @return *new^5
+* eval *arg =
+  %obj = @fetch   *arg
+  case %obj of
+    LHC.Prim.unpackString# i8*|arg^1 →
+      @tail LHC.Prim.unpackString#(i8*|arg^1)
+    Main.entrypoint →
+      @tail Main.entrypoint()
     DEFAULT →
-      @return *arg^1
+      @return *arg
 
 [code omitted]
 
-void * LHC.Prim.putStr^12 *LHC.Prim.lst^14 void|LHC.Prim.s^50 =
-  *LHC.Prim.lst.eval^15 = eval(*LHC.Prim.lst^14)
-  %LHC.Prim.lst.eval.node^2 = @fetch   *LHC.Prim.lst.eval^15
-  case %LHC.Prim.lst.eval.node^2 of
-    LHC.Prim.Nil^3 →
-      *con^16 = @store (LHC.Prim.Unit^2)
-      @return void|LHC.Prim.s^50, *con^16
-    LHC.Prim.Cons^4 *LHC.Prim.head^17 *LHC.Prim.tail^18 →
-      *LHC.Prim.head.eval^19 = eval(*LHC.Prim.head^17)
-      %LHC.Prim.head.eval.node^3 = @fetch   *LHC.Prim.head.eval^19
-      LHC.Prim.C#^1 i32|LHC.Prim.char^58 ←  %LHC.Prim.head.eval.node^3
-      void|ret.apply^59, *ret.apply^20 = LHC.Prim.c_putchar^5(i32|LHC.Prim.char^58, void|LHC.Prim.s^50)
-      @tail LHC.Prim.putStr^12(*LHC.Prim.tail^18, void|ret.apply^59)
+* LHC.Prim.putStr *LHC.Prim.lst =
+  *LHC.Prim.lst.eval = eval(*LHC.Prim.lst)
+  %LHC.Prim.lst.eval.node = @fetch   *LHC.Prim.lst.eval
+  case %LHC.Prim.lst.eval.node of
+    LHC.Prim.Nil →
+      *con = @store (LHC.Prim.Unit)
+      @return *con
+    LHC.Prim.Cons *LHC.Prim.head *LHC.Prim.tail →
+      *LHC.Prim.head.eval = eval(*LHC.Prim.head)
+      %LHC.Prim.head.eval.node = @fetch   *LHC.Prim.head.eval
+      LHC.Prim.C# i32|LHC.Prim.char ←  %LHC.Prim.head.eval.node
+      *ret.apply = LHC.Prim.c_putchar(i32|LHC.Prim.char)
+      @tail LHC.Prim.putStr(*LHC.Prim.tail)
 
 [code omitted]
 
-* Main.entrypoint^17  =
-  void|void^94 = @literal 0
-  void|ret.apply^95, *ret.apply^36 = Main.main^16(void|void^94)
-  *LHC.Prim.val.eval^37 = eval(*ret.apply^36)
+* Main.entrypoint  =
+  *ret.apply = Main.main()
+  *LHC.Prim.val.eval = eval(*ret.apply)
   @exit
 ```
 
 ## Step 7: Make node sizes explicit
 
-Lower NodeSize
+Next we try to determine the sizes of nodes. Like with the previous step, there
+are many algorithms for this and they have different cost/benefit ratios.
+LHC is using a rather conservative algorithm which is less accurate than the
+algorithm described by Boquist.
+
+The following code shows how the `obj` variable has been marked with a size of
+`2`:
+
+```
+* eval *arg =
+  %2%obj = @fetch   *arg
+  case %2%obj of
+    LHC.Prim.unpackString# i8*|arg^1 →
+      @tail LHC.Prim.unpackString#(i8*|arg^1)
+    Main.entrypoint →
+      @tail Main.entrypoint()
+    DEFAULT →
+      @return *arg
+```
 
 ## Step 8: Put nodes in word-sized variables
 
-Register introduction
+LLVM has no support for Haskell nodes so we have to put the data structure into
+separate variables with one variable for each field:
+
+```
+* eval *arg =
+  #obj = @load   *arg[0]
+  #obj^1 = @load   *arg[1]
+  case #obj of
+    LHC.Prim.unpackString# →
+      i8*|arg^1 = @cast(#obj^1)
+      @tail LHC.Prim.unpackString#(i8*|arg^1)
+    Main.entrypoint →
+      @tail Main.entrypoint()
+    DEFAULT →
+      @return *arg
+```
 
 ## Step 9: Make the stack layout explicit
 
-Make stack explicit
+The next couple of steps relate to stack management. While it is possible to
+let LLVM handle the stack, this makes exceptions, garbage collection and threading
+much more difficult. Therefore, we want to allocate our own activation frames
+and only use the system stack for non-Haskell code.
+
+After the first transformation, the code is annotated with spill primitives
+(`@restore` and `@save`) which read and write variables to the current
+activation frame.
+
+```
+* LHC.Prim.putStr *LHC.Prim.lst =
+  *LHC.Prim.lst.eval = eval(*LHC.Prim.lst)
+  #LHC.Prim.lst.eval.node = @load   *LHC.Prim.lst.eval[0]
+  #LHC.Prim.lst.eval.node^1 = @load   *LHC.Prim.lst.eval[1]
+  #LHC.Prim.lst.eval.node^2 = @load   *LHC.Prim.lst.eval[2]
+  case #LHC.Prim.lst.eval.node of
+    LHC.Prim.Nil →
+      @alloc 1
+      *con = @store (LHC.Prim.Unit)
+      @return *con
+    LHC.Prim.Cons →
+      *LHC.Prim.head = @cast(#LHC.Prim.lst.eval.node^1)
+      *LHC.Prim.tail = @cast(#LHC.Prim.lst.eval.node^2)
+      @save[3] *LHC.Prim.tail
+      *LHC.Prim.head.eval = eval(*LHC.Prim.head)
+      *LHC.Prim.tail = @restore[3]
+      #LHC.Prim.head.eval.node = @load   *LHC.Prim.head.eval[0]
+      #LHC.Prim.head.eval.node^1 = @load   *LHC.Prim.head.eval[1]
+      LHC.Prim.C# ←  #LHC.Prim.head.eval.node
+      i32|LHC.Prim.char = @cast(#LHC.Prim.head.eval.node^1)
+      *ret.apply = LHC.Prim.c_putchar(i32|LHC.Prim.char)
+      *LHC.Prim.tail = @restore[3]
+      @tail LHC.Prim.putStr(*LHC.Prim.tail)
+```
 
 ## Step 10: Turn all function calls into tail calls with CPS
 
-CPS transform
+Once all the spills are explicit, we convert the code to continuation passing
+style. This gets rid of plain function applications and replaces them with
+continuations.
+
+The `putStr` function from the previous step contains three function calls (`eval`
+on line 2, `eval` on line 15, and `c_putchar` on line 21) so three continuations
+will be created:
+
+```
+void LHC.Prim.putStr *LHC.Prim.lst @cont =
+  @alloc 4
+  @bedrock.stackframe = @store (bedrock.StackFrame)
+  @bump 3
+  @write @bedrock.stackframe[2] @cont
+  void(i8*)*|fnPtr = &LHC.Prim.putStr.continuation
+  @write @bedrock.stackframe[1] void(i8*)*|fnPtr
+  @tail eval(*LHC.Prim.lst, @bedrock.stackframe)
+
+void LHC.Prim.putStr.continuation @bedrock.stackframe.cont *LHC.Prim.lst.eval =
+  @cont = @load   @bedrock.stackframe.cont[2]
+  #LHC.Prim.lst.eval.node = @load   *LHC.Prim.lst.eval[0]
+  #LHC.Prim.lst.eval.node^1 = @load   *LHC.Prim.lst.eval[1]
+  #LHC.Prim.lst.eval.node^2 = @load   *LHC.Prim.lst.eval[2]
+  case #LHC.Prim.lst.eval.node of
+    LHC.Prim.Nil →
+      @alloc 1
+      *con = @store (LHC.Prim.Unit)
+      #contNode = @load   @cont[1]
+      @invoke #contNode(@cont, *con)
+    LHC.Prim.Cons →
+      *LHC.Prim.head = @cast(#LHC.Prim.lst.eval.node^1)
+      *LHC.Prim.tail = @cast(#LHC.Prim.lst.eval.node^2)
+      @write @bedrock.stackframe.cont[3] *LHC.Prim.tail
+      void(i8*)*|fnPtr = &LHC.Prim.putStr.continuation^1
+      @write @bedrock.stackframe.cont[1] void(i8*)*|fnPtr
+      @tail eval(*LHC.Prim.head, @bedrock.stackframe.cont)
+
+void LHC.Prim.putStr.continuation^1 @bedrock.stackframe.cont *LHC.Prim.head.eval =
+  @cont = @load   @bedrock.stackframe.cont[2]
+  *LHC.Prim.tail = @load   @bedrock.stackframe.cont[3]
+  #LHC.Prim.head.eval.node = @load   *LHC.Prim.head.eval[0]
+  #LHC.Prim.head.eval.node^1 = @load   *LHC.Prim.head.eval[1]
+  LHC.Prim.C# ←  #LHC.Prim.head.eval.node
+  i32|LHC.Prim.char = @cast(#LHC.Prim.head.eval.node^1)
+  void(i8*)*|fnPtr = &LHC.Prim.putStr.continuation^2
+  @write @bedrock.stackframe.cont[1] void(i8*)*|fnPtr
+  @tail LHC.Prim.c_putchar(i32|LHC.Prim.char, @bedrock.stackframe.cont)
+
+void LHC.Prim.putStr.continuation^2 @bedrock.stackframe.cont *ret.apply =
+  @cont = @load   @bedrock.stackframe.cont[2]
+  *LHC.Prim.tail = @load   @bedrock.stackframe.cont[3]
+  @tail LHC.Prim.putStr(*LHC.Prim.tail, @cont)
+```
 
 ## Step 11: Remove `@alloc` primitives
 
