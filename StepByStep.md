@@ -80,6 +80,21 @@ We end up with a lazy, functional language that looks like a plain version of
 Haskell. At this point we also perform a few optimizations designed to improve
 the readability of the generated code.
 
+```
+[library code has been omitted]
+Main.main : LHC.Prim.IO ()
+Main.main =
+  λ LHC.Prim.s:LHC.Prim.RealWorld# →
+  LHC.Prim.thenIO (LHC.Prim.putStrLn (LHC.Prim.unpackString# "What is your name?")) (LHC.Prim.bindIO
+          LHC.Prim.getLine (λ Main.name:[LHC.Prim.Char] LHC.Prim.s:LHC.Prim.RealWorld# →
+        LHC.Prim.thenIO (LHC.Prim.putStr (LHC.Prim.unpackString# "Hi ")) (LHC.Prim.thenIO
+                (LHC.Prim.putStr Main.name) (LHC.Prim.putStrLn (LHC.Prim.unpackString# ".")))
+          LHC.Prim.s)) LHC.Prim.s
+Main.entrypoint : ()
+Main.entrypoint =
+  LHC.Prim.unsafePerformIO Main.main[0] Running step "rename"
+```
+
 ## Step 5: High level intermediate language
 
 Core -> Bedrock

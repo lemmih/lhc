@@ -4,9 +4,10 @@ import           Data.Graph                         (SCC (..),
                                                      stronglyConnComp)
 import           Data.Tagged
 import           Language.Haskell.Exts
-import           Language.Haskell.TypeCheck.Pretty  (pretty)
+import           Language.Haskell.TypeCheck.Pretty  (pretty, displayIO, renderPretty)
 import           System.Exit
 import           System.FilePath
+import System.IO
 
 import           Language.Haskell.TypeCheck
 import           Language.Haskell.Scope             hiding (Interface)
@@ -198,7 +199,8 @@ compileExecutable verbose keepIntermediateFiles file = do
             Core.deadCodeElimination entrypoint $
             NewType.lower $ mappend libraryCore core
     -- print (pretty complete)
-    -- displayIO stdout (renderPretty 1 100 (pretty complete))
+    when verbose $
+      displayIO stdout (renderPretty 1 100 (pretty complete))
 
     let bedrock = Core.convert complete
     -- print (ppModule bedrock)
