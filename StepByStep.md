@@ -503,6 +503,8 @@ void LHC.Prim.c_putchar.with_mem i32|arg @cont =
   @invoke #contNode(@cont, *con)
 ```
 
+After lowering global registers:
+
 ```
 void LHC.Prim.c_putchar.with_mem *hp i32|arg @cont =
   i32|primOut = @ccall putchar(i32|arg)
@@ -547,7 +549,8 @@ define internal fastcc void @eval(i64* %hp, i64* %arg, i64* %cont) nounwind{
   %3 = getelementptr inbounds i64, i64* %arg, i64 1
   %4 = load i64, i64* %3, align 1
   %obj_1 = bitcast i64 %4 to i64
-  switch i64 %obj, label %5 [i64 108, label %"LHC.Prim.unpackString# _" i64 185, label %"Main.entrypoint _"]
+  switch i64 %obj, label %5 [i64 108, label %"LHC.Prim.unpackString# _"
+                             i64 185, label %"Main.entrypoint _"]
 "LHC.Prim.unpackString# _":
   %arg_1 = inttoptr i64 %obj_1 to i8*
   tail call fastcc void @"LHC.Prim.unpackString#"(i64* %hp, i8* %arg_1, i64* %cont) nounwind
@@ -563,6 +566,14 @@ define internal fastcc void @eval(i64* %hp, i64* %arg, i64* %cont) nounwind{
   tail call fastcc void %8(i64* %hp, i64* %cont, i64* %arg) nounwind
   unreachable
 }
+```
+
+Finally we can execute our compiled program using the LLVM interpreter:
+
+```bash
+$ echo "lemmih" | lli examples/Greeting.ll
+What is your name?
+Hi lemmih.
 ```
 
 ## Missing pieces
