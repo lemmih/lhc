@@ -278,7 +278,7 @@ LHC is using a rather conservative algorithm which is less accurate than the
 algorithm described by Boquist.
 
 The following code shows how the `obj` variable has been marked with a size of
-`2`:
+`2` and `lst.eval.node` has size `3`:
 
 ```
 * eval *arg =
@@ -290,6 +290,20 @@ The following code shows how the `obj` variable has been marked with a size of
       @tail Main.entrypoint()
     DEFAULT →
       @return *arg
+
+* LHC.Prim.putStr *LHC.Prim.lst =
+  *LHC.Prim.lst.eval = eval(*LHC.Prim.lst)
+  %3%LHC.Prim.lst.eval.node = @fetch   *LHC.Prim.lst.eval
+  case %3%LHC.Prim.lst.eval.node of
+    LHC.Prim.Nil →
+      *con = @store (LHC.Prim.Unit)
+      @return *con
+    LHC.Prim.Cons *LHC.Prim.head *LHC.Prim.tail →
+      *LHC.Prim.head.eval = eval(*LHC.Prim.head)
+      %2%LHC.Prim.head.eval.node = @fetch   *LHC.Prim.head.eval
+      LHC.Prim.C# i32|LHC.Prim.char ←  %2%LHC.Prim.head.eval.node
+      *ret.apply = LHC.Prim.c_putchar(i32|LHC.Prim.char)
+      @tail LHC.Prim.putStr(*LHC.Prim.tail)
 ```
 
 ## Step 8: Put nodes in word-sized variables
@@ -309,6 +323,27 @@ separate variables with one variable for each field:
       @tail Main.entrypoint()
     DEFAULT →
       @return *arg
+
+* LHC.Prim.putStr *LHC.Prim.lst =
+  *LHC.Prim.lst.eval = eval(*LHC.Prim.lst)
+  #LHC.Prim.lst.eval.node = @load   *LHC.Prim.lst.eval[0]
+  #LHC.Prim.lst.eval.node^1 = @load   *LHC.Prim.lst.eval[1]
+  #LHC.Prim.lst.eval.node^2 = @load   *LHC.Prim.lst.eval[2]
+  case #LHC.Prim.lst.eval.node of
+    LHC.Prim.Nil →
+      @alloc 1
+      *con = @store (LHC.Prim.Unit)
+      @return *con
+    LHC.Prim.Cons →
+      *LHC.Prim.head = @cast(#LHC.Prim.lst.eval.node^1)
+      *LHC.Prim.tail = @cast(#LHC.Prim.lst.eval.node^2)
+      *LHC.Prim.head.eval = eval(*LHC.Prim.head)
+      #LHC.Prim.head.eval.node = @load   *LHC.Prim.head.eval[0]
+      #LHC.Prim.head.eval.node^1 = @load   *LHC.Prim.head.eval[1]
+      LHC.Prim.C# ←  #LHC.Prim.head.eval.node
+      i32|LHC.Prim.char = @cast(#LHC.Prim.head.eval.node^1)
+      *ret.apply = LHC.Prim.c_putchar(i32|LHC.Prim.char)
+      @tail LHC.Prim.putStr(*LHC.Prim.tail)
 ```
 
 ## Step 9: Make the stack layout explicit
@@ -406,19 +441,129 @@ void LHC.Prim.putStr.continuation^2 @bedrock.stackframe.cont *ret.apply =
 
 ## Step 11: Remove `@alloc` primitives
 
-Lower allocs
+Now that the activations frames are explicitly allocated, we can get rid of the
+`@alloc` primitive. We want to replace it with the `@gc_allocate` primitive but
+this primitive can fail if the heap is full. So, we have to check for failure
+and possibly initiate a garbage collection.
+
+The general principle is illustrated by this example:
+
+```
+void function *arg =
+  @alloc 4
+  function_body_here
+
+ ===>
+
+void function *arg =
+  #check <- @gc_allocate 4
+  case #check of
+    0 →
+      @tail function.without_mem(*arg)
+    1 →
+      @tail function.with_mem(*arg)
+
+; Ran out of heap, initiate a garbage collect
+void function.without_mem *arg =
+  @gc_begin
+  *arg.marked = @gc_mark *arg
+  @gc_end
+  @tail function.with_mem(*arg.marked)
+
+void function.with_mem *arg =
+  function_body_here
+```
 
 ## Step 12: Plugging in a garbage collector
 
-Lower gc primitives
+Garbage collectors in LHC are written as plugins which generate bedrock code.
+As of writing, there's only a single plugins which merely allocates a large slab
+of memory and never does any collection.
 
 ## Step 13: Remove global registers
 
-Lower globals
+The garbage collect may use global register to store the heap pointer, heap limits
+and other frequently access information. We make these registers explicit by
+passing them as the first parameters to all the bedrock functions.
+
+The following two snippets show how the virtual `hp` register is turned into
+a variable which is explicitly passed around:
+
+```
+void LHC.Prim.c_putchar.with_mem i32|arg @cont =
+  i32|primOut = @ccall putchar(i32|arg)
+  *hp = @register hp
+  *con = @cast(*hp)
+  %tmp = @node (LHC.Prim.Int32)
+  @write *hp[0] %tmp
+  @write *hp[1] i32|primOut
+  *hp' = &*hp[2]
+  @register hp = *hp'
+  #contNode = @load   @cont[1]
+  @invoke #contNode(@cont, *con)
+```
+
+```
+void LHC.Prim.c_putchar.with_mem *hp i32|arg @cont =
+  i32|primOut = @ccall putchar(i32|arg)
+  %tmp = @node (LHC.Prim.Int32)
+  @write *hp[0] %tmp
+  @write *hp[1] i32|primOut
+  *hp' = &*hp[2]
+  #contNode = @load   @cont[1]
+  @invoke #contNode(*hp', @cont, *hp)
+```
 
 ## Step 14: Generating LLVM IR
 
-Generate LLVM
+The bedrock code is very low level at this point and can be directly pretty-printed
+as LLVM IR.
+
+Bedrock function:
+
+```
+void eval *hp *arg @cont =
+  #obj = @load   *arg[0]
+  #obj^1 = @load   *arg[1]
+  case #obj of
+    LHC.Prim.unpackString# _ →
+      i8*|arg^1 = @cast(#obj^1)
+      @tail LHC.Prim.unpackString#(*hp, i8*|arg^1, @cont)
+    Main.entrypoint _ →
+      @tail Main.entrypoint(*hp, @cont)
+    DEFAULT →
+      #contNode = @load   @cont[1]
+      @invoke #contNode(*hp, @cont, *arg)
+```
+
+LLVM function:
+
+```llvm
+define internal fastcc void @eval(i64* %hp, i64* %arg, i64* %cont) nounwind{
+; <label>:0:
+  %1 = getelementptr inbounds i64, i64* %arg, i64 0
+  %2 = load i64, i64* %1, align 1
+  %obj = bitcast i64 %2 to i64
+  %3 = getelementptr inbounds i64, i64* %arg, i64 1
+  %4 = load i64, i64* %3, align 1
+  %obj_1 = bitcast i64 %4 to i64
+  switch i64 %obj, label %5 [i64 108, label %"LHC.Prim.unpackString# _" i64 185, label %"Main.entrypoint _"]
+"LHC.Prim.unpackString# _":
+  %arg_1 = inttoptr i64 %obj_1 to i8*
+  tail call fastcc void @"LHC.Prim.unpackString#"(i64* %hp, i8* %arg_1, i64* %cont) nounwind
+  ret void
+"Main.entrypoint _":
+  tail call fastcc void @Main.entrypoint(i64* %hp, i64* %cont) nounwind
+  ret void
+; <label>:5:
+  %6 = getelementptr inbounds i64, i64* %cont, i64 1
+  %7 = load i64, i64* %6, align 1
+  %contNode = bitcast i64 %7 to i64
+  %8 = inttoptr i64 %contNode to void (i64*, i64*, i64*)*
+  tail call fastcc void %8(i64* %hp, i64* %cont, i64* %arg) nounwind
+  unreachable
+}
+```
 
 ## Missing pieces
 
