@@ -9,7 +9,6 @@ pipeline. We'll use `Haskell.Language.Exts.parseFile` to turn this source file
 into an AST:
 
 ```haskell
-{-# LANGUAGE MagicHash #-}
 module Main (main) where
 
 import LHC.Prim

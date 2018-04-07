@@ -1,4 +1,3 @@
-{-# LANGUAGE MagicHash #-}
 module Main (main) where
 
 import LHC.Prim
