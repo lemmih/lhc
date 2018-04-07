@@ -109,6 +109,9 @@ When translating Core to Bedrock, we use the `@store`, `@eval` and `@apply`
 primitives to allocate nodes on the heap and to implement laziness. Read more
 about eval/apply here: https://www.microsoft.com/en-us/research/publication/make-fast-curry-pushenter-vs-evalapply/
 
+The entire bedrock code (including all library code) for our original Haskell
+program looks like this:
+
 ```
 foreign i32 putchar(i32)
 foreign i8 indexI8#(i8*)
@@ -222,7 +225,53 @@ void * Main.main^16 void|LHC.Prim.s^87 =
 
 ## Step 6: Remove `@eval` and `@apply` primitives
 
-Lower EvalApply
+GHC implements the `@eval` and `@apply` primitives in its runtime-system but
+LHC has a different strategy in mind. By analysis the code, we can replace
+each call to `@eval` and `@apply` with new function. One way of doing this is
+with a heap points-to (HPT) analysis but this is rather expensive. At the moment,
+LHC is using a cheaper algorithm at the cost of generated less optimized code.
+
+After the transformation, all calls to `@eval` have been replaced by a real
+`eval` function. The `@apply` primitive is not used by our example program:
+
+```
+[code omitted]
+* eval *arg^1 =
+  %obj^2 = @fetch   *arg^1
+  case %obj^2 of
+    LHC.Prim.unpackString#^13 i8*|arg^4 →
+      *new^3 = LHC.Prim.unpackString#^13(i8*|arg^4)
+      @return *new^3
+    Main.entrypoint^17 →
+      *new^5 = Main.entrypoint^17()
+      @return *new^5
+    DEFAULT →
+      @return *arg^1
+
+[code omitted]
+
+void * LHC.Prim.putStr^12 *LHC.Prim.lst^14 void|LHC.Prim.s^50 =
+  *LHC.Prim.lst.eval^15 = eval(*LHC.Prim.lst^14)
+  %LHC.Prim.lst.eval.node^2 = @fetch   *LHC.Prim.lst.eval^15
+  case %LHC.Prim.lst.eval.node^2 of
+    LHC.Prim.Nil^3 →
+      *con^16 = @store (LHC.Prim.Unit^2)
+      @return void|LHC.Prim.s^50, *con^16
+    LHC.Prim.Cons^4 *LHC.Prim.head^17 *LHC.Prim.tail^18 →
+      *LHC.Prim.head.eval^19 = eval(*LHC.Prim.head^17)
+      %LHC.Prim.head.eval.node^3 = @fetch   *LHC.Prim.head.eval^19
+      LHC.Prim.C#^1 i32|LHC.Prim.char^58 ←  %LHC.Prim.head.eval.node^3
+      void|ret.apply^59, *ret.apply^20 = LHC.Prim.c_putchar^5(i32|LHC.Prim.char^58, void|LHC.Prim.s^50)
+      @tail LHC.Prim.putStr^12(*LHC.Prim.tail^18, void|ret.apply^59)
+
+[code omitted]
+
+* Main.entrypoint^17  =
+  void|void^94 = @literal 0
+  void|ret.apply^95, *ret.apply^36 = Main.main^16(void|void^94)
+  *LHC.Prim.val.eval^37 = eval(*ret.apply^36)
+  @exit
+```
 
 ## Step 7: Make node sizes explicit
 
