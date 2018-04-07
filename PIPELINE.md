@@ -92,7 +92,7 @@ Main.main =
           LHC.Prim.s)) LHC.Prim.s
 Main.entrypoint : ()
 Main.entrypoint =
-  LHC.Prim.unsafePerformIO
+  LHC.Prim.unsafePerformIO Main.main
 ```
 
 ## Step 5: High level intermediate language
