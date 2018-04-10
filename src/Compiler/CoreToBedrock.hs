@@ -421,7 +421,6 @@ convertExpr lazy expr rest =
             tmp <- newVariable [] "ret" fnRetTy
             -- fetched <- newVariable [] "thunk" Node
             Bind [tmp] (Application fn (take arity args')) <$>
-              -- Bind [fetched] (Bedrock.Fetch (MemAttributes False Nothing) tmp)
               applyMany finalTys tmp (drop arity args') rest
           Just arity -> do
             tmp <- newVariable [] "thunk" NodePtr
@@ -460,7 +459,7 @@ convertExpr lazy expr rest =
             var' <- convertVariable var
             tmp <- deriveVariable val "node" Node
             -- Bind [var'] (Bedrock.TypeCast val) <$>
-            Bind [tmp] (Bedrock.Fetch (MemAttributes False Nothing) val) <$>
+            Bind [tmp] (Bedrock.Fetch val) <$>
               (Bedrock.Case tmp Nothing <$>
                     mapM convertAlt alts)
           else
@@ -477,7 +476,7 @@ convertExpr lazy expr rest =
                             mapM convertAlt alts
                 else do
                   tmp <- deriveVariable val "node" Node
-                  Bind [tmp] (Bedrock.Fetch (MemAttributes False Nothing) val) <$>
+                  Bind [tmp] (Bedrock.Fetch val) <$>
                     Bedrock.Case tmp (Just defExpr) <$>
                         mapM convertAlt alts
     Cast e ty | not lazy ->

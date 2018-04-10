@@ -51,11 +51,11 @@ instance Pretty Variable where
   pretty Variable{ variableName = name, variableType = ty } =
     pretty ty <> pretty name
 
-ppLiteral :: Literal -> Doc
-ppLiteral literal =
-  case literal of
-    LiteralInt i      -> Doc.integer i
-    LiteralString str -> Doc.text (show str)
+instance Pretty Literal where
+  pretty literal =
+    case literal of
+      LiteralInt i      -> Doc.integer i
+      LiteralString str -> Doc.text (show str)
 
 ppNode :: NodeName -> [Doc] -> Doc
 ppNode (ConstructorName constructor blanks) args =
@@ -71,7 +71,7 @@ ppPattern :: Pattern -> Doc
 ppPattern pattern =
   case pattern of
     NodePat name binds -> ppNode name (map pretty binds)
-    LitPat lit         -> ppLiteral lit
+    LitPat lit         -> pretty lit
     -- UnboxedPat binds   -> Doc.text "(#" <+> ppList (map pretty binds) <+> Doc.text "#)"
     -- VarPat var         -> pretty var
 
@@ -90,73 +90,73 @@ instance Pretty MemAttributes where
       Nothing    -> Doc.empty
       Just group -> ppSyntax "alias" <> Doc.char ':' <> Doc.int group
 
-ppExpression :: Expression -> Doc
-ppExpression simple =
-  case simple of
-    Alloc n ->
-      ppSyntax "@alloc" <+> Doc.int n
-    Store node args ->
-      ppSyntax "@store" <+>
-      Doc.parens (ppNode node (map pretty args))
-    BumpHeapPtr n ->
-      ppSyntax "@bump" <+> Doc.int n
-    Write ptr idx var ->
-      ppSyntax "@write" <+>
-      pretty ptr <> Doc.brackets (Doc.int idx) <+> pretty var
-    Address ptr idx ->
-      ppSyntax "&" <> pretty ptr <> Doc.brackets (Doc.int idx)
-    FunctionPointer fn ->
-      ppSyntax "&" <> pretty fn
-    Fetch attr ptr ->
-      ppSyntax "@fetch" <+> pretty attr <+> pretty ptr
-    Load attr ptr nth ->
-      ppSyntax "@load" <+> pretty attr <+> pretty ptr <>
-      Doc.brackets (Doc.int nth)
-    Add lhs rhs ->
-      ppSyntax "@add" <+> pretty lhs <+> pretty rhs
-    Undefined ->
-      ppSyntax "@undefined"
-    Save var n ->
-      ppSyntax "@save" <> Doc.brackets (Doc.int n) <+> pretty var
-    Restore n ->
-      ppSyntax "@restore" <> Doc.brackets (Doc.int n)
-    Application fn args ->
-      pretty fn <> Doc.parens (ppList $ map pretty args)
-    CCall fn args ->
-      ppSyntax "@ccall" <+>
-      text fn <> Doc.parens (ppList $ map pretty args)
-    Catch exh exhArgs fn args ->
-      ppSyntax "@catch" <+>
-      pretty exh <> Doc.parens (ppList $ map pretty exhArgs) <+>
-      pretty fn <> Doc.parens (ppList $ map pretty args)
-    TypeCast var ->
-      ppSyntax "@cast" <> Doc.parens (pretty var)
-    MkNode name vars ->
-      ppSyntax "@node" <+> Doc.parens (ppNode name (map pretty vars))
-    Literal lit ->
-      ppSyntax "@literal" <+> ppLiteral lit
-    Eval var ->
-      ppSyntax "@eval" <+> pretty var
-    Apply a b ->
-      ppSyntax "@apply" <+> pretty a <+> pretty b
-    ReadRegister reg ->
-      ppSyntax "@register" <+> text reg
-    WriteRegister reg var ->
-      ppSyntax "@register" <+> text reg <+> Doc.equals <+> pretty var
-    ReadGlobal reg ->
-      ppSyntax "@global" <+> text reg
-    WriteGlobal reg var ->
-      ppSyntax "@global" <+> text reg <+> Doc.equals <+> pretty var
-    GCAllocate n ->
-      ppSyntax "@gc_allocate" <+> Doc.int n
-    GCBegin ->
-      ppSyntax "@gc_begin"
-    GCEnd ->
-      ppSyntax "@gc_end"
-    GCMark var ->
-      ppSyntax "@gc_mark" <+> pretty var
-    GCMarkNode var ->
-      ppSyntax "@gc_mark_node" <+> pretty var
+instance Pretty Expression where
+  pretty simple =
+    case simple of
+      Alloc n ->
+        ppSyntax "@alloc" <+> Doc.int n
+      Store node args ->
+        ppSyntax "@store" <+>
+        Doc.parens (ppNode node (map pretty args))
+      BumpHeapPtr n ->
+        ppSyntax "@bump" <+> Doc.int n
+      Write ptr idx var ->
+        ppSyntax "@write" <+>
+        pretty ptr <> Doc.brackets (Doc.int idx) <+> pretty var
+      Address ptr idx ->
+        ppSyntax "&" <> pretty ptr <> Doc.brackets (Doc.int idx)
+      FunctionPointer fn ->
+        ppSyntax "&" <> pretty fn
+      Fetch ptr ->
+        ppSyntax "@fetch" <+> pretty ptr
+      Load ptr nth ->
+        ppSyntax "@load" <+> pretty ptr <>
+        Doc.brackets (Doc.int nth)
+      Add lhs rhs ->
+        ppSyntax "@add" <+> pretty lhs <+> pretty rhs
+      Undefined ->
+        ppSyntax "@undefined"
+      Save var n ->
+        ppSyntax "@save" <> Doc.brackets (Doc.int n) <+> pretty var
+      Restore n ->
+        ppSyntax "@restore" <> Doc.brackets (Doc.int n)
+      Application fn args ->
+        pretty fn <> Doc.parens (ppList $ map pretty args)
+      CCall fn args ->
+        ppSyntax "@ccall" <+>
+        text fn <> Doc.parens (ppList $ map pretty args)
+      Catch exh exhArgs fn args ->
+        ppSyntax "@catch" <+>
+        pretty exh <> Doc.parens (ppList $ map pretty exhArgs) <+>
+        pretty fn <> Doc.parens (ppList $ map pretty args)
+      TypeCast var ->
+        ppSyntax "@cast" <> Doc.parens (pretty var)
+      MkNode name vars ->
+        ppSyntax "@node" <+> Doc.parens (ppNode name (map pretty vars))
+      Literal lit ->
+        ppSyntax "@literal" <+> pretty lit
+      Eval var ->
+        ppSyntax "@eval" <+> pretty var
+      Apply a b ->
+        ppSyntax "@apply" <+> pretty a <+> pretty b
+      ReadRegister reg ->
+        ppSyntax "@register" <+> text reg
+      WriteRegister reg var ->
+        ppSyntax "@register" <+> text reg <+> Doc.equals <+> pretty var
+      ReadGlobal reg ->
+        ppSyntax "@global" <+> text reg
+      WriteGlobal reg var ->
+        ppSyntax "@global" <+> text reg <+> Doc.equals <+> pretty var
+      GCAllocate n ->
+        ppSyntax "@gc_allocate" <+> Doc.int n
+      GCBegin ->
+        ppSyntax "@gc_begin"
+      GCEnd ->
+        ppSyntax "@gc_end"
+      GCMark var ->
+        ppSyntax "@gc_mark" <+> pretty var
+      GCMarkNode var ->
+        ppSyntax "@gc_mark_node" <+> pretty var
 
 ppBlock :: Block -> Doc
 ppBlock block =
@@ -165,12 +165,12 @@ ppBlock block =
       ppSyntax "@return" <+>
       ppList (map pretty args)
     Bind [] simple rest ->
-      ppExpression simple Doc.<$$>
+      pretty simple Doc.<$$>
       ppBlock rest
     Bind names simple rest ->
       ppList (map pretty names) <+>
       text "=" <+>
-      ppExpression simple Doc.<$$>
+      pretty simple Doc.<$$>
       ppBlock rest
     Case scrut Nothing [(Alternative pattern expression)] ->
       ppPattern pattern <+> text "← " <+> pretty scrut Doc.<$$>
@@ -213,13 +213,13 @@ instance Pretty Attribute where
   pretty NoCPS    = text "NoCPS"
   pretty Internal = text "Internal"
 
-ppFunction :: Function -> Doc
-ppFunction fn =
-  ppList (map pretty (fnAttributes fn)) Doc.<$$>
-  ppTypes (fnResults fn) <+>
-  ppFnName (fnName fn) <+> Doc.hsep (map pretty (fnArguments fn)) <+>
-  Doc.char '=' Doc.<$$>
-  Doc.indent 2 (ppBlock (fnBody fn))
+instance Pretty Function where
+  pretty fn =
+    ppList (map pretty (fnAttributes fn)) Doc.<$$>
+    ppTypes (fnResults fn) <+>
+    ppFnName (fnName fn) <+> Doc.hsep (map pretty (fnArguments fn)) <+>
+    Doc.char '=' Doc.<$$>
+    Doc.indent 2 (ppBlock (fnBody fn))
 
 ppEntryPoint :: Name -> Doc
 ppEntryPoint entry = text "entrypoint:" <+> pretty entry
@@ -235,4 +235,4 @@ instance Pretty Module where
     Doc.vsep (map pretty (modForeigns m)) Doc.<$$>
     Doc.vsep (map pretty (nodes m)) Doc.<$$>
     ppEntryPoint (entryPoint m) Doc.<$$>
-    Doc.vsep (map ppFunction (functions m))
+    Doc.vsep (map pretty (functions m))

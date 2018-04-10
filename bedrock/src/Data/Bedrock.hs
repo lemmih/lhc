@@ -187,8 +187,8 @@ data Expression
   | Address Variable Int
   | FunctionPointer Name
 
-  | Fetch MemAttributes Variable
-  | Load MemAttributes Variable Int
+  | Fetch Variable
+  | Load Variable Int
   | Add Variable Variable
   | Undefined
   | Save Variable Int
@@ -234,13 +234,18 @@ data Block
 -----------------------------------------------
 -- QuickCheck instances
 
+upperString :: Gen String
+upperString = (:) <$> elements ['A'..'Z'] <*> listOf (elements ['a'..'z'])
+
+upperName :: Gen Name
+upperName = Name <$> listOf upperString <*> upperString <*> fmap abs arbitrary
+
 instance Arbitrary Name where
   arbitrary = Name
-    <$> listOf moduleName
+    <$> listOf upperString
     <*> variableName
     <*> fmap abs arbitrary
     where
-      moduleName = (:) <$> elements ['A'..'Z'] <*> listOf (elements ['a'..'z'])
       variableName = listOf1 (elements ['a'..'z'])
 
 instance Arbitrary Type where
@@ -293,11 +298,11 @@ instance Arbitrary Module where
 
 instance Arbitrary NodeName where
   arbitrary = oneof
-    [ ConstructorName <$> arbitrary <*> fmap abs arbitrary
+    [ ConstructorName <$> upperName <*> fmap abs arbitrary
     , FunctionName <$> arbitrary <*> fmap abs arbitrary ]
 
 instance Arbitrary NodeDefinition where
-  arbitrary = NodeDefinition <$> arbitrary <*> arbitrary
+  arbitrary = NodeDefinition <$> upperName <*> arbitrary
 
 instance Arbitrary Attribute where
   arbitrary = elements [ NoCPS, Internal ]
@@ -338,15 +343,15 @@ instance Arbitrary Expression where
     , Catch <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
     , Alloc <$> arbitrary `suchThat` (>0)
     , Store <$> arbitrary <*> arbitrary
-    , Write <$> arbitrary <*> fmap abs arbitrary <*> arbitrary
+    -- , Write <$> arbitrary <*> fmap abs arbitrary <*> arbitrary
     , Address <$> arbitrary <*> fmap abs arbitrary
-    , Fetch <$> arbitrary <*> arbitrary
-    , Load <$> arbitrary <*> arbitrary <*> fmap abs arbitrary
-    , Add <$> arbitrary <*> arbitrary
-    , ReadRegister <$> plainIdentifier
-    , WriteRegister <$> plainIdentifier <*> arbitrary
-    , ReadGlobal <$> plainIdentifier
-    , WriteGlobal <$> plainIdentifier <*> arbitrary
+    , Fetch <$> arbitrary
+    , Load <$> arbitrary <*> fmap abs arbitrary
+    -- , Add <$> arbitrary <*> arbitrary
+    -- , ReadRegister <$> plainIdentifier
+    -- , WriteRegister <$> plainIdentifier <*> arbitrary
+    -- , ReadGlobal <$> plainIdentifier
+    -- , WriteGlobal <$> plainIdentifier <*> arbitrary
     , TypeCast <$> arbitrary
     , MkNode <$> arbitrary <*> arbitrary
     , Literal <$> arbitrary

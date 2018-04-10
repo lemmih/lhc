@@ -17,10 +17,10 @@ lowerNodeSize = do
 lower :: Block -> Block
 lower block =
   case block of
-    Bind [obj1] (Fetch attrs ptr) (Case obj2 mbDefault alts)
+    Bind [obj1] (Fetch ptr) (Case obj2 mbDefault alts)
       | obj1==obj2, variableType obj1 == Node ->
       let obj = obj1{variableType = StaticNode (nodeSize alts)} in
-      Bind [obj] (Fetch attrs ptr) $
+      Bind [obj] (Fetch ptr) $
       Case obj (fmap lower mbDefault)
         [ Alternative pattern (lower branch)
         | Alternative pattern branch <- alts ]

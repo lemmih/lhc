@@ -16,8 +16,8 @@ bedrockDef :: P.LanguageDef ()
 bedrockDef = P.emptyDef
   { P.commentLine = ";" -- similar to LLVM IR
   , P.caseSensitive = True
-  , P.reservedNames =
-      [ "node", "foreign", "entrypoint", "case", "of" ]
+  , P.reservedNames = []
+      -- [ "node", "foreign", "entrypoint", "case", "of" ]
   , P.reservedOpNames = ["=","->"]
   -- , P.identStart = P.identStart P.emptyDef <|> char '@'
   }
@@ -29,12 +29,14 @@ natural, integer :: Parser Integer
 identifier :: Parser String
 symbol :: String -> Parser String
 parens :: Parser a -> Parser a
+brackets :: Parser a -> Parser a
 reservedOp, reserved :: String -> Parser ()
 stringLiteral, comma, dot :: Parser String
 commaSep, commaSep1 :: Parser a -> Parser [a]
 
 identifier = P.identifier lexer
 parens     = P.parens lexer
+brackets   = P.brackets lexer
 reserved   = P.reserved lexer
 reservedOp = P.reservedOp lexer
 symbol     = P.symbol lexer
@@ -111,7 +113,8 @@ parseNodeDefinition = do
 
 parseAttribute :: Parser Attribute
 parseAttribute = choice
-  [ reserved "NoCPS" >> return NoCPS ]
+  [ reserved "NoCPS" >> return NoCPS
+  , reserved "Internal" >> return Internal ]
 
 parseFunction :: Parser Function
 parseFunction = do
@@ -125,7 +128,7 @@ parseFunction = do
 parseConstructor :: Parser Name
 parseConstructor = try (do
   name <- parseName
-  -- guard (isUpper (head (nameIdentifier name)))
+  guard (isUpper (head (nameIdentifier name)))
   return name)
   <?> "constructor"
 
@@ -168,7 +171,7 @@ parseExpression :: Parser Expression
 parseExpression = choice
   [ do
     reserved "@cast"
-    var <- parseVariable
+    var <- parens parseVariable
     return $ TypeCast var
   , do
     reserved "@literal"
@@ -196,19 +199,21 @@ parseExpression = choice
   , do
     reserved "@fetch"
     ptr <- parseVariable
-    let attrs = MemAttributes False Nothing
-    return $ Fetch attrs ptr
+    return $ Fetch ptr
+  , do
+    reserved "@load"
+    ptr <- parseVariable
+    n <- brackets natural
+    return $ Load ptr (fromIntegral n)
   , do
     reserved "@eval"
-    ptr <- parens parseVariable
+    ptr <- parseVariable
     return $ Eval ptr
   , do
     reserved "@apply"
-    parens $ do
-      ptr <- parseVariable
-      comma
-      val <- parseVariable
-      return $ Apply ptr val
+    ptr <- parseVariable
+    val <- parseVariable
+    return $ Apply ptr val
   , do
     reserved "@ccall"
     fn <- parseForeignName
@@ -230,6 +235,31 @@ parseExpression = choice
     fn <- parseName
     args <- parens (commaSep parseVariable)
     return $ Application fn args
+  , do
+    symbol "&"
+    ptr <- parseVariable
+    n <- brackets natural
+    return $ Address ptr (fromIntegral n)
+  , do
+    reserved "@global"
+    reg <- identifier
+    symbol "="
+    var <- parseVariable
+    return $ WriteGlobal reg var
+  , do
+    reserved "@global"
+    reg <- identifier
+    return $ ReadGlobal reg
+  , do
+    reserved "@register"
+    reg <- identifier
+    symbol "="
+    var <- parseVariable
+    return $ WriteRegister reg var
+  , do
+    reserved "@register"
+    reg <- identifier
+    return $ ReadRegister reg
   ]
 
 parseBlock :: Parser Block

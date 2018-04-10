@@ -95,7 +95,7 @@ mkEval :: HPTResult -> Function -> Variable -> Variable -> Block -> Gen Block
 mkEval hpt origin bind var rest | isSimpleEval hpt var = do
     return $
         Bind [bind{variableType = StaticNode (sizeOfVariable hpt bind)}]
-            (Fetch constantMemory var)
+            (Fetch var)
             rest
 mkEval hpt origin bind var rest = do
     evalName <- tagName "eval" (fnName origin)
@@ -108,7 +108,7 @@ mkEval hpt origin bind var rest = do
         , fnResults = [StaticNode (sizeOfVariable hpt bind)]
         , fnBody = body }
     return $
-        Bind [preEvalObject] (Fetch anyMemory var) $
+        Bind [preEvalObject] (Fetch var) $
         Bind [bind] (Application evalName [var, preEvalObject])
         rest
 
@@ -117,7 +117,7 @@ mkInlineEval hpt var = do
     (arg, preEvalObject, body) <- mkEvalBody hpt 0 var
     return $
         Bind [arg] (TypeCast var) $
-        Bind [preEvalObject] (Fetch anyMemory var) $
+        Bind [preEvalObject] (Fetch var) $
         body
 
 

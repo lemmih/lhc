@@ -154,10 +154,10 @@ uniqBlock block =
             return $
                 Bind [tagBind] (MkNode nodeName []) $
                 bindMany (zip nodeBinds nodeArgs) rest'
-        Bind binds (Fetch constant ptr) rest -> lowerMany binds $ do
+        Bind binds (Fetch ptr) rest -> lowerMany binds $ do
             binds' <- resolveMany binds
             rest' <- uniqBlock rest
-            return $ foldr (\(n,b) -> Bind [b] (Load constant ptr n)) rest' (zip [0..] binds')
+            return $ foldr (\(n,b) -> Bind [b] (Load ptr n)) rest' (zip [0..] binds')
         Bind [bind] (Store nodeName args) rest -> do
             args' <- resolveMany args
             rest' <- uniqBlock rest

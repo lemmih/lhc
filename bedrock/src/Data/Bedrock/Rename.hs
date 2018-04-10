@@ -199,10 +199,10 @@ uniqSimple simple =
         Address var idx ->
             Address <$> resolve var <*> pure idx
         FunctionPointer fn -> FunctionPointer <$> resolveName fn
-        Fetch constant var ->
-            Fetch constant <$> resolve var
-        Load constant var idx ->
-            Load constant <$> resolve var <*> pure idx
+        Fetch var ->
+            Fetch <$> resolve var
+        Load var idx ->
+            Load <$> resolve var <*> pure idx
         Add a b ->
             Add <$> resolve a <*> resolve b
         Undefined -> pure Undefined
@@ -413,10 +413,10 @@ locallyExpression expr =
     FunctionPointer name ->
       FunctionPointer
         <$> locallyResolve name
-    Fetch attrs ptr ->
-      Fetch attrs <$> locallyResolveVariable ptr
-    Load attrs ptr offset ->
-      Load attrs <$> locallyResolveVariable ptr <*> pure offset
+    Fetch ptr ->
+      Fetch <$> locallyResolveVariable ptr
+    Load ptr offset ->
+      Load <$> locallyResolveVariable ptr <*> pure offset
     Add a b -> Add <$> locallyResolveVariable a <*> locallyResolveVariable b
     Undefined -> pure expr
     Save val offset ->

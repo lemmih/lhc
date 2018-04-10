@@ -43,7 +43,7 @@ lowerEvalApply = do
 
     evalBody <- do
       obj <- newVariable "obj" Node
-      Bind [obj] (Fetch memAttr arg) <$>
+      Bind [obj] (Fetch arg) <$>
         Case obj (Just defaultEval) <$> sequence
           [ mkEvalAlternative fn
           | fn <- fs
@@ -63,9 +63,6 @@ lowerEvalApply = do
     forM_ fs $ \fn ->
       pushFunction fn{fnBody = replaceEvalApply (Map.fromList applys) evalName (fnBody fn)}
 
-memAttr :: MemAttributes
-memAttr = MemAttributes False Nothing
-
 mkApplyFn :: (([Type], Type), [(NodeName, [Type])]) -> Gen Name
 mkApplyFn ((retTys, arg), nodeNames) = do
     applyName <- newName "apply"
@@ -73,7 +70,7 @@ mkApplyFn ((retTys, arg), nodeNames) = do
     arg <- newVariable "arg" arg
     obj <- newVariable "obj" Node
     applyBody <-
-      Bind [obj] (Fetch memAttr fn) <$>
+      Bind [obj] (Fetch fn) <$>
       Case obj Nothing <$> sequence
         [ do
             out <- mapM (newVariable "out") retTys

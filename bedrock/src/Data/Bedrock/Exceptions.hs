@@ -11,7 +11,6 @@ import qualified Data.Map as Map
 
 import           Data.Bedrock
 import           Data.Bedrock.Transform
-import           Data.Bedrock.Misc (anyMemory)
 
 stackFrameName :: Name
 stackFrameName = Name ["bedrock"] "StackFrame" 0
@@ -54,7 +53,7 @@ cpsBlock origin frameVar block =
             -- We need to invoke with at least 1+'size' arguments.
             -- 'node' is repeated here. Could be Undefined as well. Doesn't matter.
             return $
-                Bind [node] (Load anyMemory stdContinuation 1) $
+                Bind [node] (Load stdContinuation 1) $
                 Invoke node (stdContinuation : take size (args ++ repeat node))
         Case scrut defaultBranch alternatives ->
             Case scrut
@@ -63,7 +62,7 @@ cpsBlock origin frameVar block =
         Raise exception -> do
             node <- newVariable "contNode" Node
             return $
-                Bind [node] (Fetch anyMemory stdContinuation) $
+                Bind [node] (Fetch stdContinuation) $
                 InvokeHandler node exception
         TailCall fn args -> do
             noCPS <- hasAttribute fn NoCPS
@@ -115,7 +114,7 @@ cpsExpresion origin frameVar binds simple rest =
         Save var n ->
             Bind binds (Write frameVar n var) <$> cpsBlock origin frameVar rest
         Restore n ->
-            Bind binds (Load anyMemory frameVar n) <$> cpsBlock origin frameVar rest
+            Bind binds (Load frameVar n) <$> cpsBlock origin frameVar rest
         other -> Bind binds other <$> cpsBlock origin frameVar rest
   where
     mkContinuation use = do
@@ -127,7 +126,7 @@ cpsExpresion origin frameVar binds simple rest =
         contFnName <- tagName "continuation" (fnName origin)
 
         body <- cpsBlock origin framePtr $
-            Bind [stdContinuation] (Load anyMemory framePtr 2) $ rest
+            Bind [stdContinuation] (Load framePtr 2) $ rest
         pushHelper $
             Function { fnName      = contFnName
                      , fnAttributes = []

@@ -174,9 +174,9 @@ freeVariablesSimple simple =
         BumpHeapPtr{} -> id
         Write ptr _idx var ->
             Set.insert ptr . Set.insert var
-        Fetch _ ptr ->
+        Fetch ptr ->
             Set.insert ptr
-        Load _ ptr _idx ->
+        Load ptr _idx ->
             Set.insert ptr
         Add lhs rhs ->
             Set.insert lhs . Set.insert rhs
@@ -200,4 +200,3 @@ freeVariablesSimple simple =
         GCEnd{} -> id
         GCMark var -> Set.insert var
         GCMarkNode var -> Set.insert var
-

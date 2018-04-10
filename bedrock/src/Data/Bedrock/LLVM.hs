@@ -498,7 +498,7 @@ blockToLLVM = worker
             , maybeAtomicity = Nothing
             , alignment = 1
             , metadata = [] }
-    mkInst retTy (Bedrock.Load attrs Variable{..} offset) = do
+    mkInst retTy (Bedrock.Load Variable{..} offset) = do
         offsetPtr <- anonInst $ GetElementPtr
             { inBounds = True
             , address = LocalReference
@@ -514,10 +514,7 @@ blockToLLVM = worker
                             offsetPtr
             , maybeAtomicity = Nothing
             , alignment = 1
-            , metadata =
-                if memConstant attrs
-                    then [("invariant.load", MetadataNode [])]
-                    else [] }
+            , metadata = [] }
         return $ castReference (IntegerType 64) word retTy
     mkInst retTy (Write dst offset var) = do
         casted <- anonInst $ castReference

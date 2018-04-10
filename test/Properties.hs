@@ -19,4 +19,7 @@ parsePrettyPrintProps = do
     it "Variable" $ property $ parseTest parseVariable
     it "Foreign"  $ property $ parseTest parseForeign
     it "NodeDefinition" $ property $ parseTest parseNodeDefinition
+    it "Literal" $ property $ parseTest parseLiteral
+    it "Attribute" $ property $ parseTest parseAttribute
+    it "Expression" $ property $ parseTest parseExpression
     -- xit "Module" $ property $ parseTest parseModule
