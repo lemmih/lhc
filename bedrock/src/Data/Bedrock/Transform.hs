@@ -28,57 +28,57 @@ pushHelper fn = modify $ \st -> st{envHelpers = fn : envHelpers st}
 
 pushFunction :: Function -> Gen ()
 pushFunction fn = do
-    helpers <- gets envHelpers
-    modify $ \st -> st{envHelpers = []}
-    modifyModule $ \m -> m{functions = functions m ++ fn:helpers}
+  helpers <- gets envHelpers
+  modify $ \st -> st{envHelpers = []}
+  modifyModule $ \m -> m{functions = functions m ++ fn:helpers}
 
 pushNode :: NodeDefinition -> Gen ()
 pushNode n = modifyModule $ \m -> m{ nodes = n : nodes m }
 
 lookupAttributes :: Name -> Gen [Attribute]
 lookupAttributes name = do
-    m <- gets envFunctions
-    case Map.lookup name m of
-        -- XXX: Throw an exception?
-        Nothing -> return []
-        Just fn -> return $ fnAttributes fn
+  m <- gets envFunctions
+  case Map.lookup name m of
+    -- XXX: Throw an exception?
+    Nothing -> return []
+    Just fn -> return $ fnAttributes fn
 
 hasAttribute :: Name -> Attribute -> Gen Bool
 hasAttribute name attr = do
-    attrs <- lookupAttributes name
-    return $ attr `elem` attrs
+  attrs <- lookupAttributes name
+  return $ attr `elem` attrs
 
 newUnique :: Gen Int
 newUnique = do
-    u <- gets envUnique
-    modify $ \st -> st{envUnique = u+1}
-    return u
+  u <- gets envUnique
+  modify $ \st -> st{envUnique = u+1}
+  return u
 
 newName :: String -> Gen Name
 newName name = do
-    u <- newUnique
-    return Name
-        { nameModule = []
-        , nameIdentifier = name
-        , nameUnique = u }
+  u <- newUnique
+  return Name
+      { nameModule = []
+      , nameIdentifier = name
+      , nameUnique = u }
 
 newVariable :: String -> Type -> Gen Variable
 newVariable ident ty = do
-    name <- newName ident
-    return Variable
-        { variableName = name
-        , variableType = ty }
+  name <- newName ident
+  return Variable
+      { variableName = name
+      , variableType = ty }
 
 tagName :: String -> Name -> Gen Name
 tagName tag name = do
-    u <- newUnique
-    return $ name{ nameIdentifier = nameIdentifier name ++ "." ++ tag
-                 , nameUnique = u}
+  u <- newUnique
+  return $ name{ nameIdentifier = nameIdentifier name ++ "." ++ tag
+               , nameUnique = u}
 
 tagVariable :: String -> Variable -> Gen Variable
 tagVariable tag var = do
-    nameTag <- tagName tag (variableName var)
-    return var{ variableName = nameTag }
+  nameTag <- tagName tag (variableName var)
+  return var{ variableName = nameTag }
 
 
 
@@ -121,82 +121,82 @@ freeVariables block = freeVariables' block Set.empty
 
 freeVariables' :: Block -> Set Variable -> Set Variable
 freeVariables' block =
-    case block of
-        Case scrut defaultBranch alternatives ->
-            foldr (.) (Set.insert scrut)
-            [ flip Set.difference (freeVariablesPattern pattern Set.empty) .
-              freeVariables' branch
-            | Alternative pattern branch <- alternatives ] .
-            case defaultBranch of
-                Nothing -> id
-                Just branch -> freeVariables' branch
-        Bind binds simple rest ->
-            freeVariablesSimple simple .
-            flip Set.difference (Set.fromList binds) .
-            freeVariables' rest
-        Return args ->
-            Set.union (Set.fromList args)
-        Raise name ->
-            Set.insert name
-        Invoke cont args ->
-            Set.union (Set.fromList (cont:args))
-        InvokeHandler cont exception ->
-            Set.insert cont . Set.insert exception
-        TailCall _name args ->
-            Set.union (Set.fromList args)
-        Exit ->
-            id
-        Panic{} ->
-            id
+  case block of
+    Case scrut defaultBranch alternatives ->
+      foldr (.) (Set.insert scrut)
+      [ flip Set.difference (freeVariablesPattern pattern Set.empty) .
+        freeVariables' branch
+      | Alternative pattern branch <- alternatives ] .
+      case defaultBranch of
+        Nothing -> id
+        Just branch -> freeVariables' branch
+    Bind binds simple rest ->
+      freeVariablesSimple simple .
+      flip Set.difference (Set.fromList binds) .
+      freeVariables' rest
+    Return args ->
+      Set.union (Set.fromList args)
+    Raise name ->
+      Set.insert name
+    Invoke cont args ->
+      Set.union (Set.fromList (cont:args))
+    InvokeHandler cont exception ->
+      Set.insert cont . Set.insert exception
+    TailCall _name args ->
+      Set.union (Set.fromList args)
+    Exit ->
+      id
+    Panic{} ->
+      id
 
 freeVariablesPattern :: Pattern -> Set Variable -> Set Variable
 freeVariablesPattern pattern =
-    case pattern of
-        NodePat _ vars -> Set.union (Set.fromList vars)
-        LitPat{}       -> id
-        -- VarPat var     -> Set.insert var
+  case pattern of
+    NodePat _ vars -> Set.union (Set.fromList vars)
+    LitPat{}       -> id
+    -- VarPat var     -> Set.insert var
 
 freeVariablesSimple :: Expression -> Set Variable -> Set Variable
 freeVariablesSimple simple =
-    case simple of
-        Application _fn args ->
-            Set.union (Set.fromList args)
-        CCall _fn args ->
-            Set.union (Set.fromList args)
-        Catch _exh exhArgs _fn fnArgs ->
-            Set.union (Set.fromList (exhArgs ++ fnArgs))
-        Alloc{} ->
-            id
-        GCAllocate{} ->
-            id
-        Store _constructor args ->
-            Set.union (Set.fromList args)
-        BumpHeapPtr{} -> id
-        Write ptr _idx var ->
-            Set.insert ptr . Set.insert var
-        Fetch ptr ->
-            Set.insert ptr
-        Load ptr _idx ->
-            Set.insert ptr
-        Add lhs rhs ->
-            Set.insert lhs . Set.insert rhs
-        Undefined -> id
-        Save var _n -> Set.insert var
-        Restore{} -> id
-        ReadRegister{} -> id
-        WriteRegister _reg var -> Set.insert var
-        Address var _idx -> Set.insert var
-        FunctionPointer{} -> id
-        TypeCast var -> Set.insert var
-        Eval var ->
-            Set.insert var
-        Apply obj arg ->
-            Set.insert obj . Set.insert arg
-        ReadGlobal{} -> id
-        WriteGlobal _reg var -> Set.insert var
-        MkNode _ vars -> Set.union (Set.fromList vars)
-        Literal{} -> id
-        GCBegin{} -> id
-        GCEnd{} -> id
-        GCMark var -> Set.insert var
-        GCMarkNode var -> Set.insert var
+  case simple of
+    Application _fn args ->
+      Set.union (Set.fromList args)
+    CCall _fn args ->
+      Set.union (Set.fromList args)
+    Catch _exh exhArgs _fn fnArgs ->
+      Set.union (Set.fromList (exhArgs ++ fnArgs))
+    Alloc{} ->
+      id
+    GCAllocate{} ->
+      id
+    Store _constructor args ->
+      Set.union (Set.fromList args)
+    BumpHeapPtr{} -> id
+    Write ptr _idx var ->
+      Set.insert ptr . Set.insert var
+    Fetch ptr ->
+      Set.insert ptr
+    Load ptr _idx ->
+      Set.insert ptr
+    Add lhs rhs ->
+      Set.insert lhs . Set.insert rhs
+    Undefined -> id
+    Save var _n -> Set.insert var
+    Restore{} -> id
+    ReadRegister{} -> id
+    WriteRegister _reg var -> Set.insert var
+    Address var _idx -> Set.insert var
+    FunctionPointer{} -> id
+    TypeCast var -> Set.insert var
+    Eval var ->
+      Set.insert var
+    Apply obj arg ->
+      Set.insert obj . Set.insert arg
+    ReadGlobal{} -> id
+    WriteGlobal _reg var -> Set.insert var
+    MkNode _ vars -> Set.union (Set.fromList vars)
+    Literal{} -> id
+    GCBegin{} -> id
+    GCEnd{} -> id
+    GCMark var -> Set.insert var
+    GCMarkNode var -> Set.insert var

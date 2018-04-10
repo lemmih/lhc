@@ -23,45 +23,45 @@ import           Data.Bedrock.Transform
 --   continue marked_scope
 lowerAlloc :: Gen ()
 lowerAlloc = do
-    fs <- gets (Map.elems . envFunctions)
-    mapM_ transformFunction fs
-    --mkMarkNode
-    return ()
+  fs <- gets (Map.elems . envFunctions)
+  mapM_ transformFunction fs
+  --mkMarkNode
+  return ()
 
 transformFunction :: Function -> Gen ()
 transformFunction fn = do
-    body <- transformBlock fn (fnBody fn)
-    let fn' = fn{fnBody = body}
-    pushFunction fn'
+  body <- transformBlock fn (fnBody fn)
+  let fn' = fn{fnBody = body}
+  pushFunction fn'
 
 transformBlock :: Function -> Block -> Gen Block
 transformBlock origin block =
-    case block of
-        Case scrut defaultBranch alternatives ->
-            Case scrut
-                <$> transformMaybe (transformBlock origin) defaultBranch
-                <*> mapM (transformAlternative origin) alternatives
-        Bind binds simple rest ->
-            transformExpresion origin binds simple =<<
-                transformBlock origin rest
-        Return{} ->
-            return block
-        Raise{} ->
-            return block
-        TailCall{} ->
-            return block
-        Invoke{} ->
-            return block
-        InvokeHandler{} ->
-            return block
-        Exit ->
-            return block
-        Panic{} ->
-            return block
+  case block of
+    Case scrut defaultBranch alternatives ->
+      Case scrut
+          <$> transformMaybe (transformBlock origin) defaultBranch
+          <*> mapM (transformAlternative origin) alternatives
+    Bind binds simple rest ->
+      transformExpresion origin binds simple =<<
+          transformBlock origin rest
+    Return{} ->
+      return block
+    Raise{} ->
+      return block
+    TailCall{} ->
+      return block
+    Invoke{} ->
+      return block
+    InvokeHandler{} ->
+      return block
+    Exit ->
+      return block
+    Panic{} ->
+      return block
 
 transformAlternative :: Function -> Alternative -> Gen Alternative
 transformAlternative origin (Alternative pat block) =
-    Alternative pat <$> transformBlock origin block
+  Alternative pat <$> transformBlock origin block
 
 --gcMarkNodeName :: Name
 --gcMarkNodeName = Name [] "mark_node" 0
@@ -117,72 +117,72 @@ transformExpresion
     :: Function -> [Variable] -> Expression
     -> Block -> Gen Block
 transformExpresion origin binds simple rest =
-    case simple of
-        Store nodeName args | [bind] <- binds -> do
-            let size = 1 + length args
-            hp <- newVariable "hp" NodePtr
-            hp' <- newVariable "hp'" NodePtr
-            tmp <- newVariable "tmp" Node
-            return $
-                Bind [hp] (ReadRegister "hp") $
-                Bind [bind] (TypeCast hp) $
-                Bind [tmp] (MkNode nodeName []) $
-                Bind [] (Write hp 0 tmp) $
-                foldr (\(nth, arg) -> Bind [] (Write hp nth arg))
-                    (Bind [hp'] (Address hp size) $
-                     Bind [] (WriteRegister "hp" hp') rest)
-                    (zip [1..] args)
-        BumpHeapPtr n -> do
-            let size = n
-            hp <- newVariable "hp" NodePtr
-            hp' <- newVariable "hp'" NodePtr
-            return $
-                Bind [hp] (ReadRegister "hp") $
-                Bind [hp'] (Address hp size) $
-                Bind [] (WriteRegister "hp" hp') $ rest
-        Alloc n -> do
-            continueName <- tagName "with_mem" (fnName origin)
-            divertName <- tagName "without_mem" (fnName origin)
-            check <- newVariable "check" IWord
-            let scope = Set.toList (freeVariables rest)
-            markedScope <- mapM (tagVariable "marked") scope
-            let continue = TailCall continueName scope
-                divert = TailCall divertName scope
-                zippedScope = zip scope markedScope
-                markScope (var, markedVar) = Bind [markedVar] $
-                    case variableType var of
-                        NodePtr     -> GCMark var
-                        Node{}      -> GCMarkNode var
-                        Primitive{} -> TypeCast var
-                        IWord{}     -> TypeCast var
-                        -- This shouldn't really happen
-                        StaticNode{} -> GCMarkNode var
-                        FramePtr     -> GCMark var
+  case simple of
+    Store nodeName args | [bind] <- binds -> do
+      let size = 1 + length args
+      hp <- newVariable "hp" NodePtr
+      hp' <- newVariable "hp'" NodePtr
+      tmp <- newVariable "tmp" Node
+      return $
+        Bind [hp] (ReadRegister "hp") $
+        Bind [bind] (TypeCast hp) $
+        Bind [tmp] (MkNode nodeName []) $
+        Bind [] (Write hp 0 tmp) $
+        foldr (\(nth, arg) -> Bind [] (Write hp nth arg))
+          (Bind [hp'] (Address hp size) $
+           Bind [] (WriteRegister "hp" hp') rest)
+          (zip [1..] args)
+    BumpHeapPtr n -> do
+      let size = n
+      hp <- newVariable "hp" NodePtr
+      hp' <- newVariable "hp'" NodePtr
+      return $
+        Bind [hp] (ReadRegister "hp") $
+        Bind [hp'] (Address hp size) $
+        Bind [] (WriteRegister "hp" hp') $ rest
+    Alloc n -> do
+      continueName <- tagName "with_mem" (fnName origin)
+      divertName <- tagName "without_mem" (fnName origin)
+      check <- newVariable "check" IWord
+      let scope = Set.toList (freeVariables rest)
+      markedScope <- mapM (tagVariable "marked") scope
+      let continue = TailCall continueName scope
+          divert = TailCall divertName scope
+          zippedScope = zip scope markedScope
+          markScope (var, markedVar) = Bind [markedVar] $
+            case variableType var of
+              NodePtr     -> GCMark var
+              Node{}      -> GCMarkNode var
+              Primitive{} -> TypeCast var
+              IWord{}     -> TypeCast var
+              -- This shouldn't really happen
+              StaticNode{} -> GCMarkNode var
+              FramePtr     -> GCMark var
 
-                divertBody =
-                    Bind [] GCBegin $
-                    flip (foldr markScope) zippedScope $
-                    -- gc_evacuate ptrs
-                    Bind [] GCEnd $
-                    TailCall continueName markedScope
-            pushHelper Function
-                { fnName = continueName
-                , fnAttributes = []
-                , fnArguments = scope
-                , fnResults = []
-                , fnBody = rest }
-            pushHelper Function
-                { fnName = divertName
-                , fnAttributes = []
-                , fnArguments = scope
-                , fnResults = []
-                , fnBody = divertBody }
-            return $
-                Bind [check] (GCAllocate n) $
-                Case check Nothing
-                    [ Alternative (LitPat (LiteralInt 0)) divert
-                    , Alternative (LitPat (LiteralInt 1)) continue]
-        _       -> return $ Bind binds simple rest
+          divertBody =
+            Bind [] GCBegin $
+            flip (foldr markScope) zippedScope $
+            -- gc_evacuate ptrs
+            Bind [] GCEnd $
+            TailCall continueName markedScope
+      pushHelper Function
+          { fnName = continueName
+          , fnAttributes = []
+          , fnArguments = scope
+          , fnResults = []
+          , fnBody = rest }
+      pushHelper Function
+          { fnName = divertName
+          , fnAttributes = []
+          , fnArguments = scope
+          , fnResults = []
+          , fnBody = divertBody }
+      return $
+        Bind [check] (GCAllocate n) $
+        Case check Nothing
+          [ Alternative (LitPat (LiteralInt 0)) divert
+          , Alternative (LitPat (LiteralInt 1)) continue]
+    _       -> return $ Bind binds simple rest
 
 
 

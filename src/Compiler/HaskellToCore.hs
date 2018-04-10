@@ -22,8 +22,8 @@ import           Data.Bedrock.Misc
 import           Language.Haskell.Scope     (Entity (..), NameInfo (..),
                                              QualifiedName (..))
 import qualified Language.Haskell.Scope     as Scope
-import           Language.Haskell.TypeCheck (TcEnv (..))
-import           Language.Haskell.TypeCheck (Qualified (..), TcVar (..), Typed)
+import           Language.Haskell.TypeCheck (Qualified (..), TcEnv (..),
+                                             TcVar (..), Typed)
 import qualified Language.Haskell.TypeCheck as TC
 
 data Scope = Scope
@@ -122,24 +122,27 @@ nameInfo ast =
     TC.Coerced info _src _proof -> info
     TC.Scoped info _src         -> info
 
+nameFromEntity :: Entity -> Name
+nameFromEntity entity =
+  case entityName entity of
+    QualifiedName m ident -> Name [m] ident 0
+
 bindName :: HS.Name Typed -> M Name
 bindName hsName =
-    case nameInfo hsName of
-        Scope.Resolved entity -> do
-            let QualifiedName m ident = entityName entity
-            let name = Name [m] ident 0
-            tell $ mempty{envScope = mempty
-                { scopeVariables = Map.singleton entity name } }
-            return name
-        Scope.Binding entity -> do
-            let QualifiedName m ident = entityName entity
-            let name = Name [m] ident 0
-            tell $ mempty{envScope = mempty
-                { scopeVariables = Map.singleton entity name } }
-            return name
-        -- Scope.Binding _ -> error "bindName: Binding"
-        Scope.None -> error "bindName: None"
-        Scope.ScopeError err -> error $ "bindName: ScopeError " ++ show err
+  case nameInfo hsName of
+    Scope.Resolved entity -> do
+      let name = nameFromEntity entity
+      tell $ mempty{envScope = mempty
+          { scopeVariables = Map.singleton entity name } }
+      return name
+    Scope.Binding entity -> do
+      let name = nameFromEntity entity
+      tell $ mempty{envScope = mempty
+          { scopeVariables = Map.singleton entity name } }
+      return name
+    -- Scope.Binding _ -> error "bindName: Binding"
+    Scope.None -> error "bindName: None"
+    Scope.ScopeError err -> error $ "bindName: ScopeError " ++ show err
 
 bindVariable :: HS.Name Typed -> M Variable
 bindVariable hsName = do
@@ -343,7 +346,7 @@ convertDecl' decl =
 
         unless (isPrimitive external) $ do
             let (argTypes, _isIO, retType) = ffiTypes foreignTy
-            pushForeign $ Foreign
+            pushForeign Foreign
                 { foreignName = external
                 , foreignReturn = toCType retType
                 , foreignArguments = map toCType argTypes }
@@ -388,7 +391,7 @@ convertAltPats conds failBranch successBranch =
     case conds of
         [] -> pure successBranch
         ((scrut,pat) : more)
-            | isSimplePat pat -> do
+            | isSimplePat pat ->
                 convertAltPat scrut failBranch pat =<<
                     convertAltPats more failBranch successBranch
             | otherwise -> do
@@ -506,7 +509,6 @@ convertExternal "cast" ty = do
 convertExternal cName ty
     | isIO = do
         args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
-        primArgs <- return args
         primOut <- Variable <$> newName "primOut" <*> pure i32
         s <- Variable
                 <$> newName "s"
@@ -516,7 +518,7 @@ convertExternal cName ty
         return $
             Lam args $
             let action = Lam [s] $
-                    WithExternal primOut cName primArgs s $
+                    WithExternal primOut cName args s $
                     UnboxedTuple [Var s, App (Con int32Con) (Var primOut)]
             in action -- (App (WithCoercion (CoerceAp [retType]) (Con ioCon)) action)
     | otherwise = do -- not isIO
@@ -683,10 +685,10 @@ convertExp expr =
             Let (Rec [ (Variable name ty, body)
                      | Decl ty name body <- concat decls ])
                 <$> convertExp expr
-        HS.List _ [] -> do
+        HS.List _ [] ->
             -- coercion <- requireCoercion src
-            return $ {-WithCoercion coercion-} (Con nilCon)
-        HS.Do _ stmts -> do
+            return {- $ WithCoercion coercion-} (Con nilCon)
+        HS.Do _ stmts ->
             convertStmts stmts
         _ -> error $ "H->C convertExp: " ++ show expr
 

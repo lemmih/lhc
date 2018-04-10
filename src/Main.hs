@@ -1,16 +1,17 @@
+{-# LANGUAGE LambdaCase #-}
 module Main (main) where
 
-import           Data.Graph                         (SCC (..),
-                                                     stronglyConnComp)
+import           Data.Graph                         (SCC (..), stronglyConnComp)
 import           Data.Tagged
 import           Language.Haskell.Exts
-import           Language.Haskell.TypeCheck.Pretty  (pretty, displayIO, renderPretty)
+import           Language.Haskell.TypeCheck.Pretty  (displayIO, pretty,
+                                                     renderPretty)
 import           System.Exit
 import           System.FilePath
-import System.IO
+import           System.IO
 
-import           Language.Haskell.TypeCheck
 import           Language.Haskell.Scope             hiding (Interface)
+import           Language.Haskell.TypeCheck
 
 import qualified Compiler.Core                      as Core
 import qualified Compiler.Core.DCE                  as Core
@@ -45,14 +46,14 @@ main :: IO ()
 main = Compiler.customMain customCommands lhcCompiler
 
 customCommands :: Parser (IO ())
-customCommands = hsubparser (buildCommand)
+customCommands = hsubparser buildCommand
   where
     buildCommand = command "build" (info build idm)
     build =
         compileExecutable
         <$> switch (long "verbose")
         <*> switch (long "keep-intermediate-files")
-        <*> (argument str (metavar "MODULE"))
+        <*> argument str (metavar "MODULE")
 
 data LHC
 instance IsDBName LHC where
@@ -110,47 +111,43 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
         scc = stronglyConnComp graph
     resolveEnvRef <- newIORef emptyResolveEnv
     tiEnvRef <- newIORef emptyTcEnv
-    forM_ scc $ \group -> do
-      case group of
-        AcyclicSCC m -> do
-          resolveEnv <- readIORef resolveEnvRef
-          tiEnv <- readIORef tiEnvRef
-          putStrLn "Origin analysis..."
-          let (resolveEnv', errs, m') = resolve resolveEnv m
-              Just scopeIface = lookupInterface (getModuleName m) resolveEnv'
-          unless (null errs) $ do
-            mapM_ print errs
-            exitWith (ExitFailure 1)
-          putStrLn "Typechecking..."
-          case typecheck tiEnv m' of
-            Left err -> error (show err)
-            Right (typedModule, tiEnv') -> do
-              -- tiEnv' <- runTI tiEnv (tiModule m')
-              let iface = mkInterface scopeIface tiEnv'
-                  ifaceFile = buildDir </> moduleFile m' <.> "hi"
-              createDirectoryIfMissing True (buildDir </> moduleFile m')
-              writeInterface ifaceFile iface
-              putStrLn "Converting to core..."
-              let core = Haskell.convert tiEnv' typedModule
-                  coreFile = buildDir </> moduleFile m' <.> "core"
-                  complete = Core.simplify $ Core.simplify $ NewType.lower $ Core.simplify $ Core.simplify $ core
-                  (_,etaAbs) = Core.simpleEta Core.emptySimpleEtaAnnotation complete
-              -- print (pretty complete)
-              -- displayIO stdout (renderPretty 1 120 (pretty etaAbs))
-              encodeFile coreFile etaAbs
-              writeFile (coreFile <.> "pretty") (show $ pretty etaAbs)
-              writeIORef resolveEnvRef resolveEnv'
-              writeIORef tiEnvRef tiEnv'
-        CyclicSCC{} -> error "Recursive modules not handled yet."
+    forM_ scc $ \case
+      AcyclicSCC m -> do
+        resolveEnv <- readIORef resolveEnvRef
+        tiEnv <- readIORef tiEnvRef
+        putStrLn "Origin analysis..."
+        let (resolveEnv', errs, m') = resolve resolveEnv m
+            Just scopeIface = lookupInterface (getModuleName m) resolveEnv'
+        unless (null errs) $ do
+          mapM_ print errs
+          exitWith (ExitFailure 1)
+        putStrLn "Typechecking..."
+        case typecheck tiEnv m' of
+          Left err -> error (show err)
+          Right (typedModule, tiEnv') -> do
+            let iface = mkInterface scopeIface tiEnv'
+                ifaceFile = buildDir </> moduleFile m' <.> "hi"
+            createDirectoryIfMissing True (buildDir </> moduleFile m')
+            writeInterface ifaceFile iface
+            putStrLn "Converting to core..."
+            let core = Haskell.convert tiEnv' typedModule
+                coreFile = buildDir </> moduleFile m' <.> "core"
+                complete = Core.simplify $ Core.simplify $ NewType.lower $ Core.simplify $ Core.simplify core
+                (_,etaAbs) = Core.simpleEta Core.emptySimpleEtaAnnotation complete
+            encodeFile coreFile etaAbs
+            writeFile (coreFile <.> "pretty") (show $ pretty etaAbs)
+            writeIORef resolveEnvRef resolveEnv'
+            writeIORef tiEnvRef tiEnv'
+      CyclicSCC{} -> error "Recursive modules not handled yet."
 
 loadLibrary :: InstalledPackageInfo -> IO [(String, (Interface, Core.Module))]
 loadLibrary pkgInfo =
-    forM (exposedModules pkgInfo) $ \exposedModule -> do
-        Just hiFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath (exposedName exposedModule) <.> "hi")
-        Just coreFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath (exposedName exposedModule) <.> "core")
-        iface <- readInterface hiFile
-        core <- decodeFile coreFile
-        return (intercalate "." (Dist.components $ exposedName exposedModule), (iface, core))
+  forM (exposedModules pkgInfo) $ \exposedModule -> do
+    Just hiFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath (exposedName exposedModule) <.> "hi")
+    Just coreFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath (exposedName exposedModule) <.> "core")
+    iface <- readInterface hiFile
+    core <- decodeFile coreFile
+    return (intercalate "." (Dist.components $ exposedName exposedModule), (iface, core))
 
 -- Load dependencies interface files
 -- convert to scope interfaces
@@ -162,47 +159,47 @@ loadLibrary pkgInfo =
 -- convert to bedrock
 compileExecutable :: Bool -> Bool -> FilePath -> IO ()
 compileExecutable verbose keepIntermediateFiles file = do
-    -- putStrLn $ "Loading deps: " ++ show deps
-    db <- userDB
-    pkgs <- readPackageDB Don'tInitDB (db :: StandardDB LHC)
-    -- pkgs <- readPackagesInfo
-    --             (Proxy :: Proxy (StandardDB LHC))
-    --             [GlobalPackageDB, UserPackageDB] deps
-    ifaces <- concat <$> mapM loadLibrary pkgs
-    let scope =
-            [ (modName, toScopeInterface iface)
-            | (modName, (iface, _core)) <- ifaces ]
-        scopeEnv = fromInterfaces scope
+  -- putStrLn $ "Loading deps: " ++ show deps
+  db <- userDB
+  pkgs <- readPackageDB Don'tInitDB (db :: StandardDB LHC)
+  -- pkgs <- readPackagesInfo
+  --             (Proxy :: Proxy (StandardDB LHC))
+  --             [GlobalPackageDB, UserPackageDB] deps
+  ifaces <- concat <$> mapM loadLibrary pkgs
+  let scope =
+          [ (modName, toScopeInterface iface)
+          | (modName, (iface, _core)) <- ifaces ]
+      scopeEnv = fromInterfaces scope
 
-    when verbose $ putStrLn "Parsing file..."
-    ParseOk m <- parseFile file
-    when verbose $ putStrLn "Origin analysis..."
-    let (resolveEnv, errs, m') = resolve scopeEnv m
-        Just _scopeIface = lookupInterface (getModuleName m) resolveEnv
-    unless (null errs) $ do
-      mapM_ print errs
-      exitWith (ExitFailure 1)
-    when verbose $ putStrLn "Typechecking..."
-    let env = addAllToTcEnv (map (fst . snd) ifaces) emptyTcEnv
-    let Right (typedModule, env') = typecheck env m'
-    when verbose $ putStrLn "Converting to core..."
-    let core = Haskell.convert env' typedModule
-        libraryCore = mconcat (map (snd . snd) ifaces)
-        entrypoint = Name ["Main"] "entrypoint" 0
-        complete =
-            -- Core.deadCodeElimination entrypoint $
-            -- Core.simpleInline $
-            -- Core.unique $
-            snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
-            Core.simplify $ Core.simplify $ Core.simplify $
-            snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
-            Core.deadCodeElimination entrypoint $
-            NewType.lower $ mappend libraryCore core
-    -- print (pretty complete)
-    when verbose $
-      displayIO stdout (renderPretty 1 100 (pretty complete))
+  when verbose $ putStrLn "Parsing file..."
+  ParseOk m <- parseFile file
+  when verbose $ putStrLn "Origin analysis..."
+  let (resolveEnv, errs, m') = resolve scopeEnv m
+      Just _scopeIface = lookupInterface (getModuleName m) resolveEnv
+  unless (null errs) $ do
+    mapM_ print errs
+    exitWith (ExitFailure 1)
+  when verbose $ putStrLn "Typechecking..."
+  let env = addAllToTcEnv (map (fst . snd) ifaces) emptyTcEnv
+  let Right (typedModule, env') = typecheck env m'
+  when verbose $ putStrLn "Converting to core..."
+  let core = Haskell.convert env' typedModule
+      libraryCore = mconcat (map (snd . snd) ifaces)
+      entrypoint = Name ["Main"] "entrypoint" 0
+      complete =
+          -- Core.deadCodeElimination entrypoint $
+          -- Core.simpleInline $
+          -- Core.unique $
+          snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
+          Core.simplify $ Core.simplify $ Core.simplify $
+          snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
+          Core.deadCodeElimination entrypoint $
+          NewType.lower $ mappend libraryCore core
+  -- print (pretty complete)
+  when verbose $
+    displayIO stdout (renderPretty 1 100 (pretty complete))
 
-    let bedrock = Core.convert complete
-    -- print (ppModule bedrock)
-    Bedrock.compileModule keepIntermediateFiles verbose bedrock file
-    return ()
+  let bedrock = Core.convert complete
+  -- print (ppModule bedrock)
+  Bedrock.compileModule keepIntermediateFiles verbose bedrock file
+  return ()
