@@ -61,8 +61,8 @@ import           Data.Bedrock.Compile
 
 
 
-doCompile :: KeepIntermediateFiles -> Verbose -> [FilePath] -> IO ()
-doCompile keepIntermediateFiles verbose ~[path] = do
+doCompile :: KeepIntermediateFiles -> Verbose -> FilePath -> IO ()
+doCompile keepIntermediateFiles verbose path = do
     compileFromFileWithOpts keepIntermediateFiles verbose path
 
 
@@ -83,7 +83,7 @@ main = join $ execParser $ info (helper <*> opts) idm
   where
     opts = foldr (<|>) empty
         [ version
-        , hsubparser $ mempty ]
+        , hsubparser compileCommand ]
 
     version =
         flag'
@@ -93,11 +93,11 @@ main = join $ execParser $ info (helper <*> opts) idm
     compileCommand = command "compile" (info compile idm)
     compile =
         doCompile
-            <$> pure True
+            <$> switch (long "keep-intermediate-files")
             <*> switch
                  ( long "verbose"
                 <> help "Whether to be verbose" )
-            <*> (many $ argument str (metavar "FILE"))
+            <*> (argument str (metavar "FILE"))
 -- main = runChoice (noCommand, defTI{ termName = "bedrock"}) commands
 --   where
 --     noCommand = ret (pure $ helpFail Plain Nothing)
@@ -105,4 +105,3 @@ main = join $ execParser $ info (helper <*> opts) idm
 --         [ (parseTerm, parseInfo)
 --         , (runTerm, runInfo)
 --         , (compileTerm, compileInfo) ]
-
