@@ -387,7 +387,7 @@ blockToLLVM = worker
                 , arguments = [ (ConstantOperand $ Constant.Int 32 0, []) ]
                 , functionAttributes = []
                 , metadata = [] }
-            return $ Unreachable []
+            return $ Ret Nothing []
         Return [] -> return $ Ret Nothing []
         Bedrock.Invoke cont args -> do
             -- traceLLVM $ "Bedrock: Invoke"
@@ -411,7 +411,7 @@ blockToLLVM = worker
                     | Variable{..} <- args ]
                 , functionAttributes = [Right NoUnwind]
                 , metadata = [] }
-            return $ Unreachable []
+            return $ Ret Nothing []
         _ -> do
             traceLLVM $ "Bedrock: Internal error: Unhandled construct"
             doInst $ Call
