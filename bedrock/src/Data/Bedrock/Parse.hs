@@ -73,7 +73,11 @@ parseType = choice
       return $ StaticNode (fromIntegral n)
   , symbol "%" >> return Node
   , symbol "#" >> return IWord
-  , symbol "@" >> return FramePtr
+  , try $ do
+      symbol "@"
+      n <- natural
+      symbol "@"
+      return $ FramePtr (fromIntegral n)
   , Primitive <$> parseCType ]
   <?> "type"
 

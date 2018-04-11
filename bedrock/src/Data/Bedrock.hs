@@ -93,7 +93,7 @@ data Type
   | IWord
   | Primitive CType
   -- | LLVMPrimitive LLVM.Type
-  | FramePtr
+  | FramePtr NodeSize
   deriving (Show, Read, Eq, Ord, Data, Generic)
 data Variable = Variable
   { variableName :: Name
@@ -253,9 +253,10 @@ instance Arbitrary Type where
     [ elements
       [ NodePtr
       , Node
-      , FramePtr
+      -- , FramePtr
       , IWord ]
     , StaticNode <$> fmap abs arbitrary
+    , FramePtr <$> fmap abs arbitrary
     , Primitive <$> arbitrary ]
 
 instance Arbitrary Variable where

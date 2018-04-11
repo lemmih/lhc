@@ -84,7 +84,7 @@ allotStackPositions free action = do
     let alreadyAllotted = map fst layout
         -- The two first stack slots are reserved for the return address
         -- and the previous stack frame
-        freeSpots = [3..] \\ map snd layout
+        freeSpots = [2..] \\ map snd layout
         newAllotted = zip (free \\ alreadyAllotted) freeSpots
     local (\env -> env{ envStackLayout = sortBy (comparing snd) $ newAllotted ++ envStackLayout env }) $
       action newAllotted

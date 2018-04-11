@@ -286,7 +286,7 @@ sizeOfVariable :: HPTResult -> Variable -> Int
 sizeOfVariable hpt var =
     case variableType var of
         NodePtr      -> 1
-        FramePtr     -> 1
+        FramePtr{}   -> 1
         Node         -> sizeOfObjects hpt objects
         StaticNode n -> n
         Primitive CVoid -> 0
@@ -517,7 +517,7 @@ hptAlternative origin scrut (Alternative pattern branch) = do
                         forM_ vals $ \ptr -> do
                             setOfPtrs <- getPtrScope' ptr
                             setPtrScope arg setOfPtrs
-                    FramePtr   ->
+                    FramePtr{}  ->
                         forM_ vals $ \ptr -> do
                             setOfPtrs <- getPtrScope' ptr
                             setPtrScope arg setOfPtrs
@@ -632,7 +632,10 @@ stackTrace objects = fmap concat $
         case name of
             FunctionName fn blanks -> do
                 fnArgs <- getFunctionArgumentRegisters fn
-                let isFrameVariable var = variableType var == FramePtr
+                let isFrameVariable var =
+                      case variableType var of
+                        FramePtr{} -> True
+                        _          -> False
 
                 case findIndices isFrameVariable fnArgs of
                     -- Reach top-level and there are no more frames

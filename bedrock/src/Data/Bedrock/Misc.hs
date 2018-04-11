@@ -14,7 +14,7 @@ newIDByType ns ty =
         NodePtr      ->
             ( nsNextPointerId ns
             , incGlobal ns{nsNextPointerId = nsNextPointerId ns + 1})
-        FramePtr      ->
+        FramePtr{}   ->
             ( nsNextPointerId ns
             , incGlobal ns{nsNextPointerId = nsNextPointerId ns + 1})
         Node         ->
@@ -25,7 +25,7 @@ newIDByType ns ty =
             , incGlobal ns{nsNextNodeId = nsNextNodeId ns + 1})
         Primitive{}  -> newGlobalID ns
         IWord{}      -> newGlobalID ns
-        -- LLVMPrimitive{} -> 
+        -- LLVMPrimitive{} ->
             {-( nsNextPrimitiveId ns
             , incGlobal ns{nsNextPrimitiveId = nsNextPrimitiveId ns + 1})-}
   where
@@ -41,7 +41,7 @@ newGlobalID ns =
 -- NB: Node pointers. Not pointers to external memory.
 isPointerType :: Type -> Bool
 isPointerType NodePtr  = True
-isPointerType FramePtr = True
+isPointerType FramePtr{} = True
 isPointerType _ = False
 
 isNodeType :: Type -> Bool

@@ -30,7 +30,7 @@ instance Pretty Type where
   pretty (StaticNode n) = Doc.char '%' <> Doc.int n <> Doc.char '%'
   pretty IWord          = Doc.char '#'
   pretty (Primitive ty) = pretty ty
-  pretty FramePtr       = Doc.red (Doc.char '@')
+  pretty (FramePtr n)   = Doc.red (Doc.char '@') <> Doc.int n <> Doc.red (Doc.char '@')
 
 instance Pretty CType where
   pretty I8 = text "i8"

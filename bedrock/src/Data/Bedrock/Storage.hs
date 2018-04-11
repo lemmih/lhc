@@ -139,7 +139,7 @@ transformExpresion origin binds simple rest =
       return $
         Bind [hp] (ReadRegister "hp") $
         Bind [hp'] (Address hp size) $
-        Bind [] (WriteRegister "hp" hp') $ rest
+        Bind [] (WriteRegister "hp" hp') rest
     Alloc n -> do
       continueName <- tagName "with_mem" (fnName origin)
       divertName <- tagName "without_mem" (fnName origin)
@@ -157,7 +157,7 @@ transformExpresion origin binds simple rest =
               IWord{}     -> TypeCast var
               -- This shouldn't really happen
               StaticNode{} -> GCMarkNode var
-              FramePtr     -> GCMark var
+              FramePtr{}   -> GCMark var
 
           divertBody =
             Bind [] GCBegin $

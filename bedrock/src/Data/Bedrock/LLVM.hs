@@ -252,7 +252,7 @@ typeToLLVM ty =
         StaticNode{}    -> IntegerType 64
         IWord           -> IntegerType 64
         Primitive cType -> cTypeToLLVM cType
-        FramePtr        -> PointerType (IntegerType 64) (AddrSpace 0)
+        FramePtr{}      -> PointerType (IntegerType 64) (AddrSpace 0)
 
 bitSize :: LLVM.Type -> Word32
 bitSize (IntegerType n) = n

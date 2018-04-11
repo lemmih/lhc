@@ -101,7 +101,8 @@ mkInvokeHandlerAlts :: HPTResult -> Objects -> Variable -> Gen [Alternative]
 mkInvokeHandlerAlts hpt objects arg = do
     let mkAlt (name@(FunctionName fn blanks), objArgs) = do
             let partialArgs = dropLast blanks $ hptFnArgs hpt Map.! fn
-                isFrameVariable var = variableType var == FramePtr
+                isFrameVariable Variable{variableType=FramePtr{}} = True
+                isFrameVariable _ = False
             case findIndex isFrameVariable partialArgs of
                 Nothing ->
                     return $
