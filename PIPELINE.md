@@ -70,7 +70,7 @@ x = (length :: forall a. [a] -> Int) @Char "Hello world"
 
 ## Step 4: Desugaring
 
-Haskell has a lot of syntaxtic sugar that can be simplified away. If-then-else
+Haskell has a lot of syntactic sugar that can be simplified away. If-then-else
 expressions are replaced by case-expressions, pattern matches in function
 definitions are replaced by explicit case-expressions, do-notation is replaced
 by calls to `bind` and `then`, etc.
@@ -108,7 +108,7 @@ When translating Core to Bedrock, we use the `@store`, `@eval` and `@apply`
 primitives to allocate nodes on the heap and to implement laziness. Read more
 about eval/apply here: https://www.microsoft.com/en-us/research/publication/make-fast-curry-pushenter-vs-evalapply/
 
-The entire bedrock code (including all library code) for our original Haskell
+The entire Bedrock code (including all library code) for our original Haskell
 program looks like this:
 
 ```
@@ -225,8 +225,8 @@ void * Main.main void|LHC.Prim.s =
 ## Step 6: Remove `@eval` and `@apply` primitives
 
 GHC implements the `@eval` and `@apply` primitives in its runtime-system but
-LHC has a different strategy in mind. By analysis the code, we can replace
-each call to `@eval` and `@apply` with new function. One way of doing this is
+LHC has a different strategy in mind. By analyzing the code, we can replace
+each call to `@eval` and `@apply` with a new function. One way of doing this is
 with a heap points-to (HPT) analysis but this is rather expensive. At the moment,
 LHC is using a cheaper algorithm at the cost of generated less optimized code.
 
@@ -476,7 +476,7 @@ void function.with_mem *arg =
 ## Step 12: Plugging in a garbage collector
 
 Garbage collectors in LHC are written as plugins which generate bedrock code.
-As of writing, there's only a single plugins which merely allocates a large slab
+As of writing, there's only a single plugin which merely allocates a large slab
 of memory and never does any collection.
 
 ## Step 13: Remove global registers
