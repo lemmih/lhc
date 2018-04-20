@@ -147,6 +147,7 @@ data NodeDefinition = NodeDefinition Name [Type]
 data Attribute
   = NoCPS
   | Internal
+  | AltReturn Int Name
   deriving (Show, Read, Eq, Data, Generic)
 
 data Function = Function
@@ -179,6 +180,7 @@ data Expression
   = Application Name [Variable]
   | CCall String [Variable]
   | Catch Name [Variable] Name [Variable]
+  | InvokeReturn Int Variable [Variable]
   -- Built-in
   | Alloc Int
   | Store NodeName [Variable]
@@ -213,6 +215,7 @@ data Expression
   | GCEnd
   | GCMark Variable
   | GCMarkNode Variable
+  | GCMarkFrame Variable
   deriving (Show, Read, Eq, Data, Generic)
 
 data Block
@@ -221,7 +224,7 @@ data Block
   | Return [Variable]
   | Raise Variable
   | TailCall Name [Variable]
-  | Invoke Variable [Variable]
+  | Invoke Int Variable [Variable]
   | InvokeHandler Variable Variable
   | Exit
   | Panic String
@@ -372,7 +375,7 @@ instance Arbitrary Block where
     , Return <$> arbitrary
     , Raise <$> arbitrary
     , TailCall <$> arbitrary <*> arbitrary
-    , Invoke <$> arbitrary <*> arbitrary
+    , Invoke <$> fmap abs arbitrary <*> arbitrary <*> arbitrary
     , InvokeHandler <$> arbitrary <*> arbitrary
     , pure Exit
     , Panic <$> arbitrary ]

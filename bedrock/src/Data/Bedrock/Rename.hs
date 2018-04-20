@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 module Data.Bedrock.Rename (unique, locallyUnique) where
 
 import           Control.Monad.Reader
@@ -118,10 +119,15 @@ uniqFunction :: Function -> Uniq Function
 uniqFunction (Function name attrs args rets body) = renameVariables args $
     Function
         <$> resolveName name
-        <*> pure attrs
+        <*> mapM uniqAttribute attrs
         <*> mapM resolve args
         <*> pure rets
         <*> uniqBlock body
+
+uniqAttribute :: Attribute -> Uniq Attribute
+uniqAttribute NoCPS              = pure NoCPS
+uniqAttribute Internal           = pure Internal
+uniqAttribute (AltReturn n name) = AltReturn n <$> resolveName name
 
 uniqBlock :: Block -> Uniq Block
 uniqBlock block =
@@ -142,8 +148,8 @@ uniqBlock block =
             Raise <$> resolve var
         TailCall fn vars ->
             TailCall <$> resolveName fn <*> mapM resolve vars
-        Invoke fn vars ->
-            Invoke <$> resolve fn <*> mapM resolve vars
+        Invoke n fn vars ->
+            Invoke n <$> resolve fn <*> mapM resolve vars
         InvokeHandler cont exception ->
             InvokeHandler <$> resolve cont <*> resolve exception
         Exit -> pure Exit
@@ -180,58 +186,62 @@ uniqMaybe fn obj =
 
 uniqSimple :: Expression -> Uniq Expression
 uniqSimple simple =
-    case simple of
-        Application fn vars ->
-            Application <$> resolveName fn <*> mapM resolve vars
-        CCall fn vars ->
-            CCall fn <$> mapM resolve vars
-        Catch exh exhArgs fn fnArgs ->
-            Catch
-                <$> resolveName exh <*> mapM resolve exhArgs
-                <*> resolveName fn <*> mapM resolve fnArgs
-        Alloc n ->
-            pure (Alloc n)
-        Store nodeName vars ->
-            Store <$> resolveNodeName nodeName <*> mapM resolve vars
-        BumpHeapPtr n -> pure $ BumpHeapPtr n
-        Write ptr idx var ->
-            Write <$> resolve ptr <*> pure idx <*> resolve var
-        Address var idx ->
-            Address <$> resolve var <*> pure idx
-        FunctionPointer fn -> FunctionPointer <$> resolveName fn
-        Fetch var ->
-            Fetch <$> resolve var
-        Load var idx ->
-            Load <$> resolve var <*> pure idx
-        Add a b ->
-            Add <$> resolve a <*> resolve b
-        Undefined -> pure Undefined
-        Save var nth -> Save <$> resolve var <*> pure nth
-        Restore nth -> pure $ Restore nth
-        Eval var ->
-            Eval <$> resolve var
-        Apply a b ->
-            Apply <$> resolve a <*> resolve b
-        ReadRegister{} -> return simple
-        WriteRegister reg var ->
-            WriteRegister reg <$> resolve var
-        ReadGlobal reg ->
-            pure $ ReadGlobal reg
-        WriteGlobal reg var ->
-            WriteGlobal reg <$> resolve var
-        TypeCast var ->
-            TypeCast <$> resolve var
-        Literal lit -> pure $ Literal lit
-        MkNode name vars ->
-            MkNode <$> resolveNodeName name <*> mapM resolve vars
-        GCAllocate n ->
-            pure (GCAllocate n)
-        GCBegin -> pure GCBegin
-        GCEnd -> pure GCEnd
-        GCMark var ->
-            GCMark <$> resolve var
-        GCMarkNode var ->
-            GCMarkNode <$> resolve var
+  case simple of
+    Application fn vars ->
+        Application <$> resolveName fn <*> mapM resolve vars
+    CCall fn vars ->
+        CCall fn <$> mapM resolve vars
+    Catch exh exhArgs fn fnArgs ->
+        Catch
+            <$> resolveName exh <*> mapM resolve exhArgs
+            <*> resolveName fn <*> mapM resolve fnArgs
+    InvokeReturn n fn vars ->
+      InvokeReturn n <$> resolve fn <*> mapM resolve vars
+    Alloc n ->
+        pure (Alloc n)
+    Store nodeName vars ->
+        Store <$> resolveNodeName nodeName <*> mapM resolve vars
+    BumpHeapPtr n -> pure $ BumpHeapPtr n
+    Write ptr idx var ->
+        Write <$> resolve ptr <*> pure idx <*> resolve var
+    Address var idx ->
+        Address <$> resolve var <*> pure idx
+    FunctionPointer fn -> FunctionPointer <$> resolveName fn
+    Fetch var ->
+        Fetch <$> resolve var
+    Load var idx ->
+        Load <$> resolve var <*> pure idx
+    Add a b ->
+        Add <$> resolve a <*> resolve b
+    Undefined -> pure Undefined
+    Save var nth -> Save <$> resolve var <*> pure nth
+    Restore nth -> pure $ Restore nth
+    Eval var ->
+        Eval <$> resolve var
+    Apply a b ->
+        Apply <$> resolve a <*> resolve b
+    ReadRegister{} -> return simple
+    WriteRegister reg var ->
+        WriteRegister reg <$> resolve var
+    ReadGlobal reg ->
+        pure $ ReadGlobal reg
+    WriteGlobal reg var ->
+        WriteGlobal reg <$> resolve var
+    TypeCast var ->
+        TypeCast <$> resolve var
+    Literal lit -> pure $ Literal lit
+    MkNode name vars ->
+        MkNode <$> resolveNodeName name <*> mapM resolve vars
+    GCAllocate n ->
+        pure (GCAllocate n)
+    GCBegin -> pure GCBegin
+    GCEnd -> pure GCEnd
+    GCMark var ->
+        GCMark <$> resolve var
+    GCMarkNode var ->
+        GCMarkNode <$> resolve var
+    GCMarkFrame var ->
+        GCMarkFrame <$> resolve var
 
 
 
@@ -317,15 +327,23 @@ locallyFunction fn = do
   limitScope $ do
     args <- mapM locallyBindVariable (fnArguments fn)
     body <- locallyBlock (fnBody fn)
+    attrs <- mapM locallyAttribute (fnAttributes fn)
     return $ fn
       { fnName = name
       , fnArguments = args
+      , fnAttributes = attrs
       , fnBody = body }
 
 locallyMaybe :: (a -> LUniq a) -> Maybe a -> LUniq (Maybe a)
-locallyMaybe _ Nothing = return Nothing
+locallyMaybe _ Nothing   = return Nothing
 locallyMaybe fn (Just a) = Just <$> fn a
 
+locallyAttribute :: Attribute -> LUniq Attribute
+locallyAttribute =
+  \case
+    NoCPS -> pure NoCPS
+    Internal -> pure Internal
+    AltReturn n name -> AltReturn n <$> locallyResolve name
 
 locallyBlock :: Block -> LUniq Block
 locallyBlock block =
@@ -348,8 +366,8 @@ locallyBlock block =
       TailCall
         <$> locallyResolve fn
         <*> mapM locallyResolveVariable args
-    Invoke fn args ->
-      Invoke
+    Invoke n fn args ->
+      Invoke n
         <$> locallyResolveVariable fn
         <*> mapM locallyResolveVariable args
     Exit -> return block
@@ -395,6 +413,10 @@ locallyExpression expr =
       CCall fn
         <$> mapM locallyResolveVariable args
     -- Catch Name [Variable] Name [Variable]
+    InvokeReturn n fn args ->
+      InvokeReturn n
+        <$> locallyResolveVariable fn
+        <*> mapM locallyResolveVariable args
     Alloc{} -> pure expr
     Store name args ->
       Store
@@ -446,4 +468,5 @@ locallyExpression expr =
     GCEnd -> pure expr
     GCMark arg -> GCMark <$> locallyResolveVariable arg
     GCMarkNode arg -> GCMarkNode <$> locallyResolveVariable arg
+    GCMarkFrame arg -> GCMarkFrame <$> locallyResolveVariable arg
     Catch{} -> pure expr

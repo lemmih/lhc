@@ -87,7 +87,7 @@ dceBlock root block =
     TailCall fn args -> do
       useMany [root] args
       return block
-    Invoke a args -> do
+    Invoke _ a args -> do
       useMany [root] (a:args)
       return block
     InvokeHandler a b -> do

@@ -23,7 +23,6 @@ import           Data.Bedrock.Simplify.DCE
 import           Data.Bedrock.Simplify.LocalDCE
 import qualified Data.Bedrock.StackLayout          as StackLayout
 import           Data.Bedrock.Storage
-import           Data.Bedrock.Storage.Fixed
 import           Data.Bedrock.Storage.Pluggable
 import           Data.Bedrock.VoidElimination
 
@@ -71,37 +70,25 @@ runPipeline keepIntermediateFiles verbose title m0 =
     hpt0 = runHPT m0
     dstFile n tag = title <.> show n <.> tag <.> "rock"
 
-compileModule :: KeepIntermediateFiles -> Verbose -> Module -> FilePath -> IO ()
-compileModule keepIntermediateFiles verbose m path = do
-    result <- runPipeline keepIntermediateFiles verbose (takeBaseName path) m stdPipeline
+compileModule :: KeepIntermediateFiles -> Verbose -> GC StorageManager -> Module -> FilePath -> IO ()
+compileModule keepIntermediateFiles verbose gc m path = do
+    result <- runPipeline keepIntermediateFiles verbose (takeBaseName path) m (stdPipeline gc)
     LLVM.compile result (replaceExtension path "ll")
 
-compileFromFile :: FilePath -> IO ()
+compileFromFile :: GC StorageManager -> FilePath -> IO ()
 compileFromFile = compileFromFileWithOpts True True
 
 compileFromFileWithOpts :: KeepIntermediateFiles -> Verbose
-                        -> FilePath -> IO ()
-compileFromFileWithOpts keepIntermediateFiles verbose path = do
+                        -> GC StorageManager -> FilePath -> IO ()
+compileFromFileWithOpts keepIntermediateFiles verbose gc path = do
     ret <- parseFromFile parseModule path
     case ret of
         Left err -> print err
-        Right m  -> do
-            result <- runPipeline keepIntermediateFiles verbose base m stdPipeline
-            LLVM.compile result (replaceExtension path "ll")
-  where
-    base = takeBaseName path
-
-compileWithOpts :: KeepIntermediateFiles -> Verbose
-                -> FilePath -> Module -> IO ()
-compileWithOpts keepIntermediateFiles verbose path m = do
-    result <- runPipeline keepIntermediateFiles verbose base m stdPipeline
-    LLVM.compile result (replaceExtension path "ll")
-  where
-    base = takeBaseName path
+        Right m  -> compileModule keepIntermediateFiles verbose gc m path
 
 
-stdPipeline :: Pipeline
-stdPipeline =
+stdPipeline :: GC StorageManager -> Pipeline
+stdPipeline gc =
         [ "rename"          :> locallyUnique . simplify . unique
         , "inlined"         :> locallyUnique . simplifySteps 10 . unique
         -- , PerformHPT
@@ -116,8 +103,8 @@ stdPipeline =
         , "no-stack"        :> locallyUnique . mergeAllocsModule . locallyUnique . runGen cpsTransformation
         -- , "no-invoke"       :?> runGen . lowerInvoke
         , "no-allocs"       :> locallyUnique . runGen lowerAlloc
-        , "no-gc"           :> locallyUnique . lowerGC fixedGC
         , "no-globals"      :> locallyUnique . lowerGlobalRegisters
+        , "no-gc"           :> locallyUnique . lowerGC gc
         , "pretty"          :> locallyUnique . unique . localDCE . simplify . simplify
         -- , "pretty"          :> locallyUnique
         ]

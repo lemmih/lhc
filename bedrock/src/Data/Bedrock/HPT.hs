@@ -562,7 +562,7 @@ hptBlock origin block =
             foreignArgs <- getFunctionArgumentRegisters fn
             forM_ (zip foreignRets originRets) $ uncurry hptCopyVariables
             forM_ (zip vars foreignArgs) $ uncurry hptCopyVariables
-        Invoke obj args -> eachIteration $ do
+        Invoke _ obj args -> eachIteration $ do
             objects <- getNodeScope obj
             hptInvoke objects args
         InvokeHandler obj arg -> eachIteration $ do
@@ -796,7 +796,7 @@ analyseUsage m =
             Return vars         -> pushMany vars
             Raise var           -> push var
             TailCall _fn vars   -> pushMany vars
-            Invoke v1 vs        -> pushMany (v1:vs)
+            Invoke _ v1 vs      -> pushMany (v1:vs)
             InvokeHandler v1 v2 -> pushMany [v1,v2]
             Exit                -> return ()
             Panic{}             -> return ()

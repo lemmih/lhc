@@ -129,6 +129,12 @@ instance Pretty Expression where
         ppSyntax "@catch" <+>
         pretty exh <> Doc.parens (ppList $ map pretty exhArgs) <+>
         pretty fn <> Doc.parens (ppList $ map pretty args)
+      InvokeReturn 0 cont args ->
+        ppSyntax "@invoke" <+> pretty cont <>
+        Doc.parens (ppList (map pretty args))
+      InvokeReturn n cont args ->
+        ppSyntax "@invoke" <> brackets (int n) <+> pretty cont <>
+        Doc.parens (ppList (map pretty args))
       TypeCast var ->
         ppSyntax "@cast" <> Doc.parens (pretty var)
       MkNode name vars ->
@@ -157,6 +163,8 @@ instance Pretty Expression where
         ppSyntax "@gc_mark" <+> pretty var
       GCMarkNode var ->
         ppSyntax "@gc_mark_node" <+> pretty var
+      GCMarkFrame var ->
+        ppSyntax "@gc_mark_frame" <+> pretty var
 
 ppBlock :: Block -> Doc
 ppBlock block =
@@ -188,8 +196,11 @@ ppBlock block =
     TailCall fn args ->
       ppSyntax "@tail" <+>
       pretty fn <> Doc.parens (ppList (map pretty args))
-    Invoke cont args ->
+    Invoke 0 cont args ->
       ppSyntax "@invoke" <+> pretty cont <>
+      Doc.parens (ppList (map pretty args))
+    Invoke n cont args ->
+      ppSyntax "@invoke" <> brackets (int n) <+> pretty cont <>
       Doc.parens (ppList (map pretty args))
     InvokeHandler cont exception ->
       ppSyntax "@invokeHandler" <>
@@ -212,6 +223,7 @@ ppTypes lst = Doc.hsep $ map pretty lst
 instance Pretty Attribute where
   pretty NoCPS    = text "NoCPS"
   pretty Internal = text "Internal"
+  pretty (AltReturn n name) = text "return" <> brackets (int n) <+> pretty name
 
 instance Pretty Function where
   pretty fn =

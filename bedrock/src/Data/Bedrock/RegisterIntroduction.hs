@@ -176,8 +176,8 @@ uniqBlock block =
         TailCall fn vars ->
             TailCall fn <$> resolveArgs fn vars
         -- FIXME: the code for Invoke is wrong.
-        Invoke fn vars ->
-            Invoke <$> pure fn <*> resolveMany vars
+        Invoke n fn vars ->
+            Invoke n fn <$> resolveMany vars
         InvokeHandler{} -> error $
             "Register introduction: @InvokeHandler must have been lowered\
             \ by now"
@@ -217,6 +217,8 @@ uniqExpression expr =
             Catch
                 <$> pure exh <*> resolveMany exhArgs
                 <*> pure fn <*> resolveMany fnArgs
+        InvokeReturn n fn vars ->
+          InvokeReturn n fn <$> resolveMany vars
         Alloc{} -> pure expr
         Store nodeName vars ->
             Store <$> pure nodeName <*> resolveMany vars
@@ -236,6 +238,7 @@ uniqExpression expr =
         GCEnd -> pure expr
         GCMark{} -> pure expr
         GCMarkNode{} -> pure expr
+        GCMarkFrame{} -> pure expr
         Write{} -> pure expr
         Address{} -> pure expr
         ReadRegister{} -> pure expr

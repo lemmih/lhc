@@ -144,11 +144,15 @@ transformExpresion origin binds simple rest =
       continueName <- tagName "with_mem" (fnName origin)
       divertName <- tagName "without_mem" (fnName origin)
       check <- newVariable "check" IWord
+      fnPtr <- newVariable "returnAddr" IWord
       let scope = Set.toList (freeVariables rest)
       markedScope <- mapM (tagVariable "marked") scope
       let continue = TailCall continueName scope
           divert = TailCall divertName scope
           zippedScope = zip scope markedScope
+          -- markScope (var, markedVar) | FramePtr{} <- variableType var =
+          --   Bind [fnPtr] (Load var 0) .
+          --   Bind [markedVar] (InvokeReturn 1 fnPtr [var])
           markScope (var, markedVar) = Bind [markedVar] $
             case variableType var of
               NodePtr     -> GCMark var
@@ -157,7 +161,7 @@ transformExpresion origin binds simple rest =
               IWord{}     -> TypeCast var
               -- This shouldn't really happen
               StaticNode{} -> GCMarkNode var
-              FramePtr{}   -> GCMark var
+              FramePtr{}   -> GCMarkFrame var
 
           divertBody =
             Bind [] GCBegin $

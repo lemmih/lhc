@@ -41,6 +41,7 @@ library
                        Data.Bedrock.GlobalVariables
                        Data.Bedrock.Storage.Pluggable
                        Data.Bedrock.Storage.Fixed
+                       Data.Bedrock.Storage.Trace
                        Data.Bedrock.RegisterIntroduction
                        Data.Bedrock.Rename
                        Data.Bedrock.InlineByCost

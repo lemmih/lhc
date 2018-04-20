@@ -29,6 +29,7 @@ lowerGlobalRegisters m = m
     regs = Set.toList $ allRegisters m
 
 lowerFunction :: Function -> Lower Function
+lowerFunction fn | Internal `elem` fnAttributes fn = pure fn
 lowerFunction fn = do
     regs <- asks Map.elems
     body' <- lowerBlock (fnBody fn)
@@ -70,9 +71,9 @@ lowerBlock block =
         Exit -> return Exit
         Return{} -> return block
         Panic{} -> return block
-        Invoke fn args -> do
+        Invoke n fn args -> do
             regs <- asks Map.elems
-            return $ Invoke fn (regs ++ args)
+            return $ Invoke n fn (regs ++ args)
         _ -> error $ "lower registers: " ++ show block
 
 lowerAlternative :: Alternative -> Lower Alternative
@@ -110,4 +111,3 @@ getGlobalIDs = worker []
     worker acc ns n =
         let (idNum, ns') = newGlobalID ns
         in worker (idNum:acc) ns' (n-1)
-

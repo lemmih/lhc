@@ -9,6 +9,7 @@ import           System.Process
 import Text.Printf
 
 import           Data.Bedrock.Compile
+import           Data.Bedrock.Storage.Fixed
 
 -- doParse :: [FilePath] -> Bool -> IO ()
 -- doParse _ _ = return ()
@@ -63,7 +64,7 @@ import           Data.Bedrock.Compile
 
 doCompile :: KeepIntermediateFiles -> Verbose -> FilePath -> IO ()
 doCompile keepIntermediateFiles verbose path = do
-    compileFromFileWithOpts keepIntermediateFiles verbose path
+    compileFromFileWithOpts keepIntermediateFiles verbose fixedGC path
 
 
 -- compileTerm :: Term (IO ())

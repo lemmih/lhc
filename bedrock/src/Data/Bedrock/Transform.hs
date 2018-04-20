@@ -138,7 +138,7 @@ freeVariables' block =
       Set.union (Set.fromList args)
     Raise name ->
       Set.insert name
-    Invoke cont args ->
+    Invoke _n cont args ->
       Set.union (Set.fromList (cont:args))
     InvokeHandler cont exception ->
       Set.insert cont . Set.insert exception
@@ -165,6 +165,8 @@ freeVariablesSimple simple =
       Set.union (Set.fromList args)
     Catch _exh exhArgs _fn fnArgs ->
       Set.union (Set.fromList (exhArgs ++ fnArgs))
+    InvokeReturn _n fn args ->
+      Set.union (Set.fromList (fn:args))
     Alloc{} ->
       id
     GCAllocate{} ->
@@ -200,3 +202,4 @@ freeVariablesSimple simple =
     GCEnd{} -> id
     GCMark var -> Set.insert var
     GCMarkNode var -> Set.insert var
+    GCMarkFrame var -> Set.insert var

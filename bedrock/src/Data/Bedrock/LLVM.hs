@@ -76,6 +76,7 @@ toLLVM bedrock = LLVM.Module
             mainDef
             forM_ (functions bedrock) $ \Bedrock.Function{..} -> do
                 blocks <- genBlocks $ blockToLLVM fnBody
+                mbPrefix <- attributesToPrefix fnAttributes
                 newDefinition $ GlobalDefinition functionDefaults
                     { name = nameToLLVM fnName
                     , returnType = typesToLLVM fnResults
@@ -88,6 +89,7 @@ toLLVM bedrock = LLVM.Module
                     , linkage = LLVM.Internal
                     , Global.callingConvention = Fast
                     , basicBlocks = blocks
+                    , prefix = mbPrefix
                     , Global.functionAttributes = [Right NoUnwind]
                     }
     mainDef = do
@@ -109,6 +111,17 @@ toLLVM bedrock = LLVM.Module
             , returnType = IntegerType 32
             , basicBlocks = [BasicBlock (UnName 0) [Do entryCall] (Do $ Unreachable [])] }
 
+attributesToPrefix :: [Bedrock.Attribute] -> GenModule (Maybe Constant.Constant)
+attributesToPrefix = worker []
+  where
+    worker [] [] = return Nothing
+    worker [single] [] = return (Just single)
+    worker acc [] = return (Just $ Constant.Vector acc)
+    worker acc (AltReturn _n name : xs) = do
+      ty <- getFunctionType name
+      worker (Constant.GlobalReference (PointerType ty (AddrSpace 0)) (nameToLLVM name) : acc) xs
+      -- error "prefix" ty xs  acc
+    worker acc (_:xs) = worker acc xs
 
 mkEnv :: Bedrock.Module -> Env
 mkEnv bedrock = env
@@ -342,7 +355,7 @@ blockToLLVM = worker
                 doInst $ Call Nothing C [] (Right $ ConstantOperand $ Constant.GlobalReference
                         (FunctionType VoidType [] False)
                         (LLVM.Name "llvm.trap")) [] [] []
-                return $ Ret Nothing []
+                return $ Unreachable []
               Just branch -> worker branch
           return $ Switch
               { operand0' = LocalReference
@@ -361,21 +374,40 @@ blockToLLVM = worker
             worker next
         TailCall fName args -> do
             -- traceLLVM $ "TailCall: " ++ show fName
-            doInst $ Call
-                { tailCallKind = Just Tail
-                , callingConvention = Fast
-                , returnAttributes = []
-                , function = Right $ ConstantOperand $ Constant.GlobalReference
-                                (FunctionType VoidType [] False)
-                                (nameToLLVM fName)
-                , arguments =
-                    [ (LocalReference
-                        (typeToLLVM variableType)
-                        (nameToLLVM variableName), [])
-                    | Variable{..} <- args ]
-                , functionAttributes = [Right NoUnwind]
-                , metadata = [] }
-            return $ Ret Nothing []
+            fnTy@(FunctionType retTy _argTypes _isVarArg) <- getFunctionType fName
+            if retTy == VoidType
+              then do
+                doInst $ Call
+                    { tailCallKind = Just Tail
+                    , callingConvention = Fast
+                    , returnAttributes = []
+                    , function = Right $ ConstantOperand $ Constant.GlobalReference
+                                    fnTy
+                                    (nameToLLVM fName)
+                    , arguments =
+                        [ (LocalReference
+                            (typeToLLVM variableType)
+                            (nameToLLVM variableName), [])
+                        | Variable{..} <- args ]
+                    , functionAttributes = [Right NoUnwind]
+                    , metadata = [] }
+                return $ Ret Nothing []
+              else do
+                ret <- anonInst $ Call
+                    { tailCallKind = Just Tail
+                    , callingConvention = Fast
+                    , returnAttributes = []
+                    , function = Right $ ConstantOperand $ Constant.GlobalReference
+                                    fnTy
+                                    (nameToLLVM fName)
+                    , arguments =
+                        [ (LocalReference
+                            (typeToLLVM variableType)
+                            (nameToLLVM variableName), [])
+                        | Variable{..} <- args ]
+                    , functionAttributes = [Right NoUnwind]
+                    , metadata = [] }
+                return $ Ret (Just $ LocalReference retTy ret) []
         Exit -> do
             doInst $ Call
                 { tailCallKind = Nothing
@@ -389,7 +421,8 @@ blockToLLVM = worker
                 , metadata = [] }
             return $ Ret Nothing []
         Return [] -> return $ Ret Nothing []
-        Bedrock.Invoke cont args -> do
+        Return [var] -> return $ Ret (Just $ LocalReference (typeToLLVM $ variableType var) (nameToLLVM $ variableName var)) []
+        Bedrock.Invoke _n cont args -> do
             -- traceLLVM $ "Bedrock: Invoke"
             fnPtr <- anonInst $ castReference
                         (typeToLLVM $ variableType cont)
@@ -412,6 +445,19 @@ blockToLLVM = worker
                 , functionAttributes = [Right NoUnwind]
                 , metadata = [] }
             return $ Ret Nothing []
+        Panic str -> do
+          traceLLVM $ "Bedrock: Panic: " ++ str
+          doInst $ Call
+              { tailCallKind = Nothing
+              , callingConvention = C
+              , returnAttributes = []
+              , function = Right $ ConstantOperand $ Constant.GlobalReference
+                              (FunctionType VoidType [] False)
+                              (LLVM.Name "exit")
+              , arguments = [ (ConstantOperand $ Constant.Int 32 1, []) ]
+              , functionAttributes = []
+              , metadata = [] }
+          return $ Unreachable []
         _ -> do
             traceLLVM $ "Bedrock: Internal error: Unhandled construct"
             doInst $ Call
@@ -476,6 +522,53 @@ blockToLLVM = worker
                 | Variable{..} <- args ]
             , functionAttributes = []
             , metadata = [] }
+    mkInst retTy (InvokeReturn n var args) = do
+      -- traceLLVM $ "InvokeReturn"
+      -- fnPtr <- anonInst $ castReference
+      --             (typeToLLVM $ variableType cont)
+      --             (nameToLLVM $ variableName cont)
+      --             (PointerType (FunctionType VoidType
+      --                 (map (typeToLLVM . variableType) args)
+      --                 False) (AddrSpace 0))
+      let fnTy = PointerType (FunctionType retTy
+                  (map (typeToLLVM . variableType) args)
+                  False) (AddrSpace 0)
+      casted <- anonInst $ castReference
+                  (typeToLLVM $ variableType var)
+                  (nameToLLVM $ variableName var)
+                  (PointerType fnTy (AddrSpace 0))
+      fnOffset <- anonInst $ GetElementPtr
+          { inBounds = True
+          , address = LocalReference
+                          (PointerType fnTy (AddrSpace 0))
+                          casted
+          , indices = [ConstantOperand $ Constant.Int 64 (fromIntegral $ negate n)]
+          , metadata = [] }
+      fnPtr <- anonInst $ LLVM.Load
+              { volatile = False
+              , address = LocalReference
+                            (PointerType fnTy (AddrSpace 0))
+                            fnOffset
+              , maybeAtomicity = Nothing
+              , alignment = 1
+              , metadata = [] }
+      return Call
+          { tailCallKind = Nothing
+          , callingConvention = Fast
+          , returnAttributes = []
+          , function = Right $ LocalReference
+                          fnTy
+                          fnPtr
+          , arguments =
+              [ (LocalReference
+                  (typeToLLVM variableType)
+                  (nameToLLVM variableName), [])
+              | Variable{..} <- args ]
+          , functionAttributes = [Right NoUnwind]
+          , metadata = [] }
+      -- cast var to fn ptr ptr
+      -- peek at negative nth index
+      -- call
     mkInst retTy Undefined = return BitCast
         { operand0 = ConstantOperand $ Constant.Undef retTy
         , type' = retTy

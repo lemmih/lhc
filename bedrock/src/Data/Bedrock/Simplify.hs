@@ -109,7 +109,7 @@ simplifyBlock block =
         TailCall fnName vars -> TailCall fnName <$> mapM resolve vars
         Exit -> pure Exit
         Panic msg -> pure $ Panic msg
-        Invoke cont vars -> Invoke <$> resolve cont <*> mapM resolve vars
+        Invoke n cont vars -> Invoke n <$> resolve cont <*> mapM resolve vars
         _ -> return block
 
 simplifyAlternative :: Alternative -> M Alternative

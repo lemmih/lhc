@@ -37,7 +37,7 @@ voidBlock block =
     Return vars -> Return (voidVariables vars)
     Raise{} -> block
     TailCall fn vars -> TailCall fn (voidVariables vars)
-    Invoke fn vars -> Invoke fn (voidVariables vars)
+    Invoke n fn vars -> Invoke n fn (voidVariables vars)
     InvokeHandler{} -> block
     Exit    -> block
     Panic{} -> block

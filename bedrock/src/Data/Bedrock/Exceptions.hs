@@ -8,6 +8,7 @@ module Data.Bedrock.Exceptions
 import           Control.Applicative           (pure, (<$>), (<*>))
 import           Control.Monad.State
 import qualified Data.Map as Map
+-- import           Data.Bedrock.PrettyPrint (pretty)
 
 import           Data.Bedrock
 import           Data.Bedrock.Transform
@@ -55,7 +56,7 @@ cpsBlock size origin frameVar block =
       -- 'node' is repeated here. Could be Undefined as well. Doesn't matter.
       return $
         Bind [node] (Load (stdContinuation size) 0) $
-        Invoke node (stdContinuation size : take fn_size (args ++ repeat node))
+        Invoke 0 node (stdContinuation size : take fn_size (args ++ repeat node))
     Case scrut defaultBranch alternatives ->
       Case scrut
         <$> maybe (return Nothing) (fmap Just . cpsBlock size origin frameVar) defaultBranch
@@ -123,14 +124,30 @@ cpsExpresion size origin frameVar binds simple rest =
         fnPtr <- newVariable "fnPtr" (Primitive $ CPointer (CFunction CVoid [CPointer I8]))
 
         framePtr <- newVariable "bedrock.stackframe.cont" (FramePtr size)
+        prevFrame <- newVariable "bedrock.stackframe.cont" (FramePtr 0)
+        prevFrameMarked <- newVariable "bedrock.stackframe.cont" (FramePtr 0)
 
         contFnName <- tagName "continuation" (fnName origin)
+
+        gcFnName <- tagName "gc" contFnName
+
+        pushHelper Function
+          { fnName = gcFnName
+          , fnAttributes = [NoCPS, Internal]
+          , fnArguments = [framePtr]
+          , fnResults = [FramePtr 0]
+          , fnBody =
+              Bind [prevFrame] (Load framePtr 1) $
+              Bind [prevFrameMarked] (GCMarkFrame prevFrame) $
+              Return [framePtr]
+              -- Panic $ "GC not implemented for: " ++ show (pretty contFnName)
+          }
 
         body <- cpsBlock size origin framePtr $
             Bind [stdContinuation size] (Load framePtr 1) $ rest
         pushHelper $
             Function { fnName      = contFnName
-                     , fnAttributes = []
+                     , fnAttributes = [ AltReturn 1 gcFnName ]
                      , fnArguments = framePtr : binds
                      , fnResults   = []
                      , fnBody      = body }

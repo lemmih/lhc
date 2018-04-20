@@ -22,11 +22,12 @@ newtype GC a = GC { unGC :: State GCState a }
         , MonadState GCState )
 
 data StorageManager = StorageManager
-    { smInit     :: Function
-    , smBegin    :: Function
-    , smEnd      :: Function
-    , smMark     :: Function
-    , smAllocate :: (Variable -> Expression)
+    { smInit      :: Function
+    , smBegin     :: Function
+    , smEnd       :: Function
+    , smMark      :: Function
+    , smMarkFrame :: Function
+    , smAllocate  :: (Variable -> Expression)
     }
 
 runGC :: Module -> GC a -> (a, Module)
@@ -63,7 +64,7 @@ lowerGC' :: StorageManager -> Module -> Module
 lowerGC' sm m = m{ functions = loweredFunctions ++ newFunctions }
   where
     loweredFunctions = mapM (lowerFunction (entryPoint m)) (functions m) sm
-    newFunctions = map ($sm) [smInit, smBegin, smEnd, smMark]
+    newFunctions = map ($sm) [smInit, smBegin, smEnd, smMark, smMarkFrame]
 
 lowerFunction :: Name -> Function -> StorageManager -> Function
 lowerFunction entry fn = do
@@ -71,7 +72,8 @@ lowerFunction entry fn = do
     sm <- ask
     let initName = fnName (smInit sm)
     if fnName fn == entry
-        then return fn{ fnBody = Bind [] (Application initName []) body }
+        then return fn{ fnBody = Bind [] (Application initName []) $
+                                 Bind [Variable (Name [] "hp" 0) NodePtr] (ReadGlobal "hp") body }
         else return fn{ fnBody = body }
 
 lowerBlock :: Block -> StorageManager -> Block
@@ -107,6 +109,8 @@ lowerExpression binds simple rest sm =
             ret $ Application (fnName (smEnd sm)) []
         GCMark ptr ->
             ret $ Application (fnName (smMark sm)) [ptr]
+        GCMarkFrame frame ->
+            ret $ Application (fnName (smMarkFrame sm)) [frame]
         GCMarkNode{} ->
             error "Storage.Pluggable: Can't deal with GCMarkNode"
         _ -> ret simple

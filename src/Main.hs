@@ -23,11 +23,13 @@ import qualified Compiler.HaskellToCore             as Haskell
 import           Compiler.Interface
 import           Control.Monad
 import           Data.Bedrock                       (Name (..))
+import           Data.Bedrock.Storage.Fixed
+import           Data.Bedrock.Storage.Trace
 import qualified Data.Bedrock.Compile               as Bedrock
 import           Data.Binary
 import           Data.IORef
 import           Data.List                          (intercalate)
-import           Data.Monoid                        (mconcat)
+import           Data.Monoid                        (mconcat,(<>))
 import qualified Distribution.ModuleName            as Dist
 import           Options.Applicative
 import           System.Directory
@@ -52,7 +54,8 @@ customCommands = hsubparser buildCommand
     build =
         compileExecutable
         <$> switch (long "verbose")
-        <*> switch (long "keep-intermediate-files")
+        <*> switch (long "keep-intermediate-files" <> help "Write bedrock files to disk")
+        <*> strOption (long "gc" <> metavar "strategy" <> help "GC strategy" <> value "fixed" <> showDefault)
         <*> argument str (metavar "MODULE")
 
 data LHC
@@ -157,8 +160,8 @@ loadLibrary pkgInfo =
 -- convert to core
 -- merge with library core files
 -- convert to bedrock
-compileExecutable :: Bool -> Bool -> FilePath -> IO ()
-compileExecutable verbose keepIntermediateFiles file = do
+compileExecutable :: Bool -> Bool -> String -> FilePath -> IO ()
+compileExecutable verbose keepIntermediateFiles gcStrategy file = do
   -- putStrLn $ "Loading deps: " ++ show deps
   db <- userDB
   pkgs <- readPackageDB Don'tInitDB (db :: StandardDB LHC)
@@ -201,5 +204,10 @@ compileExecutable verbose keepIntermediateFiles file = do
 
   let bedrock = Core.convert complete
   -- print (ppModule bedrock)
-  Bedrock.compileModule keepIntermediateFiles verbose bedrock file
+  let gc = case gcStrategy of
+             "" -> fixedGC
+             "fixed" -> fixedGC
+             "trace" -> traceGC
+             _ -> error $ "Unknown strategy. Options are: fixed, trace"
+  Bedrock.compileModule keepIntermediateFiles verbose gc bedrock file
   return ()

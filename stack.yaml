@@ -24,12 +24,18 @@ packages:
     - Cabal
   extra-dep: true
 
+- location:
+    git: https://github.com/Lemmih/llvm-hs-pretty.git
+    commit: 7e0ccd633195797e946699c4dbf8b1c741487c6e
+  extra-dep: true
+
+
 extra-deps:
 - haskell-src-exts-1.20.2
 - haskell-packages-0.6.1
-- llvm-hs-pretty-0.2.0.0
 - llvm-hs-pure-6.0.0
 - resolv-0.1.1.1
+- cabal-helper-0.7.3.0
 
 flags:
   llvm-hs:

@@ -1,4 +1,4 @@
-module Data.Bedrock.Storage.Fixed where
+module Data.Bedrock.Storage.Trace where
 
 import Data.Bedrock
 import Data.Bedrock.Storage.Pluggable
@@ -10,28 +10,38 @@ gc_init =
     mem <- @ccall mmap(null, 1024*pagesize, PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS , -1, 0);
     writeGlobal "hp" mem
 
-gc_allocate n =
-    return success
-
 -}
 
-fixedGC :: GC StorageManager
-fixedGC = do
+traceGC :: GC StorageManager
+traceGC = do
     pushForeign $ Foreign
         { foreignName = "calloc"
         , foreignReturn = CPointer I8
         , foreignArguments = [I32, I32] }
-    initName <- newName "fixed_gc_init"
+    initName <- newName "trace_gc_init"
     rawPtr <- newVariable "ptr" (Primitive (CPointer I8))
     hp <- newVariable "hp" NodePtr
     wordSize <- newVariable "size" (Primitive I32)
     heapSize <- newVariable "heapSize" (Primitive I32)
-    beginName <- newName "fixed_gc_begin"
-    endName <- newName "fixed_gc_end"
-    markName <- newName "fixed_gc_mark"
-    markFrameName <- newName "fixed_gc_mark_frame"
+    beginName <- newName "trace_gc_begin"
+    endName <- newName "trace_gc_end"
+    markName <- newName "trace_gc_mark"
+    markFrameName <- newName "trace_gc_mark_frame"
     markPtr  <- newVariable "root" NodePtr
-    markFrame  <- newVariable "frame" (FramePtr 0)
+    markFrame <- newVariable "frame" (FramePtr 0)
+
+    markBody <- do
+      val <- newVariable "ptr" IWord
+      retAddr <- newVariable "retAddr" IWord
+      return $
+        Bind [val] (TypeCast markFrame) $
+        Case val (Just $
+                    Bind [retAddr] (Load markFrame 0) $
+                    Bind [] (InvokeReturn 1 retAddr [markFrame]) $
+                    Return [markFrame])
+          [ Alternative (LitPat (LiteralInt 0)) (Return [markFrame]) ]
+
+
     let initFn = Function initName [] [] [] $
             Bind [wordSize] (Literal (LiteralInt 8)) $
             Bind [heapSize] (Literal (LiteralInt 10240)) $
@@ -40,14 +50,15 @@ fixedGC = do
             Bind [] (WriteGlobal "hp" hp) $
             Return []
         beginFn = Function beginName [] [] [] $
-            Panic "FixedGC: Collection not supported!"
+            Return []
         endFn = Function endName [] [] [] $
-            Panic "FixedGC: Collection not supported!"
+            Return []
         markFn = Function markName [] [markPtr] [NodePtr] $
-            Panic "FixedGC: Collection not supported!"
+            --Panic "TraceGC: Collection not supported!"
+            Return [markPtr]
         markFrameFn = Function markFrameName [] [markFrame] [FramePtr 0] $
-            Panic "FixedGC: Collection not supported!"
-        allocate _size = Literal (LiteralInt 1)
+            markBody
+        allocate _size = Literal (LiteralInt 0)
     return StorageManager
         { smInit     = initFn
         , smBegin    = beginFn
