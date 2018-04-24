@@ -368,14 +368,14 @@ _isHeapLocationShared hpLocation = do
     vector <- asks envSharedHeapLocations
     liftST $ mread "envSharedHeapLocations" vector hpLocation
 
-markHeapLocationShared :: HeapLocation -> HPT s ()
-markHeapLocationShared hpLocation = do
-    vector <- asks envSharedHeapLocations
-    liftST $ MVector.write vector hpLocation True
+-- markHeapLocationShared :: HeapLocation -> HPT s ()
+-- markHeapLocationShared hpLocation = do
+--     vector <- asks envSharedHeapLocations
+--     liftST $ MVector.write vector hpLocation True
 
-markHeapLocationSetShared :: HeapLocationSet -> HPT s ()
-markHeapLocationSetShared (HeapLocationSet hpSet) =
-    forM_ (IntSet.toList hpSet) $ markHeapLocationShared
+-- markHeapLocationSetShared :: HeapLocationSet -> HPT s ()
+-- markHeapLocationSetShared (HeapLocationSet hpSet) =
+--     forM_ (IntSet.toList hpSet) $ markHeapLocationShared
 
 singletonObject :: NodeName -> [Variable] -> Objects
 singletonObject name vars =
@@ -437,9 +437,9 @@ setHeapObjects hp objects = do
         oldObjects <- mread "envHeap_upd" heap hp
         MVector.write heap hp (mergeObjects objects oldObjects)
 
-setHeapSetObjects :: HeapLocationSet -> Objects -> HPT s ()
-setHeapSetObjects (HeapLocationSet hpSet) objects =
-    forM_ (IntSet.toList hpSet) $ \hp -> setHeapObjects hp objects
+-- setHeapSetObjects :: HeapLocationSet -> Objects -> HPT s ()
+-- setHeapSetObjects (HeapLocationSet hpSet) objects =
+--     forM_ (IntSet.toList hpSet) $ \hp -> setHeapObjects hp objects
 
 setNodeScope :: Variable -> Objects -> HPT s ()
 setNodeScope v o = {-trace ("setNodeScope: "++show v) $ -}setNodeScope' (variableIndex v) o
@@ -695,48 +695,41 @@ hptExpression origin binds simple =
             forM_ (zip vars foreignArgs) $ uncurry hptCopyVariables
             forM_ (zip foreignRets binds) $ uncurry hptCopyVariables
         CCall{} -> return ()
-        Eval ptrRef | [objRef] <- binds -> eachIteration $ do
-            shared <- isVariableShared ptrRef
-            hpLocs <- getPtrScope ptrRef
-            objects <- getHeapSetObjects hpLocs
-            forM_ (Map.toList objects) $ \(nodeName, args) -> do
-                case nodeName of
-                    FunctionName name 0 -> do
-                        [foreignRet] <- getFunctionReturnRegisters name
-                        foreignObjs <- getNodeScope foreignRet
-                        setNodeScope objRef foreignObjs
-                        when shared $ do
-                            setHeapSetObjects hpLocs foreignObjs
-                            markHeapLocationSetShared hpLocs
-                    _ -> setNodeScope objRef (Map.singleton nodeName args)
-        Apply fn arg | [objRef] <- binds -> eachIteration $ do
-            objects <- getNodeScope fn
-            forM_ (Map.toList objects) $ \(nodeName, args) -> do
-                case nodeName of
-                    FunctionName name 1 -> do
-                        [foreignRet] <- getFunctionReturnRegisters name
-                        foreignObjs <- getNodeScope foreignRet
-                        setNodeScope objRef foreignObjs
-                        fnArgs <- getFunctionArgumentRegisters name
-                        hptCopyVariables arg (last fnArgs)
-                    FunctionName name n | n > 1 -> do
-                        let newObjects = Map.singleton (FunctionName name (n-1)) (Vector.snoc args (IntSet.singleton (variableIndex arg)))
-                        setNodeScope objRef newObjects
-                        fnArgs <- getFunctionArgumentRegisters name
-                        hptCopyVariables arg (fnArgs!!(length fnArgs-n))
-                    ConstructorName name n | n > 0 -> do
-                        let newObjects = Map.singleton (ConstructorName name (n-1)) (Vector.snoc args (IntSet.singleton (variableIndex arg)))
-                        setNodeScope objRef newObjects
-                    UnboxedTupleName -> return ()
-                    _ -> error $ "invalid apply: " ++ show (objRef, nodeName)
-        Add{} -> return ()
-        GCAllocate{} -> return ()
-        GCBegin -> return ()
-        GCEnd -> return ()
-        GCMark var | [ptr] <- binds ->
-            hptCopyVariables var ptr
-        GCMarkNode node | [bind] <- binds ->
-            hptCopyVariables node bind
+        -- FIXME: This code was disabled because Eval+Apply were replaced by Builtin.
+        -- Eval ptrRef | [objRef] <- binds -> eachIteration $ do
+        --     shared <- isVariableShared ptrRef
+        --     hpLocs <- getPtrScope ptrRef
+        --     objects <- getHeapSetObjects hpLocs
+        --     forM_ (Map.toList objects) $ \(nodeName, args) -> do
+        --         case nodeName of
+        --             FunctionName name 0 -> do
+        --                 [foreignRet] <- getFunctionReturnRegisters name
+        --                 foreignObjs <- getNodeScope foreignRet
+        --                 setNodeScope objRef foreignObjs
+        --                 when shared $ do
+        --                     setHeapSetObjects hpLocs foreignObjs
+        --                     markHeapLocationSetShared hpLocs
+        --             _ -> setNodeScope objRef (Map.singleton nodeName args)
+        -- Apply fn arg | [objRef] <- binds -> eachIteration $ do
+        --     objects <- getNodeScope fn
+        --     forM_ (Map.toList objects) $ \(nodeName, args) -> do
+        --         case nodeName of
+        --             FunctionName name 1 -> do
+        --                 [foreignRet] <- getFunctionReturnRegisters name
+        --                 foreignObjs <- getNodeScope foreignRet
+        --                 setNodeScope objRef foreignObjs
+        --                 fnArgs <- getFunctionArgumentRegisters name
+        --                 hptCopyVariables arg (last fnArgs)
+        --             FunctionName name n | n > 1 -> do
+        --                 let newObjects = Map.singleton (FunctionName name (n-1)) (Vector.snoc args (IntSet.singleton (variableIndex arg)))
+        --                 setNodeScope objRef newObjects
+        --                 fnArgs <- getFunctionArgumentRegisters name
+        --                 hptCopyVariables arg (fnArgs!!(length fnArgs-n))
+        --             ConstructorName name n | n > 0 -> do
+        --                 let newObjects = Map.singleton (ConstructorName name (n-1)) (Vector.snoc args (IntSet.singleton (variableIndex arg)))
+        --                 setNodeScope objRef newObjects
+        --             UnboxedTupleName -> return ()
+        --             _ -> error $ "invalid apply: " ++ show (objRef, nodeName)
         Catch exh exhVars fn fnVars -> do
             exhRets <- getFunctionReturnRegisters exh
             fnRets  <- getFunctionReturnRegisters fn
@@ -758,14 +751,6 @@ hptExpression origin binds simple =
 
             forM_ (zip exhRets binds) $ uncurry hptCopyVariables
             forM_ (zip fnRets binds) $ uncurry hptCopyVariables
-        Alloc{} -> return ()
-        Write{} -> error $ "HPT: Deal with Write"
-        Address{} -> error $ "HPT: Deal with Address"
-        Load{} -> error $ "HPT: Deal with Load"
-        ReadRegister{} -> return ()
-        WriteRegister{} -> return ()
-        ReadGlobal{} -> return ()
-        WriteGlobal{} -> return ()
         _ -> error $ "HPT: unHPandled simple: " ++ show simple
 
 
@@ -806,25 +791,5 @@ analyseUsage m =
             Application _fn vars   -> pushMany vars
             CCall _fn vars         -> pushMany vars
             Catch _ exhVars _ vars -> pushMany exhVars >> pushMany vars
-            Alloc{}                -> return ()
-            Store _name vars       -> pushMany vars
-            Write v1 _ v2          -> pushMany [v1,v2]
-            Address var _          -> push var
-            Fetch var              -> push var
-            Load var _             -> push var
-            Add v1 v2              -> pushMany [v1,v2]
-            ReadRegister{}         -> return ()
-            WriteRegister _ var    -> push var
-            ReadGlobal{}           -> return ()
-            WriteGlobal _ var      -> push var
-            TypeCast var           -> push var
-            MkNode _name vars      -> pushMany vars
             Literal{}              -> return ()
-            Eval var               -> push var
-            Apply v1 v2            -> pushMany [v1,v2]
-            GCAllocate{}           -> return ()
-            GCBegin{}              -> return ()
-            GCEnd{}                -> return ()
-            GCMark var             -> push var
-            GCMarkNode var         -> push var
             _                      -> return ()

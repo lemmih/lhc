@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE LambdaCase #-}
 module Data.Bedrock.PrettyPrint
   ( Pretty(..)
   , module Data.Bedrock.PrettyPrint
@@ -90,36 +91,21 @@ instance Pretty MemAttributes where
       Nothing    -> Doc.empty
       Just group -> ppSyntax "alias" <> Doc.char ':' <> Doc.int group
 
+instance Pretty Parameter where
+  pretty =
+    \case
+      PInt n -> Doc.int n
+      PString str -> Doc.text str
+      PName name -> pretty name
+      PNodeName node -> ppNode node []
+      PVariable var -> pretty var
+      PVariables var -> Doc.brackets (ppList $ map pretty var)
+
 instance Pretty Expression where
   pretty simple =
     case simple of
-      Alloc n ->
-        ppSyntax "@alloc" <+> Doc.int n
-      Store node args ->
-        ppSyntax "@store" <+>
-        Doc.parens (ppNode node (map pretty args))
-      BumpHeapPtr n ->
-        ppSyntax "@bump" <+> Doc.int n
-      Write ptr idx var ->
-        ppSyntax "@write" <+>
-        pretty ptr <> Doc.brackets (Doc.int idx) <+> pretty var
-      Address ptr idx ->
-        ppSyntax "&" <> pretty ptr <> Doc.brackets (Doc.int idx)
-      FunctionPointer fn ->
-        ppSyntax "&" <> pretty fn
-      Fetch ptr ->
-        ppSyntax "@fetch" <+> pretty ptr
-      Load ptr nth ->
-        ppSyntax "@load" <+> pretty ptr <>
-        Doc.brackets (Doc.int nth)
-      Add lhs rhs ->
-        ppSyntax "@add" <+> pretty lhs <+> pretty rhs
-      Undefined ->
-        ppSyntax "@undefined"
-      Save var n ->
-        ppSyntax "@save" <> Doc.brackets (Doc.int n) <+> pretty var
-      Restore n ->
-        ppSyntax "@restore" <> Doc.brackets (Doc.int n)
+      Builtin str params ->
+        ppSyntax ('@':str) <> Doc.parens (ppList $ map pretty params)
       Application fn args ->
         pretty fn <> Doc.parens (ppList $ map pretty args)
       CCall fn args ->
@@ -135,36 +121,8 @@ instance Pretty Expression where
       InvokeReturn n cont args ->
         ppSyntax "@invoke" <> brackets (int n) <+> pretty cont <>
         Doc.parens (ppList (map pretty args))
-      TypeCast var ->
-        ppSyntax "@cast" <> Doc.parens (pretty var)
-      MkNode name vars ->
-        ppSyntax "@node" <+> Doc.parens (ppNode name (map pretty vars))
       Literal lit ->
         ppSyntax "@literal" <+> pretty lit
-      Eval var ->
-        ppSyntax "@eval" <+> pretty var
-      Apply a b ->
-        ppSyntax "@apply" <+> pretty a <+> pretty b
-      ReadRegister reg ->
-        ppSyntax "@register" <+> text reg
-      WriteRegister reg var ->
-        ppSyntax "@register" <+> text reg <+> Doc.equals <+> pretty var
-      ReadGlobal reg ->
-        ppSyntax "@global" <+> text reg
-      WriteGlobal reg var ->
-        ppSyntax "@global" <+> text reg <+> Doc.equals <+> pretty var
-      GCAllocate n ->
-        ppSyntax "@gc_allocate" <+> Doc.int n
-      GCBegin ->
-        ppSyntax "@gc_begin"
-      GCEnd ->
-        ppSyntax "@gc_end"
-      GCMark var ->
-        ppSyntax "@gc_mark" <+> pretty var
-      GCMarkNode var ->
-        ppSyntax "@gc_mark_node" <+> pretty var
-      GCMarkFrame var ->
-        ppSyntax "@gc_mark_frame" <+> pretty var
 
 ppBlock :: Block -> Doc
 ppBlock block =

@@ -1,6 +1,7 @@
 {-# LANGUAGE Haskell2010 #-}
-module Data.Bedrock.EvalApply ( lowerEvalApply ) where
+module Data.Bedrock.EvalApply (  ) where
 
+{-
 import           Control.Monad
 import           Control.Monad.State
 import qualified Data.IntSet            as IntSet
@@ -24,10 +25,10 @@ lowerEvalApply hpt = do
 traverseBlock :: HPTResult -> Function -> Block -> Gen Block
 traverseBlock hpt origin expr =
     case expr of
-        Bind [node] (Apply obj arg) (Return [retNode]) | node == retNode ->
-            mkInlineApply hpt obj arg
-        Bind [node] (Eval var) (Return [retNode]) | node == retNode ->
-            mkInlineEval hpt var
+        -- Bind [node] (Apply obj arg) (Return [retNode]) | node == retNode ->
+        --     mkInlineApply hpt obj arg
+        -- Bind [node] (Eval var) (Return [retNode]) | node == retNode ->
+        --     mkInlineEval hpt var
         Bind binds simple rest ->
             traverseExpression hpt origin binds simple =<<
                 traverseBlock hpt origin rest
@@ -41,8 +42,8 @@ traverseExpression :: HPTResult -> Function -> [Variable]
                -> Expression -> Block -> Gen Block
 traverseExpression hpt origin binds simple rest =
     case simple of
-        Eval var | [bind] <- binds      -> mkEval hpt origin bind var rest
-        Apply obj arg | [bind] <- binds -> mkApply hpt origin bind obj arg rest
+        -- Eval var | [bind] <- binds      -> mkEval hpt origin bind var rest
+        -- Apply obj arg | [bind] <- binds -> mkApply hpt origin bind obj arg rest
         _                               -> return $ Bind binds simple rest
 
 
@@ -178,3 +179,4 @@ traverseAlternative hpt origin alternative =
     case alternative of
         Alternative pattern branch ->
             Alternative pattern <$> traverseBlock hpt origin branch
+-}

@@ -64,7 +64,7 @@ simplifyBlock block =
             Bind [node]
                 <$> simplifyExpression expr
                 <*> simplifyBlock rest
-        Bind rets (Apply ptr arg) rest -> do
+        Bind rets (Builtin "apply" [PVariable ptr, PVariable arg]) rest -> do
             mbConst <- lookupStore ptr
             case mbConst of
                 Just (FunctionName fnName 1, args) ->
@@ -73,10 +73,11 @@ simplifyBlock block =
                 Just (FunctionName fnName n, args) ->
                     simplifyBlock $
                         Bind rets (Store (FunctionName fnName (n-1)) (args ++ [arg])) rest
-                _Nothing ->
-                    Bind rets
-                        <$> (Apply <$> resolve ptr <*> resolve arg)
-                        <*> simplifyBlock rest
+                _Nothing -> do
+                  ptr' <- resolve ptr
+                  arg' <- resolve arg
+                  Bind rets (Builtin "apply" [PVariable ptr', PVariable arg'])
+                    <$> simplifyBlock rest
         Bind [] TypeCast{} rest ->
             simplifyBlock rest
         Bind [] Literal{} rest ->
@@ -132,7 +133,6 @@ simplifyExpression expr =
                     Application fnName args
                 Just (nodeName, args) ->
                     simplifyExpression $ TypeCast var
-        Apply a b -> Apply <$> resolve a <*> resolve b
         MkNode name vars -> MkNode name <$> mapM resolve vars
         TypeCast var -> TypeCast <$> resolve var
         CCall fn vars -> CCall fn <$> mapM resolve vars

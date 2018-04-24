@@ -61,11 +61,11 @@ renameVariables (v:vs) action =
 
 resolveName :: Name -> Uniq Name
 resolveName name = do
-    m <- ask
-    case Map.lookup name m of
-        Nothing  -> -- return $ Name [] "unresolved" 0
-            error $ "Unresolved identifier: " ++ show (name, Map.keys m)
-        Just new -> return new
+  m <- ask
+  case Map.lookup name m of
+    -- Nothing  -> pure $ name{ nameModule = nameModule name ++ [nameIdentifier name], nameIdentifier = "unresolved"}
+    Nothing  -> error $ "Unresolved identifier: " ++ show (name, Map.keys m)
+    Just new -> return new
 
 resolveNodeName :: NodeName -> Uniq NodeName
 resolveNodeName nodeName =
@@ -80,11 +80,8 @@ resolveNodeName nodeName =
 
 resolve :: Variable -> Uniq Variable
 resolve var = do
-  m <- ask
-  case Map.lookup (variableName var) m of
-    Nothing  -> -- Name [] "unresolved" 0
-      error $ "Unresolved identifier: " ++ show (variableName var, Map.keys m)
-    Just new -> pure var{ variableName = new }
+  name <- resolveName (variableName var)
+  pure var{ variableName = name }
 
 --resolveArgument :: Argument -> Uniq Argument
 --resolveArgument arg =
@@ -185,6 +182,16 @@ uniqMaybe fn obj =
         Nothing  -> return Nothing
         Just val -> Just <$> fn val
 
+uniqParameter :: Parameter -> Uniq Parameter
+uniqParameter param =
+  case param of
+    PInt{} -> pure param
+    PString{} -> pure param
+    PName name -> PName <$> resolveName name
+    PNodeName node -> PNodeName <$> resolveNodeName node
+    PVariable var -> PVariable <$> resolve var
+    PVariables vars -> PVariables <$> mapM resolve vars
+
 uniqSimple :: Expression -> Uniq Expression
 uniqSimple simple =
   case simple of
@@ -198,52 +205,9 @@ uniqSimple simple =
             <*> resolveName fn <*> mapM resolve fnArgs
     InvokeReturn n fn vars ->
       InvokeReturn n <$> resolve fn <*> mapM resolve vars
-    Alloc n ->
-        pure (Alloc n)
-    Store nodeName vars ->
-        Store <$> resolveNodeName nodeName <*> mapM resolve vars
-    BumpHeapPtr n -> pure $ BumpHeapPtr n
-    Write ptr idx var ->
-        Write <$> resolve ptr <*> pure idx <*> resolve var
-    Address var idx ->
-        Address <$> resolve var <*> pure idx
-    FunctionPointer fn -> FunctionPointer <$> resolveName fn
-    Fetch var ->
-        Fetch <$> resolve var
-    Load var idx ->
-        Load <$> resolve var <*> pure idx
-    Add a b ->
-        Add <$> resolve a <*> resolve b
-    Undefined -> pure Undefined
-    Save var nth -> Save <$> resolve var <*> pure nth
-    Restore nth -> pure $ Restore nth
-    Eval var ->
-        Eval <$> resolve var
-    Apply a b ->
-        Apply <$> resolve a <*> resolve b
-    ReadRegister{} -> return simple
-    WriteRegister reg var ->
-        WriteRegister reg <$> resolve var
-    ReadGlobal reg ->
-        pure $ ReadGlobal reg
-    WriteGlobal reg var ->
-        WriteGlobal reg <$> resolve var
-    TypeCast var ->
-        TypeCast <$> resolve var
+    Builtin fn params ->
+      Builtin fn <$> mapM uniqParameter params
     Literal lit -> pure $ Literal lit
-    MkNode name vars ->
-        MkNode <$> resolveNodeName name <*> mapM resolve vars
-    GCAllocate n ->
-        pure (GCAllocate n)
-    GCBegin -> pure GCBegin
-    GCEnd -> pure GCEnd
-    GCMark var ->
-        GCMark <$> resolve var
-    GCMarkNode var ->
-        GCMarkNode <$> resolve var
-    GCMarkFrame var ->
-        GCMarkFrame <$> resolve var
-
 
 
 
@@ -403,6 +367,17 @@ locallyNodeName node =
         <*> pure missing
     UnboxedTupleName -> pure node
 
+
+locallyParameter :: Parameter -> LUniq Parameter
+locallyParameter param =
+  case param of
+    PInt{} -> pure param
+    PString{} -> pure param
+    PName name -> PName <$> locallyResolve name
+    PNodeName node -> PNodeName <$> locallyNodeName node
+    PVariable var -> PVariable <$> locallyResolveVariable var
+    PVariables vars -> PVariables <$> mapM locallyResolveVariable vars
+
 locallyExpression :: Expression -> LUniq Expression
 locallyExpression expr =
   case expr of
@@ -413,61 +388,15 @@ locallyExpression expr =
     CCall fn args ->
       CCall fn
         <$> mapM locallyResolveVariable args
-    -- Catch Name [Variable] Name [Variable]
+    Catch fn args handler handlerArgs ->
+      Catch fn
+        <$> mapM locallyResolveVariable args
+        <*> pure handler
+        <*> mapM locallyResolveVariable handlerArgs
     InvokeReturn n fn args ->
       InvokeReturn n
         <$> locallyResolveVariable fn
         <*> mapM locallyResolveVariable args
-    Alloc{} -> pure expr
-    Store name args ->
-      Store
-        <$> locallyNodeName name
-        <*> mapM locallyResolveVariable args
-    BumpHeapPtr{} -> pure expr
-    Write dst offset src ->
-      Write
-        <$> locallyResolveVariable dst
-        <*> pure offset
-        <*> locallyResolveVariable src
-    Address ptr offset ->
-      Address
-        <$> locallyResolveVariable ptr
-        <*> pure offset
-    FunctionPointer name ->
-      FunctionPointer
-        <$> locallyResolve name
-    Fetch ptr ->
-      Fetch <$> locallyResolveVariable ptr
-    Load ptr offset ->
-      Load <$> locallyResolveVariable ptr <*> pure offset
-    Add a b -> Add <$> locallyResolveVariable a <*> locallyResolveVariable b
-    Undefined -> pure expr
-    Save val offset ->
-      Save
-        <$> locallyResolveVariable val
-        <*> pure offset
-    Restore{} -> pure expr
-    ReadRegister{} -> pure expr
-    WriteRegister reg val ->
-      WriteRegister reg <$> locallyResolveVariable val
-    ReadGlobal{} -> pure expr
-    WriteGlobal reg val ->
-      WriteGlobal reg <$> locallyResolveVariable val
-    TypeCast arg -> TypeCast <$> locallyResolveVariable arg
-    MkNode name args ->
-      MkNode
-        <$> locallyNodeName name
-        <*> mapM locallyResolveVariable args
+    Builtin fn params ->
+      Builtin fn <$> mapM locallyParameter params
     Literal{} -> pure expr
-    Eval arg -> Eval <$> locallyResolveVariable arg
-    Apply fn a ->
-      Apply
-        <$> locallyResolveVariable fn
-        <*> locallyResolveVariable a
-    GCAllocate{} -> pure expr
-    GCBegin -> pure expr
-    GCEnd -> pure expr
-    GCMark arg -> GCMark <$> locallyResolveVariable arg
-    GCMarkNode arg -> GCMarkNode <$> locallyResolveVariable arg
-    GCMarkFrame arg -> GCMarkFrame <$> locallyResolveVariable arg
-    Catch{} -> pure expr

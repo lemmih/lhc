@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Data.Bedrock.Transform where
 
 import           Control.Monad.State
@@ -156,6 +157,16 @@ freeVariablesPattern pattern =
     LitPat{}       -> id
     -- VarPat var     -> Set.insert var
 
+freeVariablesParameter :: Parameter -> Set Variable -> Set Variable
+freeVariablesParameter =
+  \case
+    PInt{}          -> id
+    PString{}       -> id
+    PName{}         -> id
+    PNodeName{}     -> id
+    PVariable var   -> Set.insert var
+    PVariables vars -> Set.union (Set.fromList vars)
+
 freeVariablesSimple :: Expression -> Set Variable -> Set Variable
 freeVariablesSimple simple =
   case simple of
@@ -167,39 +178,6 @@ freeVariablesSimple simple =
       Set.union (Set.fromList (exhArgs ++ fnArgs))
     InvokeReturn _n fn args ->
       Set.union (Set.fromList (fn:args))
-    Alloc{} ->
-      id
-    GCAllocate{} ->
-      id
-    Store _constructor args ->
-      Set.union (Set.fromList args)
-    BumpHeapPtr{} -> id
-    Write ptr _idx var ->
-      Set.insert ptr . Set.insert var
-    Fetch ptr ->
-      Set.insert ptr
-    Load ptr _idx ->
-      Set.insert ptr
-    Add lhs rhs ->
-      Set.insert lhs . Set.insert rhs
-    Undefined -> id
-    Save var _n -> Set.insert var
-    Restore{} -> id
-    ReadRegister{} -> id
-    WriteRegister _reg var -> Set.insert var
-    Address var _idx -> Set.insert var
-    FunctionPointer{} -> id
-    TypeCast var -> Set.insert var
-    Eval var ->
-      Set.insert var
-    Apply obj arg ->
-      Set.insert obj . Set.insert arg
-    ReadGlobal{} -> id
-    WriteGlobal _reg var -> Set.insert var
-    MkNode _ vars -> Set.union (Set.fromList vars)
+    Builtin _ params ->
+      \s -> foldr freeVariablesParameter s params
     Literal{} -> id
-    GCBegin{} -> id
-    GCEnd{} -> id
-    GCMark var -> Set.insert var
-    GCMarkNode var -> Set.insert var
-    GCMarkFrame var -> Set.insert var

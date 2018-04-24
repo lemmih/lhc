@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE PatternSynonyms    #-}
 {-|
 Bedrock is a strict, first-order language designed for graph reduction.
 
@@ -176,47 +177,56 @@ data MemAttributes = MemAttributes
   , memAliasGroup :: Maybe Int
   } deriving (Show, Read, Eq, Data, Generic)
 
+data Parameter
+  = PInt Int
+  | PString String
+  | PName Name
+  | PNodeName NodeName
+  | PVariable Variable
+  | PVariables [Variable]
+  deriving (Read, Show, Eq, Data, Generic)
+
 data Expression
   = Application Name [Variable]
   | CCall String [Variable]
   | Catch Name [Variable] Name [Variable]
   | InvokeReturn Int Variable [Variable]
-  -- Built-in
-  | Alloc Int
-  | Store NodeName [Variable]
-  | BumpHeapPtr Int
-  | Write Variable Int Variable
-  | Address Variable Int
-  | FunctionPointer Name
-
-  | Fetch Variable
-  | Load Variable Int
-  | Add Variable Variable
-  | Undefined
-  | Save Variable Int
-  | Restore Int
-
-  -- Global variables.
-  | ReadRegister String
-  | WriteRegister String Variable
-  | ReadGlobal String
-  | WriteGlobal String Variable
-  | TypeCast Variable
-  | MkNode NodeName [Variable]
   | Literal Literal
+  -- Built-in
+  | Builtin String [Parameter]
 
-  -- Eval/Apply
-  | Eval Variable
-  | Apply Variable Variable
 
-  -- GC
-  | GCAllocate Int
-  | GCBegin
-  | GCEnd
-  | GCMark Variable
-  | GCMarkNode Variable
-  | GCMarkFrame Variable
   deriving (Show, Read, Eq, Data, Generic)
+
+pattern TypeCast var = Builtin "cast" [PVariable var]
+pattern MkNode name args = Builtin "node" [PNodeName name, PVariables args]
+pattern Eval a = Builtin "eval" [PVariable a]
+pattern Apply a b = Builtin "apply" [PVariable a, PVariable b]
+pattern Store node args = Builtin "store" [PNodeName node, PVariables args]
+pattern Alloc n = Builtin "alloc" [PInt n]
+pattern BumpHeapPtr n = Builtin "bump" [PInt n]
+
+pattern Write ptr idx var = Builtin "write" [PVariable ptr, PInt idx, PVariable var]
+pattern Address ptr idx = Builtin "address" [PVariable ptr, PInt idx]
+pattern FunctionPointer name = Builtin "fn_ptr" [PName name]
+
+pattern Fetch ptr = Builtin "fetch" [PVariable ptr]
+pattern Load ptr idx = Builtin "load" [PVariable ptr, PInt idx]
+pattern Undefined = Builtin "undefined" []
+pattern Save var slot = Builtin "save" [PVariable var, PInt slot]
+pattern Restore slot = Builtin "restore" [PInt slot]
+
+pattern ReadRegister reg = Builtin "read_register" [PString reg]
+pattern WriteRegister reg var = Builtin "write_register" [PString reg, PVariable var]
+pattern ReadGlobal reg = Builtin "read_global" [PString reg]
+pattern WriteGlobal reg var = Builtin "write_global" [PString reg, PVariable var]
+
+pattern GCAllocate n = Builtin "gc_allocate" [PInt n]
+pattern GCBegin = Builtin "gc_begin" []
+pattern GCEnd = Builtin "gc_end" []
+pattern GCMark var = Builtin "gc_mark" [PVariable var]
+pattern GCMarkNode var = Builtin "gc_mark_node" [PVariable var]
+pattern GCMarkFrame var = Builtin "gc_mark_frame" [PVariable var]
 
 data Block
   = Case Variable (Maybe Block) [Alternative]
@@ -359,8 +369,6 @@ instance Arbitrary Expression where
     , TypeCast <$> arbitrary
     , MkNode <$> arbitrary <*> arbitrary
     , Literal <$> arbitrary
-    , Eval <$> arbitrary
-    , Apply <$> arbitrary <*> arbitrary
     -- , GCAllocate
     -- , GCBegin
     -- , GCEnd

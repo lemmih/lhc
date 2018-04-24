@@ -219,31 +219,5 @@ uniqExpression expr =
                 <*> pure fn <*> resolveMany fnArgs
         InvokeReturn n fn vars ->
           InvokeReturn n fn <$> resolveMany vars
-        Alloc{} -> pure expr
-        Store nodeName vars ->
-            Store <$> pure nodeName <*> resolveMany vars
-        Fetch{} -> pure expr
-        Load{} -> error "uniqSimple: Load"
-        Add{} -> pure expr
-        Undefined -> pure expr
-        Eval{} -> pure expr
-        Apply{} -> pure expr
-        ReadGlobal{} -> error "uniqSimple: ReadGlobal"
-        WriteGlobal{} -> error "uniqSimple: WriteGlobal"
-        TypeCast{} -> pure expr
-        MkNode{} -> pure expr
+        Builtin{} -> pure expr
         Literal{} -> pure expr
-        GCAllocate{} -> pure expr
-        GCBegin -> pure expr
-        GCEnd -> pure expr
-        GCMark{} -> pure expr
-        GCMarkNode{} -> pure expr
-        GCMarkFrame{} -> pure expr
-        Write{} -> pure expr
-        Address{} -> pure expr
-        ReadRegister{} -> pure expr
-        WriteRegister{} -> pure expr
-        BumpHeapPtr{} -> pure expr
-        FunctionPointer{} -> pure expr
-        Save{} -> pure expr
-        Restore{} -> pure expr

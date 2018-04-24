@@ -56,7 +56,7 @@ parseModulePrefix = try $ do
 
 parseName :: Parser Name
 parseName = do
-  identifiers <- identifier `sepBy` dot
+  identifiers <- identifier `sepBy1` dot
   n <- do
     symbol "^"
     fromIntegral <$> natural
@@ -171,53 +171,27 @@ parseAlternative = do
   expression <- parseBlock
   return $ Alternative pat expression
 
+{-
+| PString String
+| PName Name
+| PNodeName NodeName
+| PVariable Variable
+| PVariables [Variable]
+-}
+parseParameter :: Parser Parameter
+parseParameter = choice
+  [ PInt . fromIntegral <$> natural
+  , PString <$> stringLiteral
+  , PVariable <$> parseVariable
+  , PVariables <$> brackets (commaSep parseVariable)
+  , PNodeName . fst <$> parseNode
+  ]
+
 parseExpression :: Parser Expression
 parseExpression = choice
   [ do
-    reserved "@cast"
-    var <- parens parseVariable
-    return $ TypeCast var
-  , do
     reserved "@literal"
     Literal <$> parseLiteral
-  , do
-    reserved "@node"
-    (name, binds) <- parens parseNode
-    return $ MkNode name binds
-  , do
-    reserved "@alloc"
-    n <- natural
-    return $ Alloc (fromIntegral n)
-  , do
-    reserved "@store"
-    parens $ do
-      constructor <- parseConstructor
-      args <- many parseVariable
-      blanks <- many (symbol "_")
-      return $ Store (ConstructorName constructor (length blanks)) args
-      <|> do
-        fn <- parseName
-        args <- many parseVariable
-        blanks <- many (symbol "_")
-        return $ Store (FunctionName fn (length blanks)) args
-  , do
-    reserved "@fetch"
-    ptr <- parseVariable
-    return $ Fetch ptr
-  , do
-    reserved "@load"
-    ptr <- parseVariable
-    n <- brackets natural
-    return $ Load ptr (fromIntegral n)
-  , do
-    reserved "@eval"
-    ptr <- parseVariable
-    return $ Eval ptr
-  , do
-    reserved "@apply"
-    ptr <- parseVariable
-    val <- parseVariable
-    return $ Apply ptr val
   , do
     reserved "@ccall"
     fn <- parseForeignName
@@ -231,39 +205,14 @@ parseExpression = choice
     args <- parens (commaSep parseVariable)
     return $ Catch exh exhArgs fn args
   , do
-    reserved "@add"
-    lhs <- parseVariable
-    rhs <- parseVariable
-    return $ Add lhs rhs
-  , do
     fn <- parseName
     args <- parens (commaSep parseVariable)
     return $ Application fn args
   , do
-    symbol "&"
-    ptr <- parseVariable
-    n <- brackets natural
-    return $ Address ptr (fromIntegral n)
-  , do
-    reserved "@global"
-    reg <- identifier
-    symbol "="
-    var <- parseVariable
-    return $ WriteGlobal reg var
-  , do
-    reserved "@global"
-    reg <- identifier
-    return $ ReadGlobal reg
-  , do
-    reserved "@register"
-    reg <- identifier
-    symbol "="
-    var <- parseVariable
-    return $ WriteRegister reg var
-  , do
-    reserved "@register"
-    reg <- identifier
-    return $ ReadRegister reg
+    symbol "@"
+    fn <- identifier
+    args <- parens (commaSep parseParameter)
+    return $ Builtin fn args
   ]
 
 parseBlock :: Parser Block

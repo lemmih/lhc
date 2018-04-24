@@ -49,6 +49,11 @@ voidPattern pattern =
       NodePat name (voidVariables vars)
     LitPat{} -> pattern
 
+voidParameter :: Parameter -> Parameter
+voidParameter param =
+  case param of
+    PVariables vars -> PVariables (voidVariables vars)
+    _ -> param
 
 voidExpression :: Expression -> Expression
 voidExpression expr =
@@ -57,36 +62,13 @@ voidExpression expr =
       Application fn (voidVariables vars)
     CCall fn vars ->
       CCall fn (voidVariables vars)
-    --Catch Name [Variable] Name [Variable]
-    --Alloc Int
-    Store name vars ->
-      Store name (voidVariables vars)
-    --BumpHeapPtr Int
-    --Write Variable Int Variable
-    --Address Variable Int
-    --FunctionPointer Name
-    --Fetch MemAttributes Variable
-    --Load MemAttributes Variable Int
-    --Add Variable Variable
-    --Undefined
-    --Save Variable Int
-    --Restore Int
-    --ReadRegister String
-    --WriteRegister String Variable
-    --ReadGlobal String
-    --WriteGlobal String Variable
-    --TypeCast Variable
-    MkNode name vars ->
-      MkNode name (voidVariables vars)
-    --Literal Literal
-    --Eval Variable
-    --Apply Variable Variable
-    --GCAllocate Int
-    --GCBegin
-    --GCEnd
-    --GCMark Variable
-    --GCMarkNode Variable
-    _ -> expr
+    Catch fn fnArgs handler handlerArgs ->
+      Catch fn (voidVariables fnArgs) handler (voidVariables handlerArgs)
+    InvokeReturn n ptr args ->
+      InvokeReturn n ptr (voidVariables args)
+    Builtin fn params -> Builtin fn (map voidParameter params)
+    Literal{} -> expr
+
 
 voidVariables :: [Variable] -> [Variable]
 voidVariables = filter (not.isVoidVariable)
