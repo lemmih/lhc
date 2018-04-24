@@ -89,7 +89,8 @@ compileFromFileWithOpts keepIntermediateFiles verbose gc path = do
 
 stdPipeline :: GC StorageManager -> Pipeline
 stdPipeline gc =
-        [ "rename"          :> locallyUnique . simplify . unique
+        [ "original"        :> id
+        , "rename"          :> locallyUnique . simplify . unique
         , "inlined"         :> locallyUnique . simplifySteps 10 . unique
         -- , PerformHPT
         -- , "no-laziness"     :?> runGen . lowerEvalApply

@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE BangPatterns               #-}
 module Data.Bedrock.Rename (unique, locallyUnique) where
 
 import           Control.Monad.Reader
@@ -11,7 +12,7 @@ import qualified Data.Map             as Map
 import           Data.Bedrock
 import           Data.Bedrock.Misc
 
-type Env = Map (Maybe Type, Name) Name
+type Env = Map Name Name
 
 newtype Uniq a = Uniq { unUniq :: ReaderT Env (State AvailableNamespace) a }
     deriving ( Monad, MonadReader Env, MonadState AvailableNamespace
@@ -32,9 +33,10 @@ unique m = evalState (runReaderT (unUniq (uniqModule m)) env) st
 newUnique :: Maybe Type -> Uniq Int
 newUnique mbTy = do
     ns <- get
-    let (idNum, ns') = case mbTy of
-            Nothing -> newGlobalID ns
-            Just ty -> newIDByType ns ty
+    let (idNum, ns') = newGlobalID ns
+    -- let (idNum, ns') = case mbTy of
+    --         Nothing -> newGlobalID ns
+    --         Just ty -> newIDByType ns ty
     put ns'
     return idNum
 
@@ -46,7 +48,7 @@ newName mbTy name = do
 rename :: Maybe Type -> Name -> Uniq a -> Uniq a
 rename mbTy old action = do
     new <- newName mbTy old
-    local (Map.insert (mbTy, old) new) action
+    local (Map.insert old new) action
 
 renameAll :: [Name] -> Uniq a -> Uniq a
 renameAll xs action = foldr (rename Nothing) action xs
@@ -54,15 +56,15 @@ renameAll xs action = foldr (rename Nothing) action xs
 renameVariables :: [Variable] -> Uniq a -> Uniq a
 renameVariables [] action     = action
 renameVariables (v:vs) action =
-    rename (Just (variableType v)) (variableName v) $
+    rename Nothing (variableName v) $
     renameVariables vs action
 
 resolveName :: Name -> Uniq Name
 resolveName name = do
     m <- ask
-    case Map.lookup (Nothing, name) m of
-        Nothing  -> return $ Name [] "unresolved" 0
-            --error $ "Unresolved identifier: " ++ show (name, Map.keys m)
+    case Map.lookup name m of
+        Nothing  -> -- return $ Name [] "unresolved" 0
+            error $ "Unresolved identifier: " ++ show (name, Map.keys m)
         Just new -> return new
 
 resolveNodeName :: NodeName -> Uniq NodeName
@@ -78,12 +80,11 @@ resolveNodeName nodeName =
 
 resolve :: Variable -> Uniq Variable
 resolve var = do
-    m <- ask
-    let name = case Map.lookup (Just (variableType var), variableName var) m of
-            Nothing  -> Name [] "unresolved" 0
-            --error $ "Unresolved identifier: " ++ show (name, Map.keys m)
-            Just new -> new
-    return $ var{ variableName = name }
+  m <- ask
+  case Map.lookup (variableName var) m of
+    Nothing  -> -- Name [] "unresolved" 0
+      error $ "Unresolved identifier: " ++ show (variableName var, Map.keys m)
+    Just new -> pure var{ variableName = new }
 
 --resolveArgument :: Argument -> Uniq Argument
 --resolveArgument arg =

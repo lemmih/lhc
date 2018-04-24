@@ -167,7 +167,8 @@ ppTypedVariable var =
     pretty (varName var) <> colon <> prettyPrec 2 (varType var)
 
 instance Pretty Variable where
-    pretty var = pretty (varName var)
+  -- pretty = ppTypedVariable
+  pretty var = pretty (varName var)
 
 data LetBind
     = NonRec Variable Expr

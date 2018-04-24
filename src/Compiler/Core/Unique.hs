@@ -18,7 +18,7 @@ unique m = evalState (runReaderT action env) 1
       decls <- mapM uniqueDecl (coreDecls m)
       return m{coreDecls = decls}
 
-type Env = Map Variable Variable
+type Env = Map Name Name
 type M a = ReaderT Env (State Int) a
 
 uniqueDecl :: Decl -> M Decl
@@ -78,27 +78,35 @@ uniqueAlt (Alt pattern e) =
       Alt (UnboxedPat vars') <$> uniqueExpr e
 
 uniqueVariable :: Variable -> M Variable
-uniqueVariable var = do
+uniqueVariable var@(Variable name ty) = do
   env <- ask
-  case Map.lookup var env of
-    Nothing -> return var
-    Just var' -> return var'
+  case Map.lookup name env of
+    Nothing -> pure var
+    Just name' -> pure $ Variable name' ty
 
 bind :: Variable -> (Variable -> M a) -> M a
 bind var action = do
-  var' <- newVariable var
-  local (Map.insert var var') (action var')
+  name' <- newName (varName var)
+  let var' = var{varName = name'}
+  local (Map.insert (varName var) name') (action var')
 
 bindMany :: [Variable] -> ([Variable] -> M a) -> M a
 bindMany vars action = do
-  vars' <- mapM newVariable vars
-  local (Map.union (Map.fromList $ zip vars vars')) (action vars')
+  names <- mapM (newName.varName) vars
+  let vars' = zipWith (\var name -> var{varName=name}) vars names
+  local (Map.union (Map.fromList $ zip (map varName vars) names)) (action vars')
 
-newVariable :: Variable -> M Variable
-newVariable v = do
+-- newVariable :: Variable -> M Variable
+-- newVariable v = do
+--   u <- get
+--   put (u+1)
+--   return v{varName = (varName v){nameUnique = u}}
+
+newName :: Name -> M Name
+newName n = do
   u <- get
   put (u+1)
-  return v{varName = (varName v){nameUnique = u}}
+  return n{nameUnique = u}
 
 uniqueMaybe :: (a -> M a) -> Maybe a -> M (Maybe a)
 uniqueMaybe _ Nothing   = pure Nothing
