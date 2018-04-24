@@ -406,7 +406,7 @@ convertExpr lazy expr rest =
           Nothing | null args, variableType v' /= NodePtr ->
             rest [v']
           Nothing -> do
-            fnRetTys <- convertResultType [] (Core.varType v)
+            fnRetTys <- convertResultType args' (Core.varType v)
             tmp <- deriveVariable v' "eval" NodePtr
             Bind [tmp] (Eval v')
               <$> applyMany fnRetTys tmp args' rest
@@ -449,9 +449,11 @@ convertExpr lazy expr rest =
     Core.Case scrut var Nothing [Core.Alt (Core.UnboxedPat binds) branch]  ->
       convertExpr False scrut $ \vals -> do
         binds' <- mapM convertVariable binds
-        let worker [] = convertExpr False branch rest
-            worker ((x,y):xs) = Bind [x] (TypeCast y) <$> worker xs
-        worker (zip binds' vals)
+        let worker [] [] = convertExpr False branch rest
+            worker (x:xs) (y:ys) = Bind [x] (TypeCast y) <$> worker xs ys
+            worker [] _ = error "Not enough binds"
+            worker _ [] = error "Not enough vals"
+        worker binds' vals
     Core.Case scrut var Nothing alts | not lazy ->
       convertExpr False scrut $ \[val] ->
         if variableType val == NodePtr
