@@ -90,9 +90,9 @@ dceBlock root block =
     Invoke _ a args -> do
       useMany [root] (a:args)
       return block
-    InvokeHandler a b -> do
-      useMany [root] [a,b]
-      return block
+    -- InvokeHandler a b -> do
+    --   useMany [root] [a,b]
+    --   return block
     Exit    -> return block
     Panic{} -> return block
 

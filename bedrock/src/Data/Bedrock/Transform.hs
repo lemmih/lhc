@@ -141,8 +141,8 @@ freeVariables' block =
       Set.insert name
     Invoke _n cont args ->
       Set.union (Set.fromList (cont:args))
-    InvokeHandler cont exception ->
-      Set.insert cont . Set.insert exception
+    -- InvokeHandler cont exception ->
+    --   Set.insert cont . Set.insert exception
     TailCall _name args ->
       Set.union (Set.fromList args)
     Exit ->

@@ -183,7 +183,7 @@ setProgramExit block =
     Raise{} -> error "setProgramExit"
     TailCall{} -> error "setProgramExit"
     Invoke{} -> error "setProgramExit"
-    InvokeHandler{} -> error "setProgramExit"
+    -- InvokeHandler{} -> error "setProgramExit"
     Exit -> Exit
     Panic msg -> Panic msg
 

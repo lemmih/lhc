@@ -235,7 +235,7 @@ data Block
   | Raise Variable
   | TailCall Name [Variable]
   | Invoke Int Variable [Variable]
-  | InvokeHandler Variable Variable
+  -- | InvokeHandler Variable Variable
   | Exit
   | Panic String
   deriving (Show, Read, Eq, Data, Generic)
@@ -303,12 +303,12 @@ instance Arbitrary Foreign where
     <*> arbitrary
 
 instance Arbitrary Module where
-  arbitrary = Module
+  arbitrary = sized (\n -> resize (n`div`10) (Module
     <$> arbitrary
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
-    <*> pure (AvailableNamespace 0 0 0 0)
+    <*> pure (AvailableNamespace 0 0 0 0)))
 
 instance Arbitrary NodeName where
   arbitrary = oneof
@@ -347,6 +347,15 @@ instance Arbitrary MemAttributes where
     <$> arbitrary
     <*> arbitrary
 
+instance Arbitrary Parameter where
+  arbitrary = oneof
+    [ PInt <$> arbitrary
+    , PString <$> arbitrary
+    , PName <$> arbitrary
+    , PNodeName <$> arbitrary
+    , PVariable <$> arbitrary
+    , PVariables <$> arbitrary ]
+
 plainIdentifier :: Gen String
 plainIdentifier = listOf1 (elements ['a'..'z'])
 
@@ -377,13 +386,19 @@ instance Arbitrary Expression where
     ]
 
 instance Arbitrary Block where
-  arbitrary = oneof
+  -- shrink (Case scrut (Just def) alts) =
+  --   def : [ block | Alternative _ block <- alts ]
+  -- shrink (Case scrut Nothing alts) =
+  --   [ block | Alternative _ block <- alts ]
+  -- shrink (Bind _ _ rest) = [rest]
+  -- shrink x = []
+  arbitrary = recursive (oneof
     [ Case <$> arbitrary <*> arbitrary <*> arbitrary
     , Bind <$> arbitrary <*> arbitrary <*> arbitrary
     , Return <$> arbitrary
     , Raise <$> arbitrary
     , TailCall <$> arbitrary <*> arbitrary
     , Invoke <$> fmap abs arbitrary <*> arbitrary <*> arbitrary
-    , InvokeHandler <$> arbitrary <*> arbitrary
+    -- , InvokeHandler <$> arbitrary <*> arbitrary
     , pure Exit
-    , Panic <$> arbitrary ]
+    , Panic <$> arbitrary ]) (pure Exit)

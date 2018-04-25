@@ -43,7 +43,7 @@ blockCost block =
     Raise{} -> return $ Just (0, \_ -> block)
     TailCall{} -> return Nothing
     Invoke{} -> return Nothing
-    InvokeHandler{} -> return Nothing
+    -- InvokeHandler{} -> return Nothing
     Exit -> return Nothing
     Panic{} -> return $ Just (0, \_ -> block)
   where
@@ -109,7 +109,7 @@ inlineBlock block =
           typeCastMany (zip inlinedArgs args) $ inliner Return
         _ -> TailCall fn args
     Invoke{} -> return block
-    InvokeHandler{} -> return block
+    -- InvokeHandler{} -> return block
     Exit -> return block
     Panic{} -> return block
 

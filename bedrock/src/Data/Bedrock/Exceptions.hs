@@ -61,11 +61,11 @@ cpsBlock size origin frameVar block =
       Case scrut
         <$> maybe (return Nothing) (fmap Just . cpsBlock size origin frameVar) defaultBranch
         <*> mapM (cpsAlternative size origin frameVar) alternatives
-    Raise exception -> do
-      node <- newVariable "contNode" Node
-      return $
-        Bind [node] (Fetch (stdContinuation size)) $
-        InvokeHandler node exception
+    -- Raise exception -> do
+    --   node <- newVariable "contNode" Node
+    --   return $
+    --     Bind [node] (Fetch (stdContinuation size)) $
+    --     InvokeHandler node exception
     TailCall fn args -> do
       noCPS <- hasAttribute fn NoCPS
       if noCPS

@@ -148,8 +148,8 @@ uniqBlock block =
             TailCall <$> resolveName fn <*> mapM resolve vars
         Invoke n fn vars ->
             Invoke n <$> resolve fn <*> mapM resolve vars
-        InvokeHandler cont exception ->
-            InvokeHandler <$> resolve cont <*> resolve exception
+        -- InvokeHandler cont exception ->
+        --     InvokeHandler <$> resolve cont <*> resolve exception
         Exit -> pure Exit
         Panic msg -> pure (Panic msg)
 
@@ -337,7 +337,7 @@ locallyBlock block =
         <*> mapM locallyResolveVariable args
     Exit -> return block
     Panic{} -> return block
-    InvokeHandler{} -> return block
+    -- InvokeHandler{} -> return block
 
 locallyAlternative :: Alternative -> LUniq Alternative
 locallyAlternative (Alternative pattern branch) = -- limitScope $

@@ -95,9 +95,9 @@ instance Pretty Parameter where
   pretty =
     \case
       PInt n -> Doc.int n
-      PString str -> Doc.text str
+      PString str -> Doc.text (show str)
       PName name -> pretty name
-      PNodeName node -> ppNode node []
+      PNodeName node -> Doc.text "node" <+> ppNode node []
       PVariable var -> pretty var
       PVariables var -> Doc.brackets (ppList $ map pretty var)
 
@@ -124,12 +124,15 @@ instance Pretty Expression where
       Literal lit ->
         ppSyntax "@literal" <+> pretty lit
 
+instance Pretty Block where
+  pretty = ppBlock
+
 ppBlock :: Block -> Doc
 ppBlock block =
   case block of
     Return args ->
-      ppSyntax "@return" <+>
-      ppList (map pretty args)
+      ppSyntax "@return" <>
+      parens (ppList (map pretty args))
     Bind [] simple rest ->
       pretty simple Doc.<$$>
       ppBlock rest
@@ -142,13 +145,13 @@ ppBlock block =
       ppPattern pattern <+> text "← " <+> pretty scrut Doc.<$$>
       ppBlock expression
     Case scrut Nothing alts ->
-      ppSyntax "case" <+> pretty scrut <+> ppSyntax "of" Doc.<$$>
-      Doc.indent 2 (Doc.vsep $ map ppAlternative alts)
+      ppSyntax "case" <+> pretty scrut <+> ppSyntax "of" <+> Doc.lbrace Doc.<$$>
+      Doc.indent 2 (Doc.vsep $ map ppAlternative alts) Doc.<$$> Doc.rbrace
     Case scrut (Just branch) alts ->
-      ppSyntax "case" <+> pretty scrut <+> ppSyntax "of" Doc.<$$>
+      ppSyntax "case" <+> pretty scrut <+> ppSyntax "of" <+> Doc.lbrace Doc.<$$>
       Doc.indent 2 (Doc.vsep (map ppAlternative alts ++
         [text "DEFAULT" <+> text "→" Doc.<$$>
-          Doc.indent 2 (ppBlock branch)]))
+          Doc.indent 2 (ppBlock branch)])) Doc.<$$> Doc.rbrace
     Raise obj ->
       ppSyntax "@raise" <+> pretty obj
     TailCall fn args ->
@@ -160,9 +163,9 @@ ppBlock block =
     Invoke n cont args ->
       ppSyntax "@invoke" <> brackets (int n) <+> pretty cont <>
       Doc.parens (ppList (map pretty args))
-    InvokeHandler cont exception ->
-      ppSyntax "@invokeHandler" <>
-      Doc.parens (ppList $ map pretty [cont, exception])
+    -- InvokeHandler cont exception ->
+    --   ppSyntax "@invokeHandler" <>
+    --   Doc.parens (ppList $ map pretty [cont, exception])
     Exit ->
       ppSyntax "@exit"
     Panic msg ->
@@ -175,8 +178,7 @@ ppFnName :: Name -> Doc
 ppFnName = Doc.blue . pretty
 
 ppTypes :: [Type] -> Doc
-ppTypes []  = text "void"
-ppTypes lst = Doc.hsep $ map pretty lst
+ppTypes = ppList . map pretty
 
 instance Pretty Attribute where
   pretty NoCPS    = text "NoCPS"
@@ -187,8 +189,7 @@ instance Pretty Function where
   pretty fn =
     ppList (map pretty (fnAttributes fn)) Doc.<$$>
     ppTypes (fnResults fn) <+>
-    ppFnName (fnName fn) <+> Doc.hsep (map pretty (fnArguments fn)) <+>
-    Doc.char '=' Doc.<$$>
+    ppFnName (fnName fn) <+> Doc.parens (ppList $ map pretty (fnArguments fn)) Doc.<$$>
     Doc.indent 2 (ppBlock (fnBody fn))
 
 ppEntryPoint :: Name -> Doc

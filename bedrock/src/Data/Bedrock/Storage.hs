@@ -52,8 +52,8 @@ transformBlock origin block =
       return block
     Invoke{} ->
       return block
-    InvokeHandler{} ->
-      return block
+    -- InvokeHandler{} ->
+    --   return block
     Exit ->
       return block
     Panic{} ->

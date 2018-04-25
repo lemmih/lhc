@@ -565,29 +565,29 @@ hptBlock origin block =
         Invoke _ obj args -> eachIteration $ do
             objects <- getNodeScope obj
             hptInvoke objects args
-        InvokeHandler obj arg -> eachIteration $ do
-
-            objects <- getNodeScope obj
-            hptInvokeHandler objects arg
+        -- InvokeHandler obj arg -> eachIteration $ do
+        --
+        --     objects <- getNodeScope obj
+        --     hptInvokeHandler objects arg
         Exit -> return ()
         Panic{} -> return ()
 
-hptInvokeHandler :: Objects -> Variable -> HPT s ()
-hptInvokeHandler objects arg = do
-    frames <- stackTrace objects
-    forM_ frames $ \frame ->
-        case frame of
-            FunctionStackFrame _fn _blanks (Just nextFramePtrs) -> do
-                nextFrame <- getHeapSetObjects nextFramePtrs
-                hptInvokeHandler nextFrame arg
-            FunctionStackFrame _ _ Nothing -> error "HPT: End of stack"
-            -- blanks must be 2
-            CatchStackFrame exh blanks nextFramePtrs -> do
-                exhArgs <- getFunctionArgumentRegisters exh
-                let [exceptionArg, contArg] = takeLast blanks exhArgs
-                eachIteration $
-                    setPtrScope contArg nextFramePtrs
-                hptCopyVariables arg exceptionArg
+-- hptInvokeHandler :: Objects -> Variable -> HPT s ()
+-- hptInvokeHandler objects arg = do
+--     frames <- stackTrace objects
+--     forM_ frames $ \frame ->
+--         case frame of
+--             FunctionStackFrame _fn _blanks (Just nextFramePtrs) -> do
+--                 nextFrame <- getHeapSetObjects nextFramePtrs
+--                 hptInvokeHandler nextFrame arg
+--             FunctionStackFrame _ _ Nothing -> error "HPT: End of stack"
+--             -- blanks must be 2
+--             CatchStackFrame exh blanks nextFramePtrs -> do
+--                 exhArgs <- getFunctionArgumentRegisters exh
+--                 let [exceptionArg, contArg] = takeLast blanks exhArgs
+--                 eachIteration $
+--                     setPtrScope contArg nextFramePtrs
+--                 hptCopyVariables arg exceptionArg
 
 hptInvoke :: Objects -> [Variable] -> HPT s ()
 hptInvoke objects args = do
@@ -782,7 +782,7 @@ analyseUsage m =
             Raise var           -> push var
             TailCall _fn vars   -> pushMany vars
             Invoke _ v1 vs      -> pushMany (v1:vs)
-            InvokeHandler v1 v2 -> pushMany [v1,v2]
+            -- InvokeHandler v1 v2 -> pushMany [v1,v2]
             Exit                -> return ()
             Panic{}             -> return ()
     analyseAlternative (Alternative _ block) = analyseBlock block

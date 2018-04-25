@@ -46,7 +46,7 @@ traverseBlock hpt origin block =
         TailCall fn vars ->
             pure $ TailCall fn (map (setVariableSize hpt) vars)
         Invoke{} -> invalid "Invoke"
-        InvokeHandler{} -> invalid "InvokeHandler"
+        -- InvokeHandler{} -> invalid "InvokeHandler"
         Raise{}  -> invalid "Raise"
         Exit -> pure block
         Panic{} -> pure block
@@ -74,5 +74,3 @@ traversePattern hpt pattern =
         NodePat node vars -> NodePat node (map (setVariableSize hpt) vars)
         LitPat{} -> pattern
         -- VarPat var -> VarPat (setVariableSize hpt var)
-
-

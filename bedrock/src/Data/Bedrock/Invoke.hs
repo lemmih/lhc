@@ -3,7 +3,7 @@ module Data.Bedrock.Invoke
 
 import           Control.Monad.State
 import qualified Data.IntSet             as IntSet
-import           Data.List
+-- import           Data.List
 import qualified Data.Map                as Map
 import qualified Data.Vector             as Vector
 
@@ -41,9 +41,9 @@ traverseBlock hpt origin block =
         Invoke _ obj args ->
             Case (setVariableSize hpt obj) Nothing
                 <$> mkInvokeAlts hpt (hptNodeScope hpt Vector.! variableIndex obj) args
-        InvokeHandler obj arg ->
-            Case (setVariableSize hpt obj) Nothing
-                <$> mkInvokeHandlerAlts hpt (hptNodeScope hpt Vector.! variableIndex obj) arg
+        -- InvokeHandler obj arg ->
+        --     Case (setVariableSize hpt obj) Nothing
+        --         <$> mkInvokeHandlerAlts hpt (hptNodeScope hpt Vector.! variableIndex obj) arg
         other -> return other
 
 traverseExpression :: HPTResult -> Expression -> Expression
@@ -60,10 +60,10 @@ derefPtrs hpt ptrs = heapLocationSetUnions
     | ptr <- IntSet.toList ptrs ]
 
 -- FIXME: merge with HPT
-derefVars :: HPTResult -> NameSet -> Objects
-derefVars hpt vars = mergeObjectList
-    [ hptNodeScope hpt Vector.! var
-    | var <- IntSet.toList vars ]
+-- derefVars :: HPTResult -> NameSet -> Objects
+-- derefVars hpt vars = mergeObjectList
+--     [ hptNodeScope hpt Vector.! var
+--     | var <- IntSet.toList vars ]
 
 -- FIXME: merge with HPT
 derefHeap :: HPTResult -> HeapLocationSet -> Objects
@@ -97,41 +97,41 @@ mkInvokeAlts hpt objects args = do
 
     mapM mkAlt (Map.toList objects)
 
-mkInvokeHandlerAlts :: HPTResult -> Objects -> Variable -> Gen [Alternative]
-mkInvokeHandlerAlts hpt objects arg = do
-    let mkAlt (name@(FunctionName fn blanks), objArgs) = do
-            let partialArgs = dropLast blanks $ hptFnArgs hpt Map.! fn
-                isFrameVariable Variable{variableType=FramePtr{}} = True
-                isFrameVariable _ = False
-            case findIndex isFrameVariable partialArgs of
-                Nothing ->
-                    return $
-                        Alternative (NodePat name partialArgs) $
-                        Panic "Couldn't find frame pointer."
-                Just framePtrIndex -> do
-                    let nextFramePtrs = objArgs Vector.! framePtrIndex
-                        nextFrameLocs = derefPtrs hpt nextFramePtrs
-                        nextFrameObjects = derefHeap hpt nextFrameLocs
-                        size = sizeOfObjects hpt nextFrameObjects
-                    let nextFramePtr = partialArgs !! framePtrIndex
-                    nextFrame <- newVariable "nextFrame" (StaticNode size)
-                    Alternative (NodePat name partialArgs) .
-                        Bind [nextFrame] (Fetch nextFramePtr) .
-                        Case nextFrame Nothing
-                            <$> mkInvokeHandlerAlts hpt nextFrameObjects arg
-        mkAlt (ConstructorName cons 0, objArgs) | isCatchFrame cons = do
-            let exhVars = objArgs Vector.! 1
-                exhObjects = derefVars hpt exhVars
-            nextFramePtr <- newVariable "nextFrame" NodePtr
-            exh <- newVariable "exh" (StaticNode (sizeOfObjects hpt exhObjects))
-            Alternative (NodePat (ConstructorName cons 0) [nextFramePtr, exh]) .
-                Case exh Nothing
-                    <$> mkInvokeAlts hpt exhObjects [arg, nextFramePtr]
-
-        mkAlt (alt, _args) =
-            return $ Alternative (NodePat alt []) (Panic "Invoke handler failure")
-
-    mapM mkAlt (Map.toList objects)
+-- mkInvokeHandlerAlts :: HPTResult -> Objects -> Variable -> Gen [Alternative]
+-- mkInvokeHandlerAlts hpt objects arg = do
+--     let mkAlt (name@(FunctionName fn blanks), objArgs) = do
+--             let partialArgs = dropLast blanks $ hptFnArgs hpt Map.! fn
+--                 isFrameVariable Variable{variableType=FramePtr{}} = True
+--                 isFrameVariable _ = False
+--             case findIndex isFrameVariable partialArgs of
+--                 Nothing ->
+--                     return $
+--                         Alternative (NodePat name partialArgs) $
+--                         Panic "Couldn't find frame pointer."
+--                 Just framePtrIndex -> do
+--                     let nextFramePtrs = objArgs Vector.! framePtrIndex
+--                         nextFrameLocs = derefPtrs hpt nextFramePtrs
+--                         nextFrameObjects = derefHeap hpt nextFrameLocs
+--                         size = sizeOfObjects hpt nextFrameObjects
+--                     let nextFramePtr = partialArgs !! framePtrIndex
+--                     nextFrame <- newVariable "nextFrame" (StaticNode size)
+--                     Alternative (NodePat name partialArgs) .
+--                         Bind [nextFrame] (Fetch nextFramePtr) .
+--                         Case nextFrame Nothing
+--                             <$> mkInvokeHandlerAlts hpt nextFrameObjects arg
+--         mkAlt (ConstructorName cons 0, objArgs) | isCatchFrame cons = do
+--             let exhVars = objArgs Vector.! 1
+--                 exhObjects = derefVars hpt exhVars
+--             nextFramePtr <- newVariable "nextFrame" NodePtr
+--             exh <- newVariable "exh" (StaticNode (sizeOfObjects hpt exhObjects))
+--             Alternative (NodePat (ConstructorName cons 0) [nextFramePtr, exh]) .
+--                 Case exh Nothing
+--                     <$> mkInvokeAlts hpt exhObjects [arg, nextFramePtr]
+--
+--         mkAlt (alt, _args) =
+--             return $ Alternative (NodePat alt []) (Panic "Invoke handler failure")
+--
+--     mapM mkAlt (Map.toList objects)
 
 
 traverseAlternative :: HPTResult -> Function -> Alternative -> Gen Alternative

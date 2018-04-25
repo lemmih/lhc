@@ -64,7 +64,7 @@ lowerBlock block =
       Return vars -> pure $ Return vars
       Raise{} -> pure block
       Invoke{} -> pure block
-      InvokeHandler{} -> pure block
+      -- InvokeHandler{} -> pure block
 
 lowerAlternative :: Alternative -> M Alternative
 lowerAlternative (Alternative pattern branch) =

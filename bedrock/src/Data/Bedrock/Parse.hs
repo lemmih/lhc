@@ -16,9 +16,9 @@ bedrockDef :: P.LanguageDef ()
 bedrockDef = P.emptyDef
   { P.commentLine = ";" -- similar to LLVM IR
   , P.caseSensitive = True
-  , P.reservedNames = []
+  , P.reservedNames = ["DEFAULT", "entrypoint"]
       -- [ "node", "foreign", "entrypoint", "case", "of" ]
-  , P.reservedOpNames = ["=","->"]
+  , P.reservedOpNames = ["=","→"]
   -- , P.identStart = P.identStart P.emptyDef <|> char '@'
   }
 
@@ -28,8 +28,7 @@ lexer = P.makeTokenParser bedrockDef
 natural, integer :: Parser Integer
 identifier :: Parser String
 symbol :: String -> Parser String
-parens :: Parser a -> Parser a
-brackets :: Parser a -> Parser a
+parens, brackets, braces :: Parser a -> Parser a
 reservedOp, reserved :: String -> Parser ()
 stringLiteral, comma, dot :: Parser String
 commaSep, commaSep1 :: Parser a -> Parser [a]
@@ -37,6 +36,7 @@ commaSep, commaSep1 :: Parser a -> Parser [a]
 identifier = P.identifier lexer
 parens     = P.parens lexer
 brackets   = P.brackets lexer
+braces     = P.braces lexer
 reserved   = P.reserved lexer
 reservedOp = P.reservedOp lexer
 symbol     = P.symbol lexer
@@ -122,8 +122,8 @@ parseAttribute = choice
 
 parseFunction :: Parser Function
 parseFunction = do
-  attributes <- many parseAttribute
-  retTypes <- many parseType
+  attributes <- commaSep parseAttribute
+  retTypes <- commaSep parseType
   name <- parseName
   args <- parens (commaSep parseVariable)
   body <- parseBlock
@@ -167,7 +167,7 @@ parsePattern = choice
 parseAlternative :: Parser Alternative
 parseAlternative = do
   pat <- parsePattern
-  reservedOp "->"
+  reservedOp "→"
   expression <- parseBlock
   return $ Alternative pat expression
 
@@ -180,11 +180,13 @@ parseAlternative = do
 -}
 parseParameter :: Parser Parameter
 parseParameter = choice
-  [ PInt . fromIntegral <$> natural
+  [ PInt . fromIntegral <$> integer
   , PString <$> stringLiteral
+  , do reserved "node"
+       PNodeName . fst <$> parseNode
   , PVariable <$> parseVariable
   , PVariables <$> brackets (commaSep parseVariable)
-  , PNodeName . fst <$> parseNode
+  , PName <$> parseName
   ]
 
 parseExpression :: Parser Expression
@@ -221,12 +223,44 @@ parseBlock = choice (
     reserved "@return"
     args <- parens (commaSep parseVariable)
     return $ Return args
+  , try $ do
+    pat <- parsePattern
+    reserved "← "
+    scrut <- parseVariable
+    rest <- parseBlock
+    return $ Case scrut Nothing [Alternative pat rest]
   , do
     reserved "case"
     scrut <- parseVariable
     reserved "of"
-    alts <- many parseAlternative
-    return $ Case scrut Nothing alts
+    braces $ do
+      alts <- many parseAlternative
+      mbDef <- option Nothing $ do
+        reserved "DEFAULT"
+        reserved "→"
+        Just <$> parseBlock
+      return $ Case scrut mbDef alts
+  , do
+    reserved "@raise"
+    e <- parseVariable
+    return $ Raise e
+  , do
+    reserved "@exit"
+    return $ Exit
+  , do
+    reserved "@tail"
+    fn <- parseName
+    args <- parens (commaSep parseVariable)
+    return $ TailCall fn args
+  , do
+    reserved "@panic"
+    Panic <$> stringLiteral
+  , do
+    reserved "@invoke"
+    idx <- option 0 (brackets natural)
+    fn <- parseVariable
+    args <- parens (commaSep parseVariable)
+    return $ Invoke (fromIntegral idx) fn args
   , do
     names <- commaSep1 parseVariable
     symbol "="
@@ -237,18 +271,6 @@ parseBlock = choice (
     simple <- parseExpression
     rest <- parseBlock
     return $ Bind [] simple rest
-  , do
-    reserved "@raise"
-    e <- parens parseVariable
-    return $ Raise e
-  , do
-    reserved "@exit"
-    return $ Exit
-  , do
-    reserved "@tail"
-    fn <- parseName
-    args <- parens (commaSep parseVariable)
-    return $ TailCall fn args
   ])
 
 parseEntryPoint :: Parser Name

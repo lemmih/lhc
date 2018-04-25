@@ -178,9 +178,9 @@ uniqBlock block =
         -- FIXME: the code for Invoke is wrong.
         Invoke n fn vars ->
             Invoke n fn <$> resolveMany vars
-        InvokeHandler{} -> error $
-            "Register introduction: @InvokeHandler must have been lowered\
-            \ by now"
+        -- InvokeHandler{} -> error $
+        --     "Register introduction: @InvokeHandler must have been lowered\
+        --     \ by now"
         Exit -> pure Exit
         Panic msg -> pure (Panic msg)
 
