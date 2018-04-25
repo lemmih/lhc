@@ -36,32 +36,34 @@ apply *fn ?arg =
 -}
 lowerEvalApply :: Gen ()
 lowerEvalApply = do
-    fs <- gets (Map.elems . envFunctions)
-    evalName <- newName "eval"
-    arg <- newVariable "arg" NodePtr
-    let defaultEval = Return [arg]
+  entrypoint <- gets (entryPoint . envModule)
+  fs <- gets (Map.elems . envFunctions)
+  evalName <- newName "eval"
+  arg <- newVariable "arg" NodePtr
+  let defaultEval = Return [arg]
 
-    evalBody <- do
-      obj <- newVariable "obj" Node
-      Bind [obj] (Fetch arg) <$>
-        Case obj (Just defaultEval) <$> sequence
-          [ mkEvalAlternative fn
-          | fn <- fs
-          , fnResults fn == [NodePtr] ]
-    pushFunction Function
-      { fnName       = evalName
-      , fnAttributes = []
-      , fnArguments  = [arg]
-      , fnResults    = [NodePtr]
-      , fnBody       = evalBody}
+  evalBody <- do
+    obj <- newVariable "obj" Node
+    Bind [obj] (Fetch arg) <$>
+      Case obj (Just defaultEval) <$> sequence
+        [ mkEvalAlternative fn
+        | fn <- fs
+        , fnName fn /= entrypoint
+        , fnResults fn == [NodePtr] ]
+  pushFunction Function
+    { fnName       = evalName
+    , fnAttributes = []
+    , fnArguments  = [arg]
+    , fnResults    = [NodePtr]
+    , fnBody       = evalBody}
 
-    pairs <- applyPairs
-    applys <- forM pairs $ \(ty, names) -> do
-      appName <- mkApplyFn (ty, names)
-      return (ty, appName)
+  pairs <- applyPairs
+  applys <- forM pairs $ \(ty, names) -> do
+    appName <- mkApplyFn (ty, names)
+    return (ty, appName)
 
-    forM_ fs $ \fn ->
-      pushFunction fn{fnBody = replaceEvalApply (Map.fromList applys) evalName (fnBody fn)}
+  forM_ fs $ \fn ->
+    pushFunction fn{fnBody = replaceEvalApply (Map.fromList applys) evalName (fnBody fn)}
 
 mkApplyFn :: (([Type], Type), [(NodeName, [Type])]) -> Gen Name
 mkApplyFn ((retTys, arg), nodeNames) = do
