@@ -79,8 +79,8 @@ data Expr
     | Con Variable
     | UnboxedTuple [Expr]
     | Lit Literal
-    | WithExternal Variable String [Variable] Variable Expr
-    | ExternalPure Variable String [Variable] Expr
+    | WithExternal Variable String [Expr] Expr Expr
+    | ExternalPure Variable String [Expr] Expr
     | App Expr Expr
     | Lam [Variable] Expr
     | Let LetBind Expr
@@ -94,14 +94,14 @@ data Expr
 
 rarrow :: Doc
 rarrow = text "→ "
-ppVars :: [Variable] -> Doc
-ppVars = hsep . map pretty
+ppVars :: [Expr] -> Doc
+ppVars = hsep . map (prettyPrec appPrecedence)
 
 ppTypedVars :: [Variable] -> Doc
 ppTypedVars = hsep . map ppTypedVariable
 
 appPrecedence :: Int
-appPrecedence = 1
+appPrecedence = 2
 
 instance Pretty Expr where
   prettyPrec p expr =
@@ -114,8 +114,8 @@ instance Pretty Expr where
         (hsep $ punctuate comma $ map pretty args) <+>
         text "#)"
       Lit lit -> pretty lit
-      App a b -> parensIf (p > 0) $ nest 2 $
-        pretty a </> prettyPrec appPrecedence b
+      App a b -> parensIf (p >= appPrecedence) $ nest 2 $
+        prettyPrec 1 a </> prettyPrec appPrecedence b
       Lam vars e -> parensIf (p > 0) $
         char 'λ' <+> ppTypedVars vars <+> rarrow <$$> pretty e
       Case scrut var Nothing [Alt pattern e] ->

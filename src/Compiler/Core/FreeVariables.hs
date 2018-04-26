@@ -19,11 +19,17 @@ freeVariablesExpr expr =
     UnboxedTuple args -> Set.unions (map freeVariablesExpr args)
     Lit{} -> Set.empty
     WithExternal outV _name args _st e ->
-      Set.fromList (map varName args) `Set.union`
+      Set.unions (map freeVariablesExpr args) `Set.union`
       Set.delete (varName outV) (freeVariablesExpr e)
+    -- WithExternal outV _name args _st e ->
+    --   Set.fromList (map varName args) `Set.union`
+    --   Set.delete (varName outV) (freeVariablesExpr e)
     ExternalPure outV _name args e ->
-      Set.fromList (map varName args) `Set.union`
+      Set.unions (map freeVariablesExpr args) `Set.union`
       Set.delete (varName outV) (freeVariablesExpr e)
+    -- ExternalPure outV _name args e ->
+    --   Set.fromList (map varName args) `Set.union`
+    --   Set.delete (varName outV) (freeVariablesExpr e)
     App a b -> freeVariablesExpr a `Set.union` freeVariablesExpr b
     Lam binds e ->
       freeVariablesExpr e Set.\\

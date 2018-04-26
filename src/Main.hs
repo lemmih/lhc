@@ -17,8 +17,8 @@ import qualified Compiler.Core                      as Core
 import qualified Compiler.Core.DCE                  as Core
 import qualified Compiler.Core.NewType              as NewType
 import qualified Compiler.Core.SimpleEta            as Core
--- import qualified Compiler.Core.SimpleInline         as Core
--- import qualified Compiler.Core.Unique         as Core
+import qualified Compiler.Core.SimpleInline         as Core
+import qualified Compiler.Core.Unique         as Core
 import qualified Compiler.Core.Simplify             as Core
 import qualified Compiler.CoreToBedrock             as Core
 import qualified Compiler.HaskellToCore             as Haskell
@@ -192,10 +192,11 @@ compileExecutable verbose keepIntermediateFiles gcStrategy file = do
       libraryCore = mconcat (map (snd . snd) ifaces)
       entrypoint = Name ["Main"] "entrypoint" 0
       complete =
-          -- Core.deadCodeElimination entrypoint $
-          -- Core.unique $
-          -- Core.simpleInline $
-          -- Core.unique $
+          Core.deadCodeElimination entrypoint $
+          Core.unique $
+          Core.simplify $ Core.simplify $ Core.simplify $ Core.simpleInline $ Core.unique $
+          Core.simplify $ Core.simplify $ Core.simplify $ Core.simpleInline $ Core.unique $
+          Core.simplify $ Core.simplify $ Core.simplify $ Core.simpleInline $ Core.unique $
           snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
           Core.simplify $ Core.simplify $ Core.simplify $
           snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $

@@ -17,7 +17,12 @@ simplify m = m
         WithExternal{} -> e
         ExternalPure{} -> e
         App Id b -> expr b
+        App (Lam (v:vs) body) b ->
+          expr (Let (NonRec v b) (Lam vs body))
+        App (Let bind rest) b ->
+          expr (Let bind (App rest b))
         App a b -> App (expr a) (expr b)
+        Lam [] rest -> expr rest
         Lam a (Lam b rest) -> expr (Lam (a++b) rest)
         Lam vars rest -> Lam vars (expr rest)
         Let bind@(NonRec _ Var{}) (Lam a b) ->

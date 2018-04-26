@@ -481,21 +481,21 @@ convertExpr lazy expr rest =
                   Bind [tmp] (Bedrock.Fetch val) <$>
                     Bedrock.Case tmp (Just defExpr) <$>
                         mapM convertAlt alts
-    Cast e ty | not lazy ->
+    Cast e ty ->
       convertExpr False e $ \[val] -> do
         var <- deriveVariable val "val" (convertTcType ty)
         Bind [var] (Bedrock.TypeCast val) <$> rest [var]
-    WithExternal binder external args st scoped | not lazy -> do
-      binder' <- convertVariable binder
-      args' <- mapM convertVariable args
-      Bind [binder'] (CCall external args')
-          <$> convertExpr False scoped rest
+    WithExternal binder external args st scoped ->
+      convertExprs args $ \args' -> do
+        binder' <- convertVariable binder
+        Bind [binder'] (CCall external args')
+            <$> convertExpr False scoped rest
 
-    ExternalPure binder external args scoped | not lazy -> do
-      binder' <- convertVariable binder
-      args' <- mapM convertVariable args
-      Bind [binder'] (CCall external args')
-          <$> convertExpr False scoped rest
+    ExternalPure binder external args scoped ->
+      convertExprs args $ \args' -> do
+        binder' <- convertVariable binder
+        Bind [binder'] (CCall external args')
+            <$> convertExpr False scoped rest
 
     Let (NonRec name e1) e2 ->
       convertExpr True e1 $ \[val] -> do
@@ -509,6 +509,12 @@ convertExpr lazy expr rest =
 
     WithProof _proof e -> convertExpr lazy e rest
 
+    -- _ | lazy -> do
+    --   body <- convertExpr False expr (pure . Return)
+    --   (node, nodeArgs) <- pushFunction [] (Left "thunk") body
+    --   tmp <- newVariable [] "thunk" NodePtr
+    --   Bind [tmp] (Store (FunctionName node 0) nodeArgs)
+    --     <$> rest [tmp]
     _ | lazy -> error $ "C->B convertExpr: " ++ show (lazy, expr)
     _ -> -- not lazy
       convertExpr True expr $ \[val] -> do

@@ -37,13 +37,13 @@ uniqueExpr expr =
     WithExternal out fn args st e ->
       bind out $ \out' ->
       WithExternal out' fn
-        <$> mapM uniqueVariable args
-        <*> uniqueVariable st
+        <$> mapM uniqueExpr args
+        <*> uniqueExpr st
         <*> uniqueExpr e
     ExternalPure out fn args e ->
       bind out $ \out' ->
         ExternalPure out' fn
-          <$> mapM uniqueVariable args
+          <$> mapM uniqueExpr args
           <*> uniqueExpr e
     App a b -> App <$> uniqueExpr a <*> uniqueExpr b
     Lam vars e -> bindMany vars $ \vars' ->

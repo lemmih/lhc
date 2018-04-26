@@ -2,16 +2,19 @@ module Compiler.Core.SimpleInline
   ( simpleInline ) where
 
 import           Data.Map (Map)
-import qualified Data.Map as Map
 import           Data.Set (Set)
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Data.Graph
+import           Data.Array
 import           Control.Monad.Reader
-import           Control.Monad.Writer        ( Writer, runWriter, tell, censor )
+import           Control.Monad.State         ( modify, gets )
+import           Control.Monad.RWS           ( RWS, evalRWS )
+import           Control.Monad.Writer        ( listen, tell )
 
 import           Compiler.Core
 import           Compiler.Core.FreeVariables
-import           Data.Bedrock                (Name)
+import           Data.Bedrock                (Name(..))
 
 -- SCC
 -- inline everything & analyse whether current function can be inlined later
@@ -20,9 +23,195 @@ import           Data.Bedrock                (Name)
 -- Functions can be inlineable iff:
 --  They do not refer to any Haskell functons.
 --  They only use their arguments once.
+--  They are only used once.
 -- Functions can be inlined iff:
 --  They are called with all arguments supplied.
 
+simpleInline :: Module -> Module
+simpleInline m =
+    m{coreDecls = fst (evalRWS (mapM worker flatDecls) emptyEnv emptyState) }
+  where
+    emptyEnv = Map.empty
+    emptyState = State 1 Map.empty Set.empty
+    (graph, fromVertex) = graphFromEdges'
+          [ (decl, declName decl, Set.toList free)
+          | decl <- coreDecls m
+          , let free = freeVariablesDecl decl ]
+    graph' = transposeG graph
+    isOneShot v =
+      case graph'!v of
+        []  -> True
+        [_] -> True
+        _   -> False
+    flatDecls = topSort graph'
+    worker v = do
+      let (decl,_,_) = fromVertex v
+          name = declName decl
+          (args, body) = splitArguments (declBody decl)
+      (decl', usage) <- listen (uniqueDecl decl)
+      when (usage==Cheap || (usage==Expensive && isOneShot v)) $
+        modify $ \st ->
+          st{ stInline = Map.insert name (args, body) (stInline st) }
+      pure decl'
+
+splitArguments :: Expr -> ([Variable], Expr)
+splitArguments (Lam vars e) = (vars, e)
+-- splitArguments (WithCoercion _ e) = splitArguments e
+splitArguments e = ([], e)
+
+
+type Env = Map Name Expr
+data State = State
+  { stUnique :: Int
+  , stInline :: Map Name ([Variable], Expr)
+  , stCheap  :: Set Name
+  }
+data Cost = Prohibitive | Expensive | Cheap deriving (Eq,Show)
+instance Monoid Cost where
+  mempty = Cheap
+  mappend Cheap Cheap = Cheap
+  mappend _ Prohibitive = Prohibitive
+  mappend Prohibitive _ = Prohibitive
+  mappend _ _ = Expensive
+type M a = RWS Env Cost State a
+
+uniqueDecl :: Decl -> M Decl
+uniqueDecl decl = do
+  body <- uniqueExpr (declBody decl)
+  return decl{declBody = body}
+
+uniqueExpr :: Expr -> M Expr
+uniqueExpr expr =
+  case expr of
+    _ | (Var var, args) <- collectApp expr -> do
+      inline <- gets stInline
+      case Map.lookup (varName var) inline of
+        Nothing -> do
+          core <- uniqueVariable var
+          foldl App core <$> mapM uniqueExpr args
+        Just (fnArgs, fnBody)
+          | extraArgs <- drop (length fnArgs) args
+          , length fnArgs <= length args -> do
+            replaceMany (zip fnArgs args) $
+              uniqueExpr (foldl App fnBody extraArgs)
+          | otherwise -> do
+            core <- uniqueVariable var
+            foldl App core <$> mapM uniqueExpr args
+    Var var -> uniqueVariable var
+    Con name -> pure $ Con name
+    UnboxedTuple args ->
+      UnboxedTuple <$> mapM uniqueExpr args
+    Lit lit -> pure $ Lit lit
+    WithExternal out fn args st e ->
+      bind out $ \out' ->
+      WithExternal out' fn
+        <$> mapM uniqueExpr args
+        <*> uniqueExpr st
+        <*> uniqueExpr e
+    ExternalPure out fn args e ->
+      bind out $ \out' ->
+        ExternalPure out' fn
+          <$> mapM uniqueExpr args
+          <*> uniqueExpr e
+    App a b -> App <$> uniqueExpr a <*> uniqueExpr b
+    Lam vars e -> bindMany vars $ \vars' ->
+      Lam vars' <$> uniqueExpr e
+    Let (NonRec v e) body -> bind v $ \v' ->
+      Let <$> (NonRec v' <$> uniqueExpr e)
+          <*> uniqueExpr body
+    Let{} ->
+      error "Compiler.Core.Unique.uniqueExpr.Let: undefined"
+    LetStrict{} ->
+      error "Compiler.Core.Unique.uniqueExpr.LetStrict: undefined"
+    Case e scrut mbDef alts -> do
+      e' <- uniqueExpr e
+      bind scrut $ \scrut' ->
+        Case e' scrut'
+            <$> uniqueMaybe uniqueExpr mbDef
+            <*> mapM uniqueAlt alts
+    Cast e ty ->
+      Cast <$> uniqueExpr e <*> pure ty
+    Id -> pure Id
+    WithProof p e -> WithProof p <$> uniqueExpr e
+
+uniqueAlt :: Alt -> M Alt
+uniqueAlt (Alt pattern e) =
+  case pattern of
+    ConPat con vars -> bindMany vars $ \vars' ->
+      Alt (ConPat con vars') <$> uniqueExpr e
+    LitPat lit ->
+      Alt (LitPat lit) <$> uniqueExpr e
+    UnboxedPat vars -> bindMany vars $ \vars' ->
+      Alt (UnboxedPat vars') <$> uniqueExpr e
+
+uniqueVariable :: Variable -> M Expr
+uniqueVariable var@(Variable name ty) = do
+  env <- ask
+  case Map.lookup name env of
+    Nothing -> do
+      consume var
+      pure (Var var)
+    Just expr -> do
+      local (Map.delete name) $ uniqueExpr expr
+
+collectApp :: Expr -> (Expr, [Expr])
+collectApp = worker []
+  where
+    worker acc expr =
+      case expr of
+        App a b -> worker (b:acc) a
+        -- WithCoercion _ e -> worker acc e
+        _ -> (expr, acc)
+
+consume :: Variable -> M ()
+consume var = do
+  cheap <- gets stCheap
+  unless (varName var `Set.member` cheap) $ tell Prohibitive
+  modify $ \st -> st{ stCheap = Set.delete (varName var) (stCheap st) }
+
+bind :: Variable -> (Variable -> M a) -> M a
+bind var action = do
+  name' <- newName (varName var)
+  let var' = var{varName = name'}
+  modify $ \st -> st{ stCheap = Set.insert name' (stCheap st) }
+  local
+    (Map.insert (varName var) (Var var'))
+    (action var')
+
+bindMany :: [Variable] -> ([Variable] -> M a) -> M a
+bindMany vars action = worker [] vars
+  where
+    worker acc [] = action (reverse acc)
+    worker acc (x:xs) = bind x $ \x' -> worker (x':acc) xs
+
+replace :: Variable -> Expr -> M a -> M a
+replace old new = local (Map.insert (varName old) new)
+
+replaceMany :: [(Variable, Expr)] -> M a -> M a
+replaceMany vars action = worker vars
+  where
+    worker [] = action
+    worker ((key,val):xs) = replace key val $ worker xs
+
+
+-- newVariable :: Variable -> M Variable
+-- newVariable v = do
+--   u <- get
+--   put (u+1)
+--   return v{varName = (varName v){nameUnique = u}}
+
+newName :: Name -> M Name
+newName n = do
+  u <- gets stUnique
+  modify $ \st -> st{stUnique = (u+1)}
+  return n{nameUnique = u}
+
+uniqueMaybe :: (a -> M a) -> Maybe a -> M (Maybe a)
+uniqueMaybe _ Nothing   = pure Nothing
+uniqueMaybe fn (Just v) = Just <$> fn v
+
+
+{-
 simpleInline :: Module -> Module
 simpleInline m =
     m{coreDecls = worker Map.empty flatDecls}
@@ -177,3 +366,4 @@ collectApp = worker []
 inlineMaybe :: (a -> M a) -> Maybe a -> M (Maybe a)
 inlineMaybe _ Nothing   = pure Nothing
 inlineMaybe fn (Just v) = Just <$> fn v
+-}

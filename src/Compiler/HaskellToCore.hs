@@ -518,7 +518,7 @@ convertExternal cName ty
         return $
             Lam args $
             let action = Lam [s] $
-                    WithExternal primOut cName args s $
+                    WithExternal primOut cName (map Var args) (Var s) $
                     UnboxedTuple [Var s, App (Con int32Con) (Var primOut)]
             in action -- (App (WithCoercion (CoerceAp [retType]) (Con ioCon)) action)
     | otherwise = do -- not isIO
@@ -526,7 +526,7 @@ convertExternal cName ty
         primOut <- Variable <$> newName "primOut" <*> pure retType
         return $
             Lam args $
-            ExternalPure primOut cName args $
+            ExternalPure primOut cName (map Var args) $
             Var primOut
   where
     (argTypes, isIO, retType) = ffiTypes ty
