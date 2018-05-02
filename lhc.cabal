@@ -42,7 +42,7 @@ Executable lhc
                      ansi-wl-pprint   >= 0.6.6,
 
                      hse-cpp          >= 0.1,
-                     haskell-packages >= 0.6,
+                     haskell-packages >= 0.6.2,
                      Cabal,
                      haskell-src-exts >= 1.16.0,
                      tagged,

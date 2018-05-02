@@ -8,7 +8,7 @@ packages:
 
 - location:
     git: https://github.com/haskell-suite/haskell-tc.git
-    commit: ee65a55e5e054b4e02ba2fe227240d21aa13cbd9
+    commit: a77175fff966b2107087e5f39ac63e8193d7392f
   extra-dep: true
 
 - location:
@@ -17,8 +17,8 @@ packages:
   extra-dep: true
 
 - location:
-    git: https://github.com/Lemmih/cabal.git
-    commit: 2bc6de8dec645e5b1425300078a3f81703ec3511
+    git: https://github.com/haskell/cabal.git
+    commit: b58b315835895b6c03311bc604f901f0939df02e
   subdirs:
     - cabal-install
     - Cabal
@@ -29,10 +29,14 @@ packages:
     commit: 7e0ccd633195797e946699c4dbf8b1c741487c6e
   extra-dep: true
 
+- location:
+    git: https://github.com/haskell-suite/haskell-packages.git
+    commit: 9131a0b737e352393e94351dd63c495f2e9ff3e6
+  extra-dep: true
+
 
 extra-deps:
 - haskell-src-exts-1.20.2
-- haskell-packages-0.6.1
 - llvm-hs-pure-6.0.0
 - resolv-0.1.1.1
 - cabal-helper-0.7.3.0
