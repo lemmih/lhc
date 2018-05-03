@@ -82,8 +82,9 @@ simplifyBlock block =
             simplifyBlock rest
         Bind [] Literal{} rest ->
             simplifyBlock rest
-        Bind [dst] (TypeCast src) rest | variableType dst == variableType src ->
-              bindVariable dst src (simplifyBlock rest)
+        Bind [dst] (TypeCast src) rest | variableType dst == variableType src -> do
+            src' <- resolve src
+            bindVariable dst src' (simplifyBlock rest)
         Bind [dst] (Address src idx) rest -> do
           src' <- resolve src
           bindAddress dst src' idx $
@@ -96,6 +97,17 @@ simplifyBlock block =
             Bind binds
                 <$> simplifyExpression simple
                 <*> simplifyBlock rest
+        -- FIXME: Sanity check: con == node
+        Case scrut Nothing alts@[Alternative (NodePat _con args) branch] -> do
+          mbNode <- lookupConstant scrut
+          case mbNode of
+            Nothing ->
+              Case
+                <$> resolve scrut
+                <*> pure Nothing
+                <*> mapM simplifyAlternative alts
+            Just (_node, nodeArgs) ->
+              bindVariables (zip args nodeArgs) $ simplifyBlock branch
         Case scrut Nothing alts ->
             Case
                 <$> resolve scrut
@@ -111,7 +123,7 @@ simplifyBlock block =
         Exit -> pure Exit
         Panic msg -> pure $ Panic msg
         Invoke n cont vars -> Invoke n <$> resolve cont <*> mapM resolve vars
-        _ -> return block
+        Raise var -> Raise <$> resolve var
 
 simplifyAlternative :: Alternative -> M Alternative
 simplifyAlternative (Alternative pattern branch) =
@@ -122,6 +134,11 @@ simplifyExpression :: Expression -> M Expression
 simplifyExpression expr =
     case expr of
         Application fn vars -> Application fn <$> mapM resolve vars
+        Fetch ptr -> do
+          mbStore <- lookupStore ptr
+          case mbStore of
+            Nothing -> pure $ Fetch ptr
+            Just (node, args) -> pure $ MkNode node args
         Eval var -> do
             mbNode <- lookupStore var
             case mbNode of
@@ -136,14 +153,28 @@ simplifyExpression expr =
         MkNode name vars -> MkNode name <$> mapM resolve vars
         TypeCast var -> TypeCast <$> resolve var
         CCall fn vars -> CCall fn <$> mapM resolve vars
-        Store node vars -> Store node <$> mapM resolve vars
-        Write v1 idx v2 -> Write <$> resolve v1 <*> pure idx <*> resolve v2
-        Address v idx -> Address <$> resolve v <*> pure idx
+        Literal{} -> pure expr
+        Catch fn args handler handlerArgs ->
+          Catch fn
+            <$> mapM resolve args
+            <*> pure handler
+            <*> mapM resolve handlerArgs
+        InvokeReturn idx v vs ->
+          InvokeReturn idx
+            <$> resolve v
+            <*> mapM resolve vs
+        Builtin fn params -> Builtin fn <$> mapM simplifyParameter params
 
-        _ -> pure expr
 
-
-
+simplifyParameter :: Parameter -> M Parameter
+simplifyParameter param =
+  case param of
+    PInt{} -> pure param
+    PString{} -> pure param
+    PName{} -> pure param
+    PNodeName{} -> pure param
+    PVariable v -> PVariable <$> resolve v
+    PVariables vs -> PVariables <$> mapM resolve vs
 
 
 
@@ -227,8 +258,12 @@ bindVariable old new fn = do
           })
         fn
 
-_lookupConstant :: Variable -> M (Maybe (NodeName, [Variable]))
-_lookupConstant var = do
+bindVariables :: [(Variable, Variable)] -> M a -> M a
+bindVariables [] = id
+bindVariables ((x,y):xs) = bindVariables xs . bindVariable x y
+
+lookupConstant :: Variable -> M (Maybe (NodeName, [Variable]))
+lookupConstant var = do
     var' <- resolve var
     m <- asks envConstant
     return $ Map.lookup var' m

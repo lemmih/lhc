@@ -98,6 +98,7 @@ dceBlock root block =
 
 isSimple :: Expression -> Bool
 isSimple Store{} = True
+isSimple MkNode{} = True
 isSimple Literal{} = True
 isSimple TypeCast{} = True
 isSimple Undefined{} = True

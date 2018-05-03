@@ -79,7 +79,7 @@ data Expr
     | Con Variable
     | UnboxedTuple [Expr]
     | Lit Literal
-    | WithExternal Variable String [Expr] Expr Expr
+    | WithExternal Variable Variable String [Expr] Expr Expr
     | ExternalPure Variable String [Expr] Expr
     | App Expr Expr
     | Lam [Variable] Expr
@@ -139,8 +139,8 @@ instance Pretty Expr where
       --   pretty c <+> pretty e
       WithProof proof e -> parensIf (p > 0) $
         pretty proof <+> pretty e
-      WithExternal outV cName args st cont ->
-        ppTypedVariable outV <+> text "←" <+>
+      WithExternal outV outS cName args st cont ->
+        ppTypedVariable outV <> comma <+> pretty outS <+> text "←" <+>
           text "external" <+> text cName <+> ppVars args <$$>
         pretty cont
       ExternalPure outV cName args cont ->

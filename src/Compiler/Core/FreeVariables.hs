@@ -18,9 +18,9 @@ freeVariablesExpr expr =
     Con{} -> Set.empty
     UnboxedTuple args -> Set.unions (map freeVariablesExpr args)
     Lit{} -> Set.empty
-    WithExternal outV _name args _st e ->
+    WithExternal outV retS _name args _st e ->
       Set.unions (map freeVariablesExpr args) `Set.union`
-      Set.delete (varName outV) (freeVariablesExpr e)
+      Set.delete (varName retS) (Set.delete (varName outV) (freeVariablesExpr e))
     -- WithExternal outV _name args _st e ->
     --   Set.fromList (map varName args) `Set.union`
     --   Set.delete (varName outV) (freeVariablesExpr e)

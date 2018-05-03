@@ -513,13 +513,16 @@ convertExternal cName ty
         s <- Variable
                 <$> newName "s"
                 <*> pure realWorld
+        s' <- Variable
+                <$> newName "s'"
+                <*> pure realWorld
         -- boxed <- Variable <$> newName "boxed" <*> pure retType
 
         return $
             Lam args $
             let action = Lam [s] $
-                    WithExternal primOut cName (map Var args) (Var s) $
-                    UnboxedTuple [Var s, App (Con int32Con) (Var primOut)]
+                    WithExternal primOut s' cName (map Var args) (Var s) $
+                    UnboxedTuple [Var s', App (Con int32Con) (Var primOut)]
             in action -- (App (WithCoercion (CoerceAp [retType]) (Con ioCon)) action)
     | otherwise = do -- not isIO
         args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t

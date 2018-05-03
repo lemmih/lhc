@@ -34,9 +34,10 @@ uniqueExpr expr =
     UnboxedTuple args ->
       UnboxedTuple <$> mapM uniqueExpr args
     Lit lit -> pure $ Lit lit
-    WithExternal out fn args st e ->
+    WithExternal out retS fn args st e ->
       bind out $ \out' ->
-      WithExternal out' fn
+      bind retS $ \retS' ->
+      WithExternal out' retS' fn
         <$> mapM uniqueExpr args
         <*> uniqueExpr st
         <*> uniqueExpr e
@@ -54,8 +55,9 @@ uniqueExpr expr =
           <*> uniqueExpr body
     Let{} ->
       error "Compiler.Core.Unique.uniqueExpr.Let: undefined"
-    LetStrict{} ->
-      error "Compiler.Core.Unique.uniqueExpr.LetStrict: undefined"
+    LetStrict v e rest ->
+      bind v $ \v' ->
+        LetStrict v' <$> uniqueExpr e <*> uniqueExpr rest
     Case e scrut mbDef alts -> do
       e' <- uniqueExpr e
       bind scrut $ \scrut' ->

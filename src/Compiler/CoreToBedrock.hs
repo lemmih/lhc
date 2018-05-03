@@ -485,10 +485,11 @@ convertExpr lazy expr rest =
       convertExpr False e $ \[val] -> do
         var <- deriveVariable val "val" (convertTcType ty)
         Bind [var] (Bedrock.TypeCast val) <$> rest [var]
-    WithExternal binder external args st scoped ->
+    WithExternal binder retS external args st scoped ->
       convertExprs args $ \args' -> do
         binder' <- convertVariable binder
-        Bind [binder'] (CCall external args')
+        retS' <- convertVariable retS
+        Bind [binder', retS'] (CCall external args')
             <$> convertExpr False scoped rest
 
     ExternalPure binder external args scoped ->

@@ -29,7 +29,7 @@ moduleGraph m =
         Con con -> [varName con]
         UnboxedTuple args -> concatMap exprDependencies args
         Lit{} -> []
-        WithExternal _ret _external _args _st rest -> exprDependencies rest
+        WithExternal _ret _retS _external _args _st rest -> exprDependencies rest
         ExternalPure _ret _external _args rest -> exprDependencies rest
         App a b -> exprDependencies a ++ exprDependencies b
         Lam vars e -> exprDependencies e \\ map varName vars
