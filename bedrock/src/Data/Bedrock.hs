@@ -191,7 +191,7 @@ data Expression
   = Application Name [Variable]
   | CCall String [Variable]
   | Catch Name [Variable] Name [Variable]
-  | InvokeReturn Int Variable [Variable]
+  | InvokeReturn Variable [Variable]
   | Literal Literal
   -- Built-in
   | Builtin String [Parameter]
@@ -235,8 +235,7 @@ data Block
   | Return [Variable]
   | Raise Variable
   | TailCall Name [Variable]
-  | Invoke Int Variable [Variable]
-  -- | InvokeHandler Variable Variable
+  | Invoke Variable [Variable]
   | Exit
   | Panic String
   deriving (Show, Read, Eq, Data, Generic)
@@ -398,7 +397,6 @@ instance Arbitrary Block where
     , Return <$> arbitrary
     , Raise <$> arbitrary
     , TailCall <$> arbitrary <*> arbitrary
-    , Invoke <$> fmap abs arbitrary <*> arbitrary <*> arbitrary
-    -- , InvokeHandler <$> arbitrary <*> arbitrary
+    , Invoke <$> arbitrary <*> arbitrary
     , pure Exit
     , Panic <$> arbitrary ]) (pure Exit)

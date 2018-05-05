@@ -37,7 +37,7 @@ traceGC = do
         Bind [val] (TypeCast markFrame) $
         Case val (Just $
                     Bind [retAddr] (Load markFrame 0) $
-                    Bind [] (InvokeReturn 1 retAddr [markFrame]) $
+                    Bind [] (InvokeReturn retAddr [markFrame]) $
                     Return [markFrame])
           [ Alternative (LitPat (LiteralInt 0)) (Return [markFrame]) ]
 

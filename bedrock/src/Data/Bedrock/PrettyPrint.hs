@@ -122,11 +122,8 @@ instance Pretty Expression where
         ppSyntax "@catch" <+>
         pretty exh <> Doc.parens (ppList $ map pretty exhArgs) <+>
         pretty fn <> Doc.parens (ppList $ map pretty args)
-      InvokeReturn 0 cont args ->
+      InvokeReturn cont args ->
         ppSyntax "@invoke" <+> pretty cont <>
-        Doc.parens (ppList (map pretty args))
-      InvokeReturn n cont args ->
-        ppSyntax "@invoke" <> brackets (int n) <+> pretty cont <>
         Doc.parens (ppList (map pretty args))
       Literal lit ->
         ppSyntax "@literal" <+> pretty lit
@@ -164,15 +161,9 @@ ppBlock block =
     TailCall fn args ->
       ppSyntax "@tail" <+>
       pretty fn <> Doc.parens (ppList (map pretty args))
-    Invoke 0 cont args ->
+    Invoke cont args ->
       ppSyntax "@invoke" <+> pretty cont <>
       Doc.parens (ppList (map pretty args))
-    Invoke n cont args ->
-      ppSyntax "@invoke" <> brackets (int n) <+> pretty cont <>
-      Doc.parens (ppList (map pretty args))
-    -- InvokeHandler cont exception ->
-    --   ppSyntax "@invokeHandler" <>
-    --   Doc.parens (ppList $ map pretty [cont, exception])
     Exit ->
       ppSyntax "@exit"
     Panic msg ->

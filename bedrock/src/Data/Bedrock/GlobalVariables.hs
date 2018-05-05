@@ -71,9 +71,9 @@ lowerBlock block =
         Exit -> return Exit
         Return{} -> return block
         Panic{} -> return block
-        Invoke n fn args -> do
-            regs <- asks Map.elems
-            return $ Invoke n fn (regs ++ args)
+        Invoke fn args -> do
+          regs <- asks Map.elems
+          return $ Invoke fn (regs ++ args)
         _ -> error $ "lower registers: " ++ show block
 
 lowerAlternative :: Alternative -> Lower Alternative

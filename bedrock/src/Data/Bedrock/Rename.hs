@@ -148,10 +148,8 @@ uniqBlock block =
             Raise <$> resolve var
         TailCall fn vars ->
             TailCall <$> resolveName fn <*> mapM resolve vars
-        Invoke n fn vars ->
-            Invoke n <$> resolve fn <*> mapM resolve vars
-        -- InvokeHandler cont exception ->
-        --     InvokeHandler <$> resolve cont <*> resolve exception
+        Invoke fn vars ->
+            Invoke <$> resolve fn <*> mapM resolve vars
         Exit -> pure Exit
         Panic msg -> pure (Panic msg)
 
@@ -205,8 +203,8 @@ uniqSimple simple =
         Catch
             <$> resolveName exh <*> mapM resolve exhArgs
             <*> resolveName fn <*> mapM resolve fnArgs
-    InvokeReturn n fn vars ->
-      InvokeReturn n <$> resolve fn <*> mapM resolve vars
+    InvokeReturn fn vars ->
+      InvokeReturn <$> resolve fn <*> mapM resolve vars
     Builtin fn params ->
       Builtin fn <$> mapM uniqParameter params
     Literal lit -> pure $ Literal lit
@@ -334,13 +332,12 @@ locallyBlock block =
       TailCall
         <$> locallyResolve fn
         <*> mapM locallyResolveVariable args
-    Invoke n fn args ->
-      Invoke n
+    Invoke fn args ->
+      Invoke
         <$> locallyResolveVariable fn
         <*> mapM locallyResolveVariable args
     Exit -> return block
     Panic{} -> return block
-    -- InvokeHandler{} -> return block
 
 locallyAlternative :: Alternative -> LUniq Alternative
 locallyAlternative (Alternative pattern branch) = -- limitScope $
@@ -396,8 +393,8 @@ locallyExpression expr =
         <$> mapM locallyResolveVariable args
         <*> pure handler
         <*> mapM locallyResolveVariable handlerArgs
-    InvokeReturn n fn args ->
-      InvokeReturn n
+    InvokeReturn fn args ->
+      InvokeReturn
         <$> locallyResolveVariable fn
         <*> mapM locallyResolveVariable args
     Builtin fn params ->

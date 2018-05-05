@@ -255,10 +255,9 @@ parseBlock = choice (
     Panic <$> stringLiteral
   , do
     reserved "@invoke"
-    idx <- option 0 (brackets natural)
     fn <- parseVariable
     args <- parens (commaSep parseVariable)
-    return $ Invoke (fromIntegral idx) fn args
+    return $ Invoke fn args
   , try $ do
     names <- commaSep1 parseVariable
     symbol "="

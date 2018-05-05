@@ -158,8 +158,7 @@ replaceEvalApply applys eval = fix $ \loop block ->
     Return vars -> Return vars
     Raise var -> Raise var
     TailCall fn args -> TailCall fn args
-    Invoke n fn args -> Invoke n fn args
-    -- InvokeHandler fn cont -> InvokeHandler fn cont
+    Invoke fn args -> Invoke fn args
     Exit -> Exit
     Panic msg -> Panic msg
   where

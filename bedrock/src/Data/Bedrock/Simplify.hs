@@ -122,7 +122,7 @@ simplifyBlock block =
         TailCall fnName vars -> TailCall fnName <$> mapM resolve vars
         Exit -> pure Exit
         Panic msg -> pure $ Panic msg
-        Invoke n cont vars -> Invoke n <$> resolve cont <*> mapM resolve vars
+        Invoke cont vars -> Invoke <$> resolve cont <*> mapM resolve vars
         Raise var -> Raise <$> resolve var
 
 simplifyAlternative :: Alternative -> M Alternative
@@ -159,8 +159,8 @@ simplifyExpression expr =
             <$> mapM resolve args
             <*> pure handler
             <*> mapM resolve handlerArgs
-        InvokeReturn idx v vs ->
-          InvokeReturn idx
+        InvokeReturn v vs ->
+          InvokeReturn
             <$> resolve v
             <*> mapM resolve vs
         Builtin fn params -> Builtin fn <$> mapM simplifyParameter params

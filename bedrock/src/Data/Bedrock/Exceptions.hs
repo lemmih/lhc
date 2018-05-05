@@ -56,7 +56,7 @@ cpsBlock size prims ptrs origin frameVar block =
       -- 'node' is repeated here. Could be Undefined as well. Doesn't matter.
       return $
         Bind [node] (Load stdContinuation 0) $
-        Invoke 0 node (stdContinuation : take fn_size (args ++ repeat node))
+        Invoke node (stdContinuation : take fn_size (args ++ repeat node))
     Case scrut defaultBranch alternatives ->
       Case scrut
         <$> maybe (return Nothing) (fmap Just . cpsBlock size prims ptrs origin frameVar) defaultBranch

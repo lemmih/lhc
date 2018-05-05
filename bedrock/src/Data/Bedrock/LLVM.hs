@@ -422,7 +422,7 @@ blockToLLVM = worker
             return $ Ret Nothing []
         Return [] -> return $ Ret Nothing []
         Return [var] -> return $ Ret (Just $ LocalReference (typeToLLVM $ variableType var) (nameToLLVM $ variableName var)) []
-        Bedrock.Invoke _n cont args -> do
+        Bedrock.Invoke cont args -> do
             -- traceLLVM $ "Bedrock: Invoke"
             fnPtr <- anonInst $ castReference
                         (typeToLLVM $ variableType cont)
@@ -555,7 +555,8 @@ blockToLLVM = worker
                 | Variable{..} <- args ]
             , functionAttributes = []
             , metadata = [] }
-    mkInst retTy (InvokeReturn n var args) = do
+    mkInst retTy (InvokeReturn var args) = do
+      let n = 0
       -- traceLLVM $ "InvokeReturn"
       -- fnPtr <- anonInst $ castReference
       --             (typeToLLVM $ variableType cont)

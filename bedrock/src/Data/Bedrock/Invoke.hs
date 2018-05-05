@@ -38,7 +38,7 @@ traverseBlock hpt origin block =
             Case scrut
                 <$> maybe (return Nothing) (fmap Just . traverseBlock hpt origin) defaultBranch
                 <*> mapM (traverseAlternative hpt origin) alternatives
-        Invoke _ obj args ->
+        Invoke obj args ->
             Case (setVariableSize hpt obj) Nothing
                 <$> mkInvokeAlts hpt (hptNodeScope hpt Vector.! variableIndex obj) args
         -- InvokeHandler obj arg ->

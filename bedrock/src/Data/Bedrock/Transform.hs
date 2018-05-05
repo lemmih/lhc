@@ -139,10 +139,8 @@ freeVariables' block =
       Set.union (Set.fromList args)
     Raise name ->
       Set.insert name
-    Invoke _n cont args ->
+    Invoke cont args ->
       Set.union (Set.fromList (cont:args))
-    -- InvokeHandler cont exception ->
-    --   Set.insert cont . Set.insert exception
     TailCall _name args ->
       Set.union (Set.fromList args)
     Exit ->
@@ -176,7 +174,7 @@ freeVariablesSimple simple =
       Set.union (Set.fromList args)
     Catch _exh exhArgs _fn fnArgs ->
       Set.union (Set.fromList (exhArgs ++ fnArgs))
-    InvokeReturn _n fn args ->
+    InvokeReturn fn args ->
       Set.union (Set.fromList (fn:args))
     Builtin _ params ->
       \s -> foldr freeVariablesParameter s params

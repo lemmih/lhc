@@ -37,8 +37,7 @@ voidBlock block =
     Return vars -> Return (voidVariables vars)
     Raise{} -> block
     TailCall fn vars -> TailCall fn (voidVariables vars)
-    Invoke n fn vars -> Invoke n fn (voidVariables vars)
-    -- InvokeHandler{} -> block
+    Invoke fn vars -> Invoke fn (voidVariables vars)
     Exit    -> block
     Panic{} -> block
 
@@ -64,8 +63,8 @@ voidExpression expr =
       CCall fn (voidVariables vars)
     Catch fn fnArgs handler handlerArgs ->
       Catch fn (voidVariables fnArgs) handler (voidVariables handlerArgs)
-    InvokeReturn n ptr args ->
-      InvokeReturn n ptr (voidVariables args)
+    InvokeReturn ptr args ->
+      InvokeReturn ptr (voidVariables args)
     Builtin fn params -> Builtin fn (map voidParameter params)
     Literal{} -> expr
 
