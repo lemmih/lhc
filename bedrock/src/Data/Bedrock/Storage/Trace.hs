@@ -28,7 +28,7 @@ traceGC = do
     markName <- newName "trace_gc_mark"
     markFrameName <- newName "trace_gc_mark_frame"
     markPtr  <- newVariable "root" NodePtr
-    markFrame <- newVariable "frame" (FramePtr 0)
+    markFrame <- newVariable "frame" FramePtr
 
     markBody <- do
       val <- newVariable "ptr" IWord
@@ -56,7 +56,7 @@ traceGC = do
         markFn = Function markName [] [markPtr] [NodePtr] $
             --Panic "TraceGC: Collection not supported!"
             Return [markPtr]
-        markFrameFn = Function markFrameName [] [markFrame] [FramePtr 0] $
+        markFrameFn = Function markFrameName [] [markFrame] [FramePtr] $
             markBody
         allocate _size = Literal (LiteralInt 0)
     return StorageManager

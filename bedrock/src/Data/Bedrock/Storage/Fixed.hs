@@ -31,7 +31,7 @@ fixedGC = do
     markName <- newName "fixed_gc_mark"
     markFrameName <- newName "fixed_gc_mark_frame"
     markPtr  <- newVariable "root" NodePtr
-    markFrame  <- newVariable "frame" (FramePtr 0)
+    markFrame  <- newVariable "frame" FramePtr
     let initFn = Function initName [] [] [] $
             Bind [wordSize] (Literal (LiteralInt 8)) $
             Bind [heapSize] (Literal (LiteralInt 10240)) $
@@ -45,7 +45,7 @@ fixedGC = do
             Panic "FixedGC: Collection not supported!"
         markFn = Function markName [] [markPtr] [NodePtr] $
             Panic "FixedGC: Collection not supported!"
-        markFrameFn = Function markFrameName [] [markFrame] [FramePtr 0] $
+        markFrameFn = Function markFrameName [] [markFrame] [FramePtr] $
             Panic "FixedGC: Collection not supported!"
         allocate _size = Literal (LiteralInt 1)
     return StorageManager

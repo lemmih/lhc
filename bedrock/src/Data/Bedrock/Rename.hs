@@ -126,7 +126,7 @@ uniqAttribute :: Attribute -> Uniq Attribute
 uniqAttribute NoCPS              = pure NoCPS
 uniqAttribute Internal           = pure Internal
 uniqAttribute (AltReturn n name) = AltReturn n <$> resolveName name
-uniqAttribute (Prefix prim ptrs (Just name)) = Prefix prim ptrs <$> (Just <$> resolveName name)
+uniqAttribute (Prefix size prim ptrs (Just name)) = Prefix size prim ptrs <$> (Just <$> resolveName name)
 uniqAttribute attr@Prefix{} = pure attr
 
 uniqBlock :: Block -> Uniq Block
@@ -311,7 +311,7 @@ locallyAttribute =
     NoCPS -> pure NoCPS
     Internal -> pure Internal
     AltReturn n name -> AltReturn n <$> locallyResolve name
-    Prefix prim ptrs mbName -> Prefix prim ptrs <$> locallyMaybe locallyResolve mbName
+    Prefix size prim ptrs mbName -> Prefix size prim ptrs <$> locallyMaybe locallyResolve mbName
 
 locallyBlock :: Block -> LUniq Block
 locallyBlock block =

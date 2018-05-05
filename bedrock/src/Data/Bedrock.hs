@@ -94,7 +94,7 @@ data Type
   | IWord
   | Primitive CType
   -- | LLVMPrimitive LLVM.Type
-  | FramePtr NodeSize
+  | FramePtr
   deriving (Show, Read, Eq, Ord, Data, Generic)
 data Variable = Variable
   { variableName :: Name
@@ -149,7 +149,7 @@ data Attribute
   = NoCPS
   | Internal
   | AltReturn Int Name
-  | Prefix [Int] [Int] (Maybe Name) -- primitives, pointers, exception handler
+  | Prefix Int [Int] [Int] (Maybe Name) -- size, primitives, pointers, exception handler
   deriving (Show, Read, Eq, Data, Generic)
 
 data Function = Function
@@ -267,10 +267,9 @@ instance Arbitrary Type where
     [ elements
       [ NodePtr
       , Node
-      -- , FramePtr
+      , FramePtr
       , IWord ]
     , StaticNode <$> fmap abs arbitrary
-    , FramePtr <$> fmap abs arbitrary
     , Primitive <$> arbitrary ]
 
 instance Arbitrary Variable where
@@ -387,12 +386,12 @@ instance Arbitrary Expression where
     ]
 
 instance Arbitrary Block where
-  -- shrink (Case scrut (Just def) alts) =
-  --   def : [ block | Alternative _ block <- alts ]
-  -- shrink (Case scrut Nothing alts) =
-  --   [ block | Alternative _ block <- alts ]
-  -- shrink (Bind _ _ rest) = [rest]
-  -- shrink x = []
+  shrink (Case scrut (Just def) alts) =
+    def : [ block | Alternative _ block <- alts ]
+  shrink (Case scrut Nothing alts) =
+    [ block | Alternative _ block <- alts ]
+  shrink (Bind _ _ rest) = [rest]
+  shrink x = []
   arbitrary = recursive (oneof
     [ Case <$> arbitrary <*> arbitrary <*> arbitrary
     , Bind <$> arbitrary <*> arbitrary <*> arbitrary

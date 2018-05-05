@@ -38,7 +38,7 @@ instance Pretty Type where
   pretty (StaticNode n) = Doc.char '%' <> Doc.int n <> Doc.char '%'
   pretty IWord          = Doc.char '#'
   pretty (Primitive ty) = pretty ty
-  pretty (FramePtr n)   = Doc.red (Doc.char '@') <> Doc.int n <> Doc.red (Doc.char '@')
+  pretty FramePtr       = Doc.red (Doc.char '@')
 
 instance Pretty CType where
   pretty I8 = text "i8"
@@ -191,8 +191,9 @@ instance Pretty Attribute where
   pretty NoCPS    = text "NoCPS"
   pretty Internal = text "Internal"
   pretty (AltReturn n name) = text "return" <> brackets (int n) <+> pretty name
-  pretty (Prefix prim ptrs mbHandler) =
+  pretty (Prefix size prim ptrs mbHandler) =
     text "prefix"
+      <+> int size
       <+> brackets (ppList (map int prim))
       <+> brackets (ppList (map int ptrs))
       <+> maybe empty pretty mbHandler

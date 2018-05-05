@@ -75,9 +75,7 @@ parseType = choice
   , symbol "#" >> return IWord
   , try $ do
       symbol "@"
-      n <- natural
-      symbol "@"
-      return $ FramePtr (fromIntegral n)
+      return $ FramePtr
   , Primitive <$> parseCType ]
   <?> "type"
 
@@ -261,7 +259,7 @@ parseBlock = choice (
     fn <- parseVariable
     args <- parens (commaSep parseVariable)
     return $ Invoke (fromIntegral idx) fn args
-  , do
+  , try $ do
     names <- commaSep1 parseVariable
     symbol "="
     simple <- parseExpression
