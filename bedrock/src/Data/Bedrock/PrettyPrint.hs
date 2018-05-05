@@ -6,12 +6,19 @@ module Data.Bedrock.PrettyPrint
   ) where
 
 import           Data.List
-import           Language.Haskell.TypeCheck.Pretty
-import           Text.PrettyPrint.ANSI.Leijen      (Doc, char, int, text, (<+>),
-                                                    (<>))
+import           Language.Haskell.TypeCheck.Pretty (Pretty(..))
+import           Text.PrettyPrint.ANSI.Leijen      (Doc, char, int, text,
+                                                    (<>), empty, brackets, parens)
 import qualified Text.PrettyPrint.ANSI.Leijen      as Doc
-
+import qualified Text.PrettyPrint.ANSI.Leijen.Internal      as Doc
 import           Data.Bedrock
+
+-------------------------------------------------------------------------------
+-- Pretty print helpers
+
+(<+>) :: Doc -> Doc -> Doc
+Doc.Empty <+> b = b
+a <+> b = a Doc.<+> b
 
 -------------------------------------------------------------------------------
 -- Pretty print
@@ -184,6 +191,11 @@ instance Pretty Attribute where
   pretty NoCPS    = text "NoCPS"
   pretty Internal = text "Internal"
   pretty (AltReturn n name) = text "return" <> brackets (int n) <+> pretty name
+  pretty (Prefix prim ptrs mbHandler) =
+    text "prefix"
+      <+> brackets (ppList (map int prim))
+      <+> brackets (ppList (map int ptrs))
+      <+> maybe empty pretty mbHandler
 
 instance Pretty Function where
   pretty fn =

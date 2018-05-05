@@ -116,6 +116,16 @@ newName ident = do
     u <- newUnique
     return $ Name [] ident u
 
+newNameFrom :: Name -> M Name
+newNameFrom (Name ms ident _) = do
+  u <- newUnique
+  return $ Name ms ident u
+
+newVariableFrom :: Variable -> M Variable
+newVariableFrom v = do
+  name' <- newNameFrom (varName v)
+  return $ v{varName = name'}
+
 nameInfo :: HS.Annotated ast => ast Typed -> Scope.NameInfo
 nameInfo ast =
   case HS.ann ast of
@@ -365,6 +375,9 @@ convertDecl' decl =
 isPrimitive :: String -> Bool
 isPrimitive "realworld#" = True
 isPrimitive "cast"       = True
+isPrimitive "-#"         = True
+isPrimitive "sdiv#"      = True
+isPrimitive "srem#"      = True
 isPrimitive _            = False
 
 convertMatches :: [Variable] -> [HS.Match Typed] -> M Expr
@@ -728,11 +741,12 @@ convertAltPat :: Variable -> Maybe Expr -> HS.Pat Typed -> Expr -> M Expr
 convertAltPat scrut failBranch pat successBranch =
     case pat of
         HS.PApp _ name pats -> do
+            scrut' <- newVariableFrom scrut
             args <- sequence [ Variable <$> bindName var <*> lookupType var
                              | HS.PVar _ var <- pats ]
             alt <- Alt <$> (ConPat <$> resolveQName name <*> pure args)
                 <*> pure successBranch
-            return $ Case (Var scrut) scrut failBranch [alt]
+            return $ Case (Var scrut) scrut' failBranch [alt]
         HS.PInfixApp src a con b -> convertAltPat scrut failBranch (HS.PApp src con [a,b]) successBranch
         HS.PTuple _ HS.Unboxed pats -> do
             args <- sequence [ Variable <$> bindName var <*> lookupType var

@@ -118,14 +118,14 @@ instance Pretty Expr where
         prettyPrec 1 a </> prettyPrec appPrecedence b
       Lam vars e -> parensIf (p > 0) $
         char 'λ' <+> ppTypedVars vars <+> rarrow <$$> pretty e
-      Case scrut var Nothing [Alt pattern e] ->
+      Case scrut var Nothing [Alt pattern e] -> parensIf (p > 0) $
         pretty var <+> text "←" <+> align (pretty scrut) <$$>
         pretty pattern <+> text "←" <+> ppTypedVariable var <$$>
         pretty e
-      Case scrut var Nothing alts ->
+      Case scrut var Nothing alts -> parensIf (p > 0) $
         text "case" <+> hang 2 (pretty scrut) <+> text "of" <$$>
         indent 2 (ppTypedVariable var <$$> vsep (map pretty alts))
-      Case scrut var (Just defaultBranch) alts ->
+      Case scrut var (Just defaultBranch) alts -> parensIf (p > 0) $
         text "case" <+> hang 2 (pretty scrut) <+> text "of" <$$>
         indent 2 ( ppTypedVariable var <$$> vsep (map pretty alts) <$$>
           text "DEFAULT" <+> rarrow <$$> indent 2 (pretty defaultBranch))

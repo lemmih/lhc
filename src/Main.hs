@@ -191,6 +191,8 @@ compileExecutable verbose keepIntermediateFiles gcStrategy file = do
   let core = Haskell.convert env' typedModule
       libraryCore = mconcat (map (snd . snd) ifaces)
       entrypoint = Name ["Main"] "entrypoint" 0
+      base = Core.deadCodeElimination entrypoint $
+             NewType.lower $ mappend libraryCore core
       complete =
           Core.deadCodeElimination entrypoint $
           Core.unique $
@@ -200,8 +202,7 @@ compileExecutable verbose keepIntermediateFiles gcStrategy file = do
           snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
           Core.simplify $ Core.simplify $ Core.simplify $
           snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
-          Core.deadCodeElimination entrypoint $
-          NewType.lower $ mappend libraryCore core
+          base
   -- print (pretty complete)
   when verbose $
     displayIO stdout (renderPretty 1 100 (pretty complete))

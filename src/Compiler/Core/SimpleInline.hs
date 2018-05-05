@@ -92,8 +92,9 @@ uniqueExpr expr =
         Just (fnArgs, fnBody)
           | extraArgs <- drop (length fnArgs) args
           , length fnArgs <= length args -> do
-            replaceMany (zip fnArgs args) $
-              uniqueExpr (foldl App fnBody extraArgs)
+            args' <- mapM uniqueExpr args
+            replaceMany (zip fnArgs args') $
+              uniqueExpr (foldl App fnBody (drop (length fnArgs) args'))
           | otherwise -> do
             core <- uniqueVariable var
             foldl App core <$> mapM uniqueExpr args
@@ -128,9 +129,11 @@ uniqueExpr expr =
     Case e scrut mbDef alts -> do
       e' <- uniqueExpr e
       bind scrut $ \scrut' ->
-        Case e' scrut'
-            <$> uniqueMaybe uniqueExpr mbDef
-            <*> mapM uniqueAlt alts
+        Case
+          <$> pure e'
+          <*> pure scrut'
+          <*> uniqueMaybe uniqueExpr mbDef
+          <*> mapM uniqueAlt alts
     Cast e ty ->
       Cast <$> uniqueExpr e <*> pure ty
     Id -> pure Id
@@ -153,8 +156,9 @@ uniqueVariable var@(Variable name ty) = do
     Nothing -> do
       consume var
       pure (Var var)
-    Just expr -> do
-      local (Map.delete name) $ uniqueExpr expr
+    Just expr -> pure expr
+    -- Just expr -> do
+    --   local (Map.delete name) $ uniqueExpr expr
 
 collectApp :: Expr -> (Expr, [Expr])
 collectApp = worker []

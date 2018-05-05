@@ -1,7 +1,11 @@
 {-# LANGUAGE MagicHash #-}
 module LHC.Prelude
   ( reverse
-  , append ) where
+  , append
+  , showInt
+  , digits
+  , last
+  , replicate ) where
 
 import LHC.Prim
 
@@ -35,8 +39,24 @@ showInt 0 = '0' : []
 showInt x = reverse (digits x)
 
 digits :: Int -> [Char]
-digits (I# i) =
-  case i32toi64 i of
-    0# -> []
-    _  -> intToDigit (srem (I# i) 10) : digits (sdiv (I# i) 10)
+digits 0 = "0"
+digits n = intToDigit (srem n 10) : digits_go (sdiv n 10)
 
+digits_go 0 = []
+digits_go n = intToDigit (srem n 10) : digits_go (sdiv n 10)
+
+-- digits (I# i) =
+--   case i32toi64 i of
+--     0# -> []
+--     _  -> intToDigit (srem (I# i) 10) : digits (sdiv (I# i) 10)
+
+last :: [a] -> a
+last [] = last []
+last (x:xs) = last_go x xs
+
+last_go x [] = x
+last_go x (y:ys) = last_go y ys
+
+replicate :: Int -> a -> [a]
+replicate 0 elt = []
+replicate n elt = elt : replicate (n-1) elt

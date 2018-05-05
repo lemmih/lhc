@@ -147,22 +147,13 @@ foreign import ccall unsafe (-#) :: I32 -> I32 -> I32
 foreign import ccall unsafe (*#) :: I32 -> I32 -> I32
 
 (+) :: Int -> Int -> Int
-a + b =
-  case a of
-    I# a# -> case b of
-      I# b# -> I# (a# +# b#)
+I# a# + I# b# = I# (a# +# b#)
 
 (-) :: Int -> Int -> Int
-a - b =
-  case a of
-    I# a# -> case b of
-      I# b# -> I# (a# -# b#)
+I# a# - I# b# = I# (a# -# b#)
 
 (*) :: Int -> Int -> Int
-a * b =
-  case a of
-    I# a# -> case b of
-      I# b# -> I# (a# *# b#)
+I# a# * I# b# = I# (a# *# b#)
 
 foreign import ccall unsafe udiv# :: I32 -> I32 -> I32
 foreign import ccall unsafe sdiv# :: I32 -> I32 -> I32

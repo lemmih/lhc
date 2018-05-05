@@ -2,25 +2,25 @@
 module Compiler.CoreToBedrock where
 
 
-import           Compiler.Core                    hiding (NodeDefinition (..),
-                                                   UnboxedPat, Variable (..))
-import qualified Compiler.Core                    as Core
-import           Data.Bedrock                     as Bedrock
+import           Compiler.Core              hiding (NodeDefinition (..),
+                                             UnboxedPat, Variable (..))
+import qualified Compiler.Core              as Core
+import           Data.Bedrock               as Bedrock
 import           Data.Bedrock.Misc
-import           Data.Bedrock.Transform           (freeVariables)
+import           Data.Bedrock.Transform     (freeVariables)
 
 import           Control.Monad.Reader
-import           Control.Monad.RWS                (MonadState (..), RWS,
-                                                   execRWS)
-import           Control.Monad.Writer             (MonadWriter (..))
-import           Data.Char                        (ord)
-import           Data.Map                         (Map)
-import qualified Data.Map                         as Map
-import qualified Data.Set                         as Set
-import Data.Maybe
+import           Control.Monad.RWS          (MonadState (..), RWS, execRWS)
+import           Control.Monad.Writer       (MonadWriter (..))
+import           Data.Char                  (ord)
+import           Data.Map                   (Map)
+import qualified Data.Map                   as Map
+import           Data.Maybe
+import qualified Data.Set                   as Set
 
-import qualified Language.Haskell.TypeCheck as TC (Type (..), Qualified(..), Proof)
-import           Language.Haskell.Scope (QualifiedName(..))
+import           Language.Haskell.Scope     (QualifiedName (..))
+import qualified Language.Haskell.TypeCheck as TC (Proof, Qualified (..),
+                                                   Type (..))
 
 -- import Debug.Trace
 
@@ -51,7 +51,7 @@ convertModule m = setArities arities $ do
       , let arity = case expr of
                       Lam vars _ -> length vars
                       -- WithCoercion _ (Lam vars _) -> length vars
-                      _ -> 0 ] ++
+                      _          -> 0 ] ++
       [ (name, length args)
       | Core.NodeDefinition name args <- coreNodes m ] ++
       [ (Core.varName con, 1)
@@ -110,7 +110,7 @@ pushFunction regArgs origin body = do
   Name orig ident _ <- asks envRoot
   name <- case origin of
               Left tag -> newName (orig++[ident]) tag
-              Right n -> return n
+              Right n  -> return n
   let fn = Function
           { fnName = name
           , fnAttributes = []
@@ -232,7 +232,7 @@ convertResultType args tcTy =
           Just ty -> convertResultType args ty
       (TC.TyFun _ a,[]) ->
         case args of
-          [] -> return [NodePtr]
+          []        -> return [NodePtr]
           (_:argss) -> convertResultType argss a
       -- TcForall _ (_ :=> ty) -> convertResultType ty
       (TC.TyUnboxedTuple tys,[]) -> concat <$> mapM (convertResultType []) tys
@@ -240,7 +240,7 @@ convertResultType args tcTy =
       _ -> return [NodePtr]
   where
     collect acc (TC.TyApp a b) = collect (b:acc) a
-    collect acc ty = (ty, reverse acc)
+    collect acc ty             = (ty, reverse acc)
 
 expandNewType :: QualifiedName -> [TC.Type] -> M (Maybe TC.Type)
 expandNewType qname args = do
@@ -268,17 +268,17 @@ newtypeSubstitution (IsNewType var) =
       case lookup ty s of
         Just ty' -> ty'
         Nothing -> case ty of
-          TC.TyApp a b -> TC.TyApp (subst s a) (subst s b)
-          TC.TyFun a b -> TC.TyFun (subst s a) (subst s b)
+          TC.TyApp a b  -> TC.TyApp (subst s a) (subst s b)
+          TC.TyFun a b  -> TC.TyFun (subst s a) (subst s b)
           TC.TyTuple ls -> TC.TyTuple (map (subst s) ls)
-          _ -> ty
+          _             -> ty
     collect acc (TC.TyApp a b) = collect (b:acc) a
-    collect acc ty = (ty, reverse acc)
+    collect acc ty             = (ty, reverse acc)
 
 -- XXX: Move this function.
 isPrimitive :: Type -> Bool
 isPrimitive Primitive{} = True
-isPrimitive _ = False
+isPrimitive _           = False
 
 convertDecl :: Core.Decl -> M ()
 convertDecl (Core.Decl ty name (Lam vars expr)) = do
@@ -352,11 +352,11 @@ collectApps = worker []
   where
     worker acc expr =
         case expr of
-            App a b -> worker (b:acc) a
+            App a b            -> worker (b:acc) a
             WithProof _proof e -> worker acc e
             -- WithProof proof e -> (e, Just proof, acc)
             -- WithCoercion c e -> (e, c, acc)
-            _ -> (expr, Nothing, acc)
+            _                  -> (expr, Nothing, acc)
 
 convertExpr :: Bool -> Core.Expr -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
 convertExpr lazy expr rest =
@@ -434,6 +434,10 @@ convertExpr lazy expr rest =
         tmp <- newVariable [] "int" (Primitive I64)
         Bind [tmp] (Bedrock.Literal (LiteralInt int))
             <$> rest [tmp]
+    Core.Lit (Core.LitChar c) -> do
+        tmp <- newVariable [] "char" (Primitive I32)
+        Bind [tmp] (Bedrock.Literal (LiteralInt $ fromIntegral $ ord c))
+            <$> rest [tmp]
     Core.Lit Core.LitVoid -> do
         tmp <- newVariable [] "void" (Primitive CVoid)
         Bind [tmp] (Bedrock.Literal (LiteralInt 0))
@@ -449,10 +453,10 @@ convertExpr lazy expr rest =
     Core.Case scrut var Nothing [Core.Alt (Core.UnboxedPat binds) branch]  ->
       convertExpr False scrut $ \vals -> do
         binds' <- mapM convertVariable binds
-        let worker [] [] = convertExpr False branch rest
+        let worker [] []         = convertExpr False branch rest
             worker (x:xs) (y:ys) = Bind [x] (TypeCast y) <$> worker xs ys
-            worker [] _ = error "Not enough binds"
-            worker _ [] = error "Not enough vals"
+            worker [] _          = error "Not enough binds"
+            worker _ []          = error "Not enough vals"
         worker binds' vals
     Core.Case scrut var Nothing alts | not lazy ->
       convertExpr False scrut $ \[val] ->
@@ -460,9 +464,9 @@ convertExpr lazy expr rest =
           then do
             var' <- convertVariable var
             tmp <- deriveVariable val "node" Node
-            -- Bind [var'] (Bedrock.TypeCast val) <$>
-            Bind [tmp] (Bedrock.Fetch val) <$>
-              (Bedrock.Case tmp Nothing <$>
+            Bind [var'] (Bedrock.TypeCast val) <$>
+              Bind [tmp] (Bedrock.Fetch val) <$>
+                (Bedrock.Case tmp Nothing <$>
                     mapM convertAlt alts)
           else
             Bedrock.Case val Nothing <$>
@@ -510,12 +514,12 @@ convertExpr lazy expr rest =
 
     WithProof _proof e -> convertExpr lazy e rest
 
-    -- _ | lazy -> do
-    --   body <- convertExpr False expr (pure . Return)
-    --   (node, nodeArgs) <- pushFunction [] (Left "thunk") body
-    --   tmp <- newVariable [] "thunk" NodePtr
-    --   Bind [tmp] (Store (FunctionName node 0) nodeArgs)
-    --     <$> rest [tmp]
+    Core.Case{} | lazy -> do
+      body <- convertExpr False expr (pure . Return)
+      (node, nodeArgs) <- pushFunction [] (Left "thunk") body
+      tmp <- newVariable [] "thunk" NodePtr
+      Bind [tmp] (Store (FunctionName node 0) nodeArgs)
+        <$> rest [tmp]
     _ | lazy -> error $ "C->B convertExpr: " ++ show (lazy, expr)
     _ -> -- not lazy
       convertExpr True expr $ \[val] -> do
@@ -572,11 +576,11 @@ convertAlt (Alt pattern branch) =
 convertLiteral :: Core.Literal -> M Bedrock.Literal
 convertLiteral lit = pure $
     case lit of
-        LitChar c -> LiteralInt (fromIntegral $ ord c)
+        LitChar c   -> LiteralInt (fromIntegral $ ord c)
         LitString s -> LiteralString s
-        LitInt i -> LiteralInt i
-        LitVoid  -> LiteralInt 0
-        _ -> error "Urk: literals"
+        LitInt i    -> LiteralInt i
+        LitVoid     -> LiteralInt 0
+        _           -> error "Urk: literals"
         -- LitWord Integer
         -- LitFloat Rational
         -- LitDouble Rational
