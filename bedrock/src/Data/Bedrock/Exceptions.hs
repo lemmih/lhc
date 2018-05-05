@@ -129,25 +129,26 @@ cpsExpresion size origin frameVar binds simple rest =
 
         contFnName <- tagName "continuation" (fnName origin)
 
-        gcFnName <- tagName "gc" contFnName
+        -- gcFnName <- tagName "gc" contFnName
 
-        pushHelper Function
-          { fnName = gcFnName
-          , fnAttributes = [NoCPS, Internal]
-          , fnArguments = [framePtr]
-          , fnResults = [FramePtr 0]
-          , fnBody =
-              Bind [prevFrame] (Load framePtr 1) $
-              Bind [prevFrameMarked] (GCMarkFrame prevFrame) $
-              Return [framePtr]
-              -- Panic $ "GC not implemented for: " ++ show (pretty contFnName)
-          }
+        -- pushHelper Function
+        --   { fnName = gcFnName
+        --   , fnAttributes = [NoCPS, Internal]
+        --   , fnArguments = [framePtr]
+        --   , fnResults = [FramePtr 0]
+        --   , fnBody =
+        --       Bind [prevFrame] (Load framePtr 1) $
+        --       Bind [prevFrameMarked] (GCMarkFrame prevFrame) $
+        --       Return [framePtr]
+        --       -- Panic $ "GC not implemented for: " ++ show (pretty contFnName)
+        --   }
 
         body <- cpsBlock size origin framePtr $
             Bind [stdContinuation size] (Load framePtr 1) $ rest
         pushHelper $
             Function { fnName      = contFnName
-                     , fnAttributes = [ AltReturn 1 gcFnName ]
+                     -- , fnAttributes = [ AltReturn 1 gcFnName ]
+                     , fnAttributes = [ Prefix [] [] Nothing ]
                      , fnArguments = framePtr : binds
                      , fnResults   = []
                      , fnBody      = body }

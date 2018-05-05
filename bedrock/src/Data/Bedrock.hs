@@ -149,6 +149,7 @@ data Attribute
   = NoCPS
   | Internal
   | AltReturn Int Name
+  | Prefix [Int] [Int] (Maybe Name) -- primitives, pointers, exception handler
   deriving (Show, Read, Eq, Data, Generic)
 
 data Function = Function
