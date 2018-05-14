@@ -9,8 +9,17 @@ import           System.Process
 import           Test.HUnit       (Assertion, Test (..), assertEqual,
                                    assertFailure, assertString)
 
+gcStrategies :: [String]
+gcStrategies = ["fixed", "semi"]
+
 unitTestFolder :: FilePath -> IO Test
-unitTestFolder path = do
+unitTestFolder path =
+  TestList <$> (forM gcStrategies $ \strategy -> do
+    test <- unitTestFolderWithGC path strategy
+    return $ TestLabel ("gc="++strategy) test)
+
+unitTestFolderWithGC :: FilePath -> String -> IO Test
+unitTestFolderWithGC path gcVariant = do
   files <- getDirectoryContents path
   tests <- forM files $ \file -> do
     let fullPath = path </> file
@@ -21,7 +30,7 @@ unitTestFolder path = do
         | takeExtension fullPath == ".hs" -> return $ Just $ TestLabel file $ TestCase $ do
             stdout <- readFileOptional $ addExtension fullPath "stdout"
             stdin  <- readFileOptional $ addExtension fullPath "stdin"
-            compileHaskell fullPath
+            compileHaskell fullPath gcVariant
             executeHaskell fullPath stdin stdout
         | otherwise -> return Nothing
   return $ TestList $ catMaybes tests
@@ -29,9 +38,9 @@ unitTestFolder path = do
 --------------------------------------------------------------------------------
 -- Helpers
 
-compileHaskell :: FilePath -> IO ()
-compileHaskell path = do
-  (code, _stdout, stderr) <- readProcessWithExitCode "stack" ["exec","--","lhc","build",path] ""
+compileHaskell :: FilePath -> String -> IO ()
+compileHaskell path gcVariant = do
+  (code, _stdout, stderr) <- readProcessWithExitCode "stack" ["exec","--","lhc","build","--gc",gcVariant, path] ""
   assertString stderr
   assertExitCode "Compilation failed" code
 
