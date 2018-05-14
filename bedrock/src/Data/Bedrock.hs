@@ -129,11 +129,17 @@ data Foreign = Foreign
 data Module = Module
   { modForeigns  :: [Foreign]
   , nodes        :: [NodeDefinition]
+  -- , modLayouts   :: [NodeLayout]
   , entryPoint   :: Name
   , functions    :: [Function]
   , modNamespace :: AvailableNamespace
   -- CAFs?
   } deriving (Show, Read, Eq, Data, Generic)
+
+-- data NodeLayout = NodeLayout
+--   { layoutName       :: NodeName
+--   , layoutPrimitives :: Int
+--   , layoutPointers   :: Int }
 
 data NodeName
   = ConstructorName Name Int
@@ -148,8 +154,7 @@ data NodeDefinition = NodeDefinition Name [Type]
 data Attribute
   = NoCPS
   | Internal
-  | AltReturn Int Name
-  | Prefix Int [Int] [Int] (Maybe Name) -- size, primitives, pointers, exception handler
+  | Prefix Int Int Int (Maybe Name) -- size, primitives, pointers, exception handler
   deriving (Show, Read, Eq, Data, Generic)
 
 data Function = Function

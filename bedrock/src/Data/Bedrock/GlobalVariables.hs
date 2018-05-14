@@ -59,6 +59,9 @@ lowerBlock block =
             return $ -- flip (foldr saveReg) allRegs $
                 Bind binds (Application fn (regs ++ args)) $
                 foldr restoreReg rest' allRegs
+        Bind [] GCEnd rest -> do
+          var <- asks (Map.! "hp")
+          Bind [var] GCEnd <$> lowerBlock rest
         Bind binds simple rest ->
             Bind binds simple <$> lowerBlock rest
         Case scrut defaultBranch alts ->

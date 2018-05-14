@@ -28,7 +28,7 @@ cpsFunction fn | NoCPS `elem` fnAttributes fn =
 cpsFunction fn = do
     let size = frameSize (fnBody fn)
     frameVar <- newVariable "bedrock.stackframe" FramePtr
-    body <- cpsBlock size [] [] fn frameVar (fnBody fn)
+    body <- cpsBlock size 0 0 fn frameVar (fnBody fn)
     let bodyWithFrame =
             Bind [] (Alloc size) $
             -- Bind [frameVar] (Store (ConstructorName stackFrameName 0) []) $
@@ -42,7 +42,7 @@ cpsFunction fn = do
     pushFunction fn'
 
 
-cpsBlock :: NodeSize -> [Int] -> [Int] -> Function -> Variable -> Block -> Gen Block
+cpsBlock :: NodeSize -> Int -> Int -> Function -> Variable -> Block -> Gen Block
 cpsBlock size prims ptrs origin frameVar block =
   case block of
     Bind binds simple rest ->
@@ -80,7 +80,7 @@ isCatchFrame :: Name -> Bool
 isCatchFrame (Name [] ident _) = exhFrameIdentifier == ident
 isCatchFrame _                 = False
 
-cpsExpression :: NodeSize -> [Int] -> [Int] -> Function -> Variable -> [Variable]
+cpsExpression :: NodeSize -> Int -> Int -> Function -> Variable -> [Variable]
              -> Expression -> Block -> Gen Block
 cpsExpression size prims ptrs origin frameVar binds simple rest =
     case simple of
@@ -108,16 +108,16 @@ cpsExpression size prims ptrs origin frameVar binds simple rest =
           else mkContinuation $ \continuationFrame ->
                   TailCall fn (fnArgs ++ [continuationFrame])
       Store (FunctionName fn blanks) args ->
-        Bind binds (Store (FunctionName fn (blanks+1)) args)
+        Bind binds (Store (FunctionName fn (blanks)) args)
           <$> cpsBlock size prims ptrs origin frameVar rest
       MkNode (FunctionName fn blanks) args ->
-        Bind binds (MkNode (FunctionName fn (blanks+1)) args)
+        Bind binds (MkNode (FunctionName fn (blanks)) args)
           <$> cpsBlock size prims ptrs origin frameVar rest
       Save var n ->
         Bind binds (Write frameVar n var)
           <$> if isPrimitive var
-              then cpsBlock size (n : prims) ptrs origin frameVar rest
-              else cpsBlock size prims (n:ptrs) origin frameVar rest
+              then cpsBlock size (succ prims) ptrs origin frameVar rest
+              else cpsBlock size prims (succ ptrs) origin frameVar rest
       Restore n ->
         Bind binds (Load frameVar n) <$> cpsBlock size prims ptrs origin frameVar rest
       other -> Bind binds other <$> cpsBlock size prims ptrs origin frameVar rest
@@ -132,25 +132,10 @@ cpsExpression size prims ptrs origin frameVar binds simple rest =
 
         contFnName <- tagName "continuation" (fnName origin)
 
-        -- gcFnName <- tagName "gc" contFnName
-
-        -- pushHelper Function
-        --   { fnName = gcFnName
-        --   , fnAttributes = [NoCPS, Internal]
-        --   , fnArguments = [framePtr]
-        --   , fnResults = [FramePtr 0]
-        --   , fnBody =
-        --       Bind [prevFrame] (Load framePtr 1) $
-        --       Bind [prevFrameMarked] (GCMarkFrame prevFrame) $
-        --       Return [framePtr]
-        --       -- Panic $ "GC not implemented for: " ++ show (pretty contFnName)
-        --   }
-
-        body <- cpsBlock size [] [] origin framePtr $
+        body <- cpsBlock size 0 0 origin framePtr $
             Bind [stdContinuation] (Load framePtr 1) $ rest
         pushHelper $
             Function { fnName      = contFnName
-                     -- , fnAttributes = [ AltReturn 1 gcFnName ]
                      , fnAttributes = [ Prefix size prims ptrs Nothing ]
                      , fnArguments = framePtr : binds
                      , fnResults   = []
@@ -161,13 +146,13 @@ cpsExpression size prims ptrs origin frameVar binds simple rest =
             Bind [] (Write frameVar 0 fnPtr) $
             use frameVar
 
-cpsAlternative :: NodeSize -> [Int] -> [Int] -> Function -> Variable -> Alternative -> Gen Alternative
+cpsAlternative :: NodeSize -> Int -> Int -> Function -> Variable -> Alternative -> Gen Alternative
 cpsAlternative size prims ptrs origin frameVar (Alternative pattern expr) =
     case pattern of
-        NodePat (FunctionName fn n) args ->
-            Alternative
-                (NodePat (FunctionName fn (n+1)) args)
-                <$> cpsBlock size prims ptrs origin frameVar expr
+        -- NodePat (FunctionName fn n) args ->
+        --     Alternative
+        --         (NodePat (FunctionName fn n) args)
+        --         <$> cpsBlock size prims ptrs origin frameVar expr
         _ -> Alternative pattern <$> cpsBlock size prims ptrs origin frameVar expr
 
 

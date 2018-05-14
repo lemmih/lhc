@@ -125,7 +125,6 @@ uniqFunction (Function name attrs args rets body) = renameVariables args $
 uniqAttribute :: Attribute -> Uniq Attribute
 uniqAttribute NoCPS              = pure NoCPS
 uniqAttribute Internal           = pure Internal
-uniqAttribute (AltReturn n name) = AltReturn n <$> resolveName name
 uniqAttribute (Prefix size prim ptrs (Just name)) = Prefix size prim ptrs <$> (Just <$> resolveName name)
 uniqAttribute attr@Prefix{} = pure attr
 
@@ -308,7 +307,6 @@ locallyAttribute =
   \case
     NoCPS -> pure NoCPS
     Internal -> pure Internal
-    AltReturn n name -> AltReturn n <$> locallyResolve name
     Prefix size prim ptrs mbName -> Prefix size prim ptrs <$> locallyMaybe locallyResolve mbName
 
 locallyBlock :: Block -> LUniq Block

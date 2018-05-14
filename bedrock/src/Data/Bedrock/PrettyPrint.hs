@@ -181,12 +181,11 @@ ppTypes = ppList . map pretty
 instance Pretty Attribute where
   pretty NoCPS    = text "NoCPS"
   pretty Internal = text "Internal"
-  pretty (AltReturn n name) = text "return" <> brackets (int n) <+> pretty name
   pretty (Prefix size prim ptrs mbHandler) =
     text "prefix"
       <+> int size
-      <+> brackets (ppList (map int prim))
-      <+> brackets (ppList (map int ptrs))
+      <+> brackets (int prim)
+      <+> brackets (int ptrs)
       <+> maybe empty pretty mbHandler
 
 instance Pretty Function where

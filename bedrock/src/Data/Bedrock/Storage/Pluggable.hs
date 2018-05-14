@@ -27,7 +27,7 @@ data StorageManager = StorageManager
     , smEnd       :: Function
     , smMark      :: Function
     , smMarkFrame :: Function
-    , smAllocate  :: (Variable -> Expression)
+    , smAllocate  :: (Variable -> Variable -> Expression)
     }
 
 runGC :: Module -> GC a -> (a, Module)
@@ -102,7 +102,7 @@ lowerExpression binds simple rest sm =
     case simple of
         GCAllocate n ->
             Bind [size] (Literal (LiteralInt $ fromIntegral n)) $
-            ret $ smAllocate sm size
+            ret $ smAllocate sm hp size
         GCBegin ->
             ret $ Application (fnName (smBegin sm)) []
         GCEnd ->
@@ -116,6 +116,7 @@ lowerExpression binds simple rest sm =
         _ -> ret simple
   where
     size = Variable (Name [] "size" 0) IWord
+    hp = Variable (Name [] "hp" 0) NodePtr
     ret s = Bind binds s rest
 
 -----------------------------------------------------------

@@ -57,59 +57,74 @@ toLLVM bedrock = LLVM.Module
     }
   where
     defs = execGenModule (mkEnv bedrock) $ do
-            newDefinition $ GlobalDefinition functionDefaults
-                    { name = LLVM.Name "exit"
-                    , returnType = VoidType
-                    , parameters = ([ Parameter (IntegerType 32) (UnName 0) []], False)
-                    }
-            newDefinition $ GlobalDefinition functionDefaults
-                    { name = LLVM.Name "llvm.trap"
-                    , returnType = VoidType
-                    , parameters = ([], False)
-                    }
-            newDefinition $ GlobalDefinition functionDefaults
-                    { name = LLVM.Name "puts"
-                    , returnType = IntegerType 32
-                    , parameters = ([ Parameter (PointerType (IntegerType 8) (AddrSpace 0)) (UnName 0) []], False)
-                    }
+      newDefinition $ GlobalDefinition functionDefaults
+              { name = LLVM.Name "exit"
+              , returnType = VoidType
+              , parameters = ([ Parameter (IntegerType 32) (UnName 0) []], False)
+              }
+      newDefinition $ GlobalDefinition functionDefaults
+              { name = LLVM.Name "llvm.trap"
+              , returnType = VoidType
+              , parameters = ([], False)
+              }
+      newDefinition $ GlobalDefinition functionDefaults
+              { name = LLVM.Name "puts"
+              , returnType = IntegerType 32
+              , parameters = ([ Parameter (PointerType (IntegerType 8) (AddrSpace 0)) (UnName 0) []], False)
+              }
+      getLayoutDef
 
-            mainDef
-            forM_ (functions bedrock) $ \Bedrock.Function{..} -> do
-                blocks <- genBlocks $ blockToLLVM fnBody
-                mbPrefix <- attributesToPrefix fnAttributes
-                newDefinition $ GlobalDefinition functionDefaults
-                    { name = nameToLLVM fnName
-                    , returnType = typesToLLVM fnResults
-                    , parameters = ([ Parameter
-                                        (typeToLLVM variableType)
-                                        (nameToLLVM variableName)
-                                        []
-                                    | Variable{..} <- fnArguments ], False)
-                    , visibility = Default
-                    , linkage = LLVM.Internal
-                    , Global.callingConvention = Fast
-                    , basicBlocks = blocks
-                    , prefix = mbPrefix
-                    , Global.functionAttributes = [Right NoUnwind]
-                    }
-    mainDef = do
-        let wordPtrTy = PointerType (IntegerType 64) (AddrSpace 0)
-            entryCall = Call
-                { tailCallKind = Nothing
-                , callingConvention = Fast
-                , returnAttributes = []
-                , function = Right $ ConstantOperand $ Constant.GlobalReference
-                                (FunctionType VoidType [] False)
-                                (nameToLLVM $ entryPoint bedrock)
-                , arguments =
-                    [ (ConstantOperand $ Constant.Null wordPtrTy, [])
-                    , (ConstantOperand $ Constant.Null wordPtrTy, []) ]
-                , functionAttributes = [Right NoUnwind, Right NoReturn]
-                , metadata = [] }
+      mainDef
+      forM_ (functions bedrock) $ \Bedrock.Function{..} -> do
+        blocks <- genBlocks $ blockToLLVM fnBody
+        mbPrefix <- attributesToPrefix fnAttributes
         newDefinition $ GlobalDefinition functionDefaults
-            { name = LLVM.Name "main"
-            , returnType = IntegerType 32
-            , basicBlocks = [BasicBlock (UnName 0) [Do entryCall] (Do $ Unreachable [])] }
+            { name = nameToLLVM fnName
+            , returnType = typesToLLVM fnResults
+            , parameters = ([ Parameter
+                                (typeToLLVM variableType)
+                                (nameToLLVM variableName)
+                                []
+                            | Variable{..} <- fnArguments ], False)
+            , visibility = Default
+            , linkage = LLVM.Internal
+            , Global.callingConvention = Fast
+            , basicBlocks = blocks
+            , prefix = mbPrefix
+            , Global.functionAttributes = [Right NoUnwind]
+            }
+    mainDef = do
+      let wordPtrTy = PointerType (IntegerType 64) (AddrSpace 0)
+          entryCall = Call
+              { tailCallKind = Nothing
+              , callingConvention = Fast
+              , returnAttributes = []
+              , function = Right $ ConstantOperand $ Constant.GlobalReference
+                              (FunctionType VoidType [] False)
+                              (nameToLLVM $ entryPoint bedrock)
+              , arguments =
+                  [ (ConstantOperand $ Constant.Null wordPtrTy, [])
+                  , (ConstantOperand $ Constant.Null wordPtrTy, []) ]
+              , functionAttributes = [Right NoUnwind, Right NoReturn]
+              , metadata = [] }
+      newDefinition $ GlobalDefinition functionDefaults
+        { name = LLVM.Name "main"
+        , returnType = IntegerType 32
+        , basicBlocks = [BasicBlock (UnName 0) [Do entryCall] (Do $ Unreachable [])] }
+    getLayoutDef = do
+      layouts <- asks envNodeLayout
+      let nLayouts = fromIntegral (length layouts)
+          infoTableType = StructureType False [IntegerType 32, IntegerType 32]
+          infoTablesType = ArrayType nLayouts infoTableType
+      newDefinition $ GlobalDefinition globalVariableDefaults
+        { name = LLVM.Name "_lhc_info_tables"
+        , isConstant = True
+        , Global.type' = infoTablesType
+        , initializer = Just $ Constant.Array infoTableType
+            [ Constant.Struct Nothing False
+                [Constant.Int 32 (fromIntegral prim), Constant.Int 32 (fromIntegral ptrs)]
+            | (prim, ptrs) <- map snd layouts ]
+        }
 
 attributesToPrefix :: [Bedrock.Attribute] -> GenModule (Maybe Constant.Constant)
 attributesToPrefix = worker []
@@ -117,10 +132,11 @@ attributesToPrefix = worker []
     worker [] [] = return Nothing
     worker [single] [] = return (Just single)
     worker acc [] = return (Just $ Constant.Vector acc)
-    worker acc (AltReturn _n name : xs) = do
-      ty <- getFunctionType name
-      worker (Constant.GlobalReference (PointerType ty (AddrSpace 0)) (nameToLLVM name) : acc) xs
-      -- error "prefix" ty xs  acc
+    worker _acc (Prefix size prims ptrs _handler : xs) =
+      return $ Just $ Constant.Struct Nothing False
+        [Constant.Int 32 (fromIntegral size)
+        ,Constant.Int 32 (fromIntegral prims)
+        ,Constant.Int 32 (fromIntegral ptrs) ]
     worker acc (_:xs) = worker acc xs
 
 mkEnv :: Bedrock.Module -> Env
@@ -128,6 +144,7 @@ mkEnv bedrock = env
   where
     env = Env
         { envNodeMapping = Map.fromList (zip allNodes [0..])
+        , envNodeLayout = nodeLayouts
         , envFunctionTypes = Map.fromList fnTypes }
     allNodes =
         [ ConstructorName name blanks
@@ -136,11 +153,30 @@ mkEnv bedrock = env
         [ FunctionName fnName blanks
         | Bedrock.Function{..} <- functions bedrock
         , blanks <- [0..length fnArguments] ]
+    nodeLayouts =
+        [ (ConstructorName name blanks, computeNodeLayout (drop blanks $ reverse args))
+        | NodeDefinition name args <- nodes bedrock
+        , blanks <- [0..length args] ] ++
+        [ (FunctionName fnName blanks, computeNodeLayout (drop blanks $ reverse $ map variableType $ filter (not.isHP) fnArguments))
+        | Bedrock.Function{..} <- functions bedrock
+        , blanks <- [0..length fnArguments] ]
     fnTypes =
       [ (fnName, FunctionType (typesToLLVM fnResults)
                       [ typeToLLVM variableType
                       | Variable{..} <- fnArguments ] False)
       | Bedrock.Function{..} <- functions bedrock ]
+
+isHP :: Variable -> Bool
+isHP var = variableName var == Bedrock.Name [] "hp" 0
+
+-- return number of primitives and number of heap pointers
+computeNodeLayout :: [Bedrock.Type] -> (Int, Int)
+computeNodeLayout = go (0,0)
+  where
+    go (prims, ptrs) [] = (prims, ptrs)
+    go (prims, ptrs) (NodePtr:xs) = go (prims, ptrs+1) xs
+    go (prims, ptrs) (FramePtr:xs) = go (prims, ptrs) xs
+    go (prims, ptrs) (_:xs) = go (prims+1,ptrs) xs
 {-
 
 toLLVM :: Bedrock.Module -> LLVM.Module
@@ -304,16 +340,12 @@ traceLLVM msg = do
         , metadata = [] }
     return ()
 
-patternTag :: Pattern -> String
-patternTag pat =
-  case pat of
-    NodePat nodeName [] ->
-      case nodeName of
-        ConstructorName name missing -> ppPartial name missing
-        FunctionName name missing    -> ppPartial name missing
-        UnboxedTupleName             -> "(# #)"
-    LitPat (LiteralInt i) -> "literal " ++ show i
-    _ -> ""
+nodeNameTag :: NodeName -> String
+nodeNameTag nodeName =
+    case nodeName of
+      ConstructorName name missing -> ppPartial name missing
+      FunctionName name missing    -> ppPartial name missing
+      UnboxedTupleName             -> "(# #)"
   where
     ppPartial name missing =
       unwords (ppName name : replicate missing "_")
@@ -321,6 +353,13 @@ patternTag pat =
       case unique of
         0 -> intercalate "." (ns++[ident])
         _ -> intercalate "." (ns++[ident]) ++ "_" ++ show unique
+
+patternTag :: Pattern -> String
+patternTag pat =
+  case pat of
+    NodePat nodeName [] -> nodeNameTag nodeName
+    LitPat (LiteralInt i) -> "literal " ++ show i
+    _ -> ""
 
 blockToLLVM :: Block -> GenBlocks Terminator
 blockToLLVM = worker

@@ -26,7 +26,7 @@ import           Compiler.Interface
 import           Control.Monad
 import           Data.Bedrock                       (Name (..))
 import           Data.Bedrock.Storage.Fixed
-import           Data.Bedrock.Storage.Trace
+import           Data.Bedrock.Storage.SemiSpace
 import qualified Data.Bedrock.Compile               as Bedrock
 import           Data.Binary
 import           Data.IORef
@@ -212,7 +212,7 @@ compileExecutable verbose keepIntermediateFiles gcStrategy file = do
   let gc = case gcStrategy of
              "" -> fixedGC
              "fixed" -> fixedGC
-             "trace" -> traceGC
-             _ -> error $ "Unknown strategy. Options are: fixed, trace"
+             "semi"  -> semiSpaceGC
+             _ -> error $ "Unknown strategy. Options are: fixed, semi"
   Bedrock.compileModule keepIntermediateFiles verbose gc bedrock file
   return ()

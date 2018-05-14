@@ -23,7 +23,8 @@ import           Data.Bedrock               (NodeName)
 import qualified Data.Bedrock as Bedrock
 
 data Env = Env
-    { envNodeMapping :: Map NodeName Integer
+    { envNodeMapping   :: Map NodeName Integer
+    , envNodeLayout    :: [(NodeName, (Int, Int))]
     , envFunctionTypes :: Map Bedrock.Name LLVM.Type
     }
 

@@ -145,7 +145,7 @@ transformExpresion origin binds simple rest =
       divertName <- tagName "without_mem" (fnName origin)
       check <- newVariable "check" IWord
       fnPtr <- newVariable "returnAddr" IWord
-      let scope = Set.toList (freeVariables rest)
+      let scope = sortScope $ Set.toList (freeVariables rest)
       markedScope <- mapM (tagVariable "marked") scope
       let continue = TailCall continueName scope
           divert = TailCall divertName scope
@@ -189,6 +189,15 @@ transformExpresion origin binds simple rest =
     _       -> return $ Bind binds simple rest
 
 
+-- FramePointers have to be marked first.
+sortScope :: [Variable] -> [Variable]
+sortScope = worker []
+  where
+    worker acc [] = acc
+    worker acc (var:vars) =
+      case variableType var of
+        FramePtr -> var : worker acc vars
+        _        -> worker (var:acc) vars
 
 
 
