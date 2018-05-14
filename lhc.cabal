@@ -22,6 +22,7 @@ Source-repository head
 Executable lhc
  main-is:            Main.hs
  other-modules:
+   RTS
    Compiler.Core
    Compiler.Core.DCE
    Compiler.Core.FreeVariables

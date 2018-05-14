@@ -73,7 +73,7 @@ runPipeline keepIntermediateFiles verbose title m0 =
 compileModule :: KeepIntermediateFiles -> Verbose -> GC StorageManager -> Module -> FilePath -> IO ()
 compileModule keepIntermediateFiles verbose gc m path = do
     result <- runPipeline keepIntermediateFiles verbose (takeBaseName path) m (stdPipeline gc)
-    LLVM.compile result (replaceExtension path "ll")
+    LLVM.compile result path
 
 compileFromFile :: GC StorageManager -> FilePath -> IO ()
 compileFromFile = compileFromFileWithOpts True True

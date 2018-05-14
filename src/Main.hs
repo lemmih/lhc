@@ -9,7 +9,6 @@ import           Language.Haskell.TypeCheck.Pretty  (displayIO, pretty,
 import           System.Exit
 import           System.FilePath
 import           System.IO
-import System.Process
 
 import           Language.Haskell.Scope             hiding (Interface)
 import           Language.Haskell.TypeCheck
@@ -19,22 +18,23 @@ import qualified Compiler.Core.DCE                  as Core
 import qualified Compiler.Core.NewType              as NewType
 import qualified Compiler.Core.SimpleEta            as Core
 import qualified Compiler.Core.SimpleInline         as Core
-import qualified Compiler.Core.Unique         as Core
 import qualified Compiler.Core.Simplify             as Core
+import qualified Compiler.Core.Unique               as Core
 import qualified Compiler.CoreToBedrock             as Core
 import qualified Compiler.HaskellToCore             as Haskell
 import           Compiler.Interface
 import           Control.Monad
 import           Data.Bedrock                       (Name (..))
+import qualified Data.Bedrock.Compile               as Bedrock
 import           Data.Bedrock.Storage.Fixed
 import           Data.Bedrock.Storage.SemiSpace
-import qualified Data.Bedrock.Compile               as Bedrock
 import           Data.Binary
 import           Data.IORef
 import           Data.List                          (intercalate)
-import           Data.Monoid                        (mconcat,(<>))
+import           Data.Monoid                        (mconcat, (<>))
 import qualified Distribution.ModuleName            as Dist
 import           Options.Applicative
+import           RTS                                (linkRTS)
 import           System.Directory
 
 import qualified Distribution.HaskellSuite.Compiler as Compiler
@@ -202,7 +202,7 @@ compileExecutable verbose keepIntermediateFiles gcStrategy file = do
           Core.simplify $ Core.simplify $ Core.simplify $ Core.simpleInline $ Core.unique $
           snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
           Core.simplify $ Core.simplify $ Core.simplify $
-          snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
+          snd $ Core.simpleEta Core.emptySimpleEtaAnnotation
           base
   -- print (pretty complete)
   when verbose $
@@ -211,42 +211,10 @@ compileExecutable verbose keepIntermediateFiles gcStrategy file = do
   let bedrock = Core.convert complete
   -- print (ppModule bedrock)
   let gc = case gcStrategy of
-             "" -> fixedGC
+             ""      -> fixedGC
              "fixed" -> fixedGC
              "semi"  -> semiSpaceGC
-             _ -> error $ "Unknown strategy. Options are: fixed, semi"
-  Bedrock.compileModule keepIntermediateFiles verbose gc bedrock file
-  addRTS (replaceExtension file "ll")
-  return ()
-
-findLLVMExecutable :: FilePath -> IO FilePath
-findLLVMExecutable exec = do
-  mbRet <- findExecutable exec
-  case mbRet of
-    Just path -> pure path
-    Nothing -> do
-      mbV6 <- findExecutable (exec++"-6.0")
-      case mbV6 of
-        Just path -> pure path
-        Nothing   -> error $ "Required program could not be found: " ++ exec
-
-addRTS :: FilePath -> IO ()
-addRTS target = do
-  rtsDir <- getDataFileName "rts"
-  semispace <- getDataFileName "rts/gc/semispace.c"
-  clang <- findLLVMExecutable "clang"
-  link <- findLLVMExecutable "llvm-link"
-  tmpDir <- getTemporaryDirectory
-  let dst = tmpDir </> "semispace.ll"
-  assertProcess clang ["-I"++rtsDir, semispace, "-emit-llvm", "-S", "-o",dst]
-  assertProcess link [target, dst, "-S", "-o", target]
-
-assertProcess :: String -> [String] -> IO ()
-assertProcess prog args = do
-  (code, _stdout, stderr) <- readProcessWithExitCode prog args ""
-  unless (null stderr) $
-    error $ prog ++ " failed with message:\n" ++ stderr
-  case code of
-    ExitSuccess -> return ()
-    ExitFailure val ->
-      error $ prog ++ " failed with error code: " ++ show val
+             _       -> error "Unknown strategy. Options are: fixed, semi"
+  let target = replaceExtension file "ll"
+  Bedrock.compileModule keepIntermediateFiles verbose gc bedrock target
+  linkRTS target
