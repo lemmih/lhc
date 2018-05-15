@@ -16,6 +16,7 @@ cabal-version:       >=1.8
 
 library
   Hs-source-dirs:      src
+  Default-Language:    Haskell2010
   exposed-modules:     Data.Bedrock
                        Data.Bedrock.Parse
                        Data.Bedrock.PrettyPrint,

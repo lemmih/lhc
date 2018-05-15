@@ -12,9 +12,9 @@ deadCodeElimination m =
         | fn <- functions m
         , fromJust (toVertex (fnName fn)) `elem` live ]
      , modForeigns =
-        [ foreign
-        | foreign <- modForeigns m
-        , fromJust (toVertex $ mkForeign (foreignName foreign)) `elem` live ]
+        [ f
+        | f <- modForeigns m
+        , fromJust (toVertex $ mkForeign (foreignName f)) `elem` live ]
      , nodes =
         [ node
         | node@(NodeDefinition name _) <- nodes m
@@ -27,8 +27,8 @@ deadCodeElimination m =
 moduleGraph :: Module -> [(Name, Name, [Name])]
 moduleGraph m =
     [ (name, name, [])
-    | foreign <- modForeigns m
-    , let name = mkForeign (foreignName foreign) ] ++
+    | f <- modForeigns m
+    , let name = mkForeign (foreignName f) ] ++
     [ (name, name, [])
     | NodeDefinition name _ <- nodes m ] ++
     [ (fnName fn, fnName fn, blockDependencies (fnBody fn))
@@ -45,7 +45,7 @@ moduleGraph m =
     exprDependencies =
       \case
         Application fn _ -> [fn]
-        CCall foreign _ -> [mkForeign foreign ]
+        CCall fn _ -> [mkForeign fn ]
         Catch a _ b _ -> [a,b]
 
         Store (ConstructorName cons _) _ -> [cons]

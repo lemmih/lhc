@@ -6,10 +6,6 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/param.h>
-/*
-
-
-*/
 
 word *_lhc_semi_init();
 void _lhc_semi_begin();
