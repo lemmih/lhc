@@ -7,6 +7,8 @@ import           System.Exit      (ExitCode (..))
 import           System.FilePath  ((</>))
 import           System.Process   (readProcessWithExitCode)
 
+-- Compile the RTS (written in c) with clang and link the files directly
+-- into the target code.
 linkRTS :: FilePath -> IO ()
 linkRTS target = do
   rtsDir <- getDataFileName "rts"
