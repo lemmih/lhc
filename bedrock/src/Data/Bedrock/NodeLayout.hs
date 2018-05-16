@@ -15,8 +15,7 @@ import           Data.Bedrock
 
 finalizeNodeLayout :: Module -> Module
 finalizeNodeLayout m = m
-    { nodes = []
-    , modLayouts = Set.toList layouts
+    { modLayouts = Set.toList layouts
     , functions = fs }
   where
     (fs, layouts) = runWriter (mapM finFunction (functions m))

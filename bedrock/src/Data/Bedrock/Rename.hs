@@ -96,8 +96,6 @@ resolve var = do
 uniqModule :: Module -> Uniq Module
 uniqModule m =
     renameAll [ name | NodeDefinition name _args <- nodes m ] $
-    renameAll [ name | NodeLayout (ConstructorName name _) _ _ <- modLayouts m ] $
-    renameAll [ name | NodeLayout (FunctionName name _) _ _ <- modLayouts m ] $
     renameAll (map fnName (functions m)) $ do
         ns  <- mapM uniqNode (nodes m)
         layouts <- mapM uniqNodeLayout (modLayouts m)
@@ -254,13 +252,6 @@ locallyBind name = do
   LUniq $ \_ -> ((), Map.singleton name{nameUnique=0} [name])
   locallyResolve name
 
-locallyBindNode :: NodeName -> LUniq NodeName
-locallyBindNode (ConstructorName name blanks) =
-  ConstructorName <$> locallyBind name <*> pure blanks
-locallyBindNode (FunctionName name blanks) =
-  FunctionName <$> locallyBind name <*> pure blanks
-locallyBindNode UnboxedTupleName = pure UnboxedTupleName
-
 runLUniq :: LUniq a -> a
 runLUniq action = a
   where
@@ -289,7 +280,7 @@ locallyNode (NodeDefinition name ty) =
 
 locallyLayout :: NodeLayout -> LUniq NodeLayout
 locallyLayout (NodeLayout name prims ptrs) =
-  NodeLayout <$> locallyBindNode name <*> pure prims <*> pure ptrs
+  NodeLayout <$> locallyNodeName name <*> pure prims <*> pure ptrs
 
 
 locallyResolve :: Name -> LUniq Name

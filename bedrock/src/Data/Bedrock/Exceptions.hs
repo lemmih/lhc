@@ -7,6 +7,7 @@ module Data.Bedrock.Exceptions
 
 import           Control.Applicative    (pure, (<$>), (<*>))
 import           Control.Monad.State
+import           Data.Map               (Map)
 import qualified Data.Map               as Map
 -- import           Data.Bedrock.PrettyPrint (pretty)
 
@@ -28,7 +29,7 @@ cpsFunction fn | NoCPS `elem` fnAttributes fn =
 cpsFunction fn = do
     let size = frameSize (fnBody fn)
     frameVar <- newVariable "bedrock.stackframe" FramePtr
-    body <- cpsBlock size 0 0 fn frameVar (fnBody fn)
+    body <- cpsBlock size Map.empty fn frameVar (fnBody fn)
     let bodyWithFrame =
             Bind [] (Alloc size) $
             -- Bind [frameVar] (Store (ConstructorName stackFrameName 0) []) $
@@ -42,11 +43,11 @@ cpsFunction fn = do
     pushFunction fn'
 
 
-cpsBlock :: NodeSize -> Int -> Int -> Function -> Variable -> Block -> Gen Block
-cpsBlock size prims ptrs origin frameVar block =
+cpsBlock :: NodeSize -> StackLayout -> Function -> Variable -> Block -> Gen Block
+cpsBlock size slots origin frameVar block =
   case block of
     Bind binds simple rest ->
-      cpsExpression size prims ptrs origin frameVar binds simple rest
+      cpsExpression size slots origin frameVar binds simple rest
     Return args -> do
       node <- newVariable "returnAddr" IWord
       let fn_size = case fnResults origin of
@@ -59,8 +60,8 @@ cpsBlock size prims ptrs origin frameVar block =
         Invoke node (stdContinuation : take fn_size (args ++ repeat node))
     Case scrut defaultBranch alternatives ->
       Case scrut
-        <$> maybe (return Nothing) (fmap Just . cpsBlock size prims ptrs origin frameVar) defaultBranch
-        <*> mapM (cpsAlternative size prims ptrs origin frameVar) alternatives
+        <$> maybe (return Nothing) (fmap Just . cpsBlock size slots origin frameVar) defaultBranch
+        <*> mapM (cpsAlternative size slots origin frameVar) alternatives
     -- Raise exception -> do
     --   node <- newVariable "contNode" Node
     --   return $
@@ -80,9 +81,12 @@ isCatchFrame :: Name -> Bool
 isCatchFrame (Name [] ident _) = exhFrameIdentifier == ident
 isCatchFrame _                 = False
 
-cpsExpression :: NodeSize -> Int -> Int -> Function -> Variable -> [Variable]
+data StackSlot = SlotPrimitive | SlotPointer deriving (Eq)
+type StackLayout = Map Int StackSlot
+
+cpsExpression :: NodeSize -> StackLayout -> Function -> Variable -> [Variable]
              -> Expression -> Block -> Gen Block
-cpsExpression size prims ptrs origin frameVar binds simple rest =
+cpsExpression size slots origin frameVar binds simple rest =
     case simple of
       Catch exh exhArgs fn fnArgs -> do
         exFrameName <- tagName ("exception_frame") (fnName origin)
@@ -109,18 +113,17 @@ cpsExpression size prims ptrs origin frameVar binds simple rest =
                   TailCall fn (fnArgs ++ [continuationFrame])
       Store (FunctionName fn blanks) args ->
         Bind binds (Store (FunctionName fn (blanks)) args)
-          <$> cpsBlock size prims ptrs origin frameVar rest
+          <$> cpsBlock size slots origin frameVar rest
       MkNode (FunctionName fn blanks) args ->
         Bind binds (MkNode (FunctionName fn (blanks)) args)
-          <$> cpsBlock size prims ptrs origin frameVar rest
+          <$> cpsBlock size slots origin frameVar rest
       Save var n ->
         Bind binds (Write frameVar n var)
-          <$> if isPrimitive var
-              then cpsBlock size (succ prims) ptrs origin frameVar rest
-              else cpsBlock size prims (succ ptrs) origin frameVar rest
+          <$> let slot = if isPrimitive var then SlotPrimitive else SlotPointer
+              in cpsBlock size (Map.insert n slot slots) origin frameVar rest
       Restore n ->
-        Bind binds (Load frameVar n) <$> cpsBlock size prims ptrs origin frameVar rest
-      other -> Bind binds other <$> cpsBlock size prims ptrs origin frameVar rest
+        Bind binds (Load frameVar n) <$> cpsBlock size slots origin frameVar rest
+      other -> Bind binds other <$> cpsBlock size slots origin frameVar rest
   where
     mkContinuation use = do
 
@@ -132,8 +135,10 @@ cpsExpression size prims ptrs origin frameVar binds simple rest =
 
         contFnName <- tagName "continuation" (fnName origin)
 
-        body <- cpsBlock size 0 0 origin framePtr $
+        body <- cpsBlock size slots origin framePtr $
             Bind [stdContinuation] (Load framePtr 1) $ rest
+        let prims = Map.size (Map.filter (\key -> key == SlotPrimitive) slots)
+            ptrs = Map.size (Map.filter (\key -> key == SlotPointer) slots)
         pushHelper $
             Function { fnName      = contFnName
                      , fnAttributes = [ Prefix size prims ptrs Nothing ]
@@ -146,14 +151,14 @@ cpsExpression size prims ptrs origin frameVar binds simple rest =
             Bind [] (Write frameVar 0 fnPtr) $
             use frameVar
 
-cpsAlternative :: NodeSize -> Int -> Int -> Function -> Variable -> Alternative -> Gen Alternative
-cpsAlternative size prims ptrs origin frameVar (Alternative pattern expr) =
+cpsAlternative :: NodeSize -> StackLayout -> Function -> Variable -> Alternative -> Gen Alternative
+cpsAlternative size slots origin frameVar (Alternative pattern expr) =
     case pattern of
         -- NodePat (FunctionName fn n) args ->
         --     Alternative
         --         (NodePat (FunctionName fn n) args)
         --         <$> cpsBlock size prims ptrs origin frameVar expr
-        _ -> Alternative pattern <$> cpsBlock size prims ptrs origin frameVar expr
+        _ -> Alternative pattern <$> cpsBlock size slots origin frameVar expr
 
 
 

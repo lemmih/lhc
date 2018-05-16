@@ -88,7 +88,7 @@ toLLVM bedrock = LLVM.Module
                             | Variable{..} <- fnArguments ], False)
             , visibility = Default
             , linkage = LLVM.Internal
-            , Global.callingConvention = Fast
+            , Global.callingConvention = lhcCC
             , basicBlocks = blocks
             , prefix = mbPrefix
             , Global.functionAttributes = [Right NoUnwind]
@@ -97,7 +97,7 @@ toLLVM bedrock = LLVM.Module
       let wordPtrTy = PointerType (IntegerType 64) (AddrSpace 0)
           entryCall = Call
               { tailCallKind = Nothing
-              , callingConvention = Fast
+              , callingConvention = lhcCC
               , returnAttributes = []
               , function = Right $ ConstantOperand $ Constant.GlobalReference
                               (FunctionType VoidType [] False)
@@ -170,117 +170,9 @@ mkEnv bedrock = env
                       | Variable{..} <- fnArguments ] False)
       | Bedrock.Function{..} <- functions bedrock ]
 
--- isHP :: Variable -> Bool
--- isHP var = variableName var == Bedrock.Name [] "hp" 0
+lhcCC :: CallingConvention
+lhcCC = C
 
--- return number of primitives and number of heap pointers
--- computeNodeLayout :: [Bedrock.Type] -> (Int, Int)
--- computeNodeLayout = go (0,0)
---   where
---     go (prims, ptrs) [] = (prims, ptrs)
---     go (prims, ptrs) (NodePtr:xs) = go (prims, ptrs+1) xs
---     go (prims, ptrs) (FramePtr:xs) = go (prims, ptrs) xs
---     go (prims, ptrs) (_:xs) = go (prims+1,ptrs) xs
-{-
-
-toLLVM :: Bedrock.Module -> LLVM.Module
-toLLVM bedrock = defaultModule
-    { moduleName = "Bedrock"
-    , moduleDataLayout = Just dataLayout
-    , moduleDefinitions =
-        [ GlobalDefinition functionDefaults
-            { name = LLVM.Name foreignName
-            , returnType = cTypeToLLVM foreignReturn
-            , parameters = ([ Parameter (cTypeToLLVM ty) (UnName 0) []
-                            | ty <- foreignArguments], False) }
-        | Foreign{..} <- modForeigns bedrock ] ++
-        [ GlobalDefinition globalVariableDefaults
-            { name = LLVM.Name ("bedrock:"++reg)
-            , linkage = LLVM.Private
-            , visibility = Default
-            , threadLocalMode = Nothing
-            , addrSpace = AddrSpace 0
-            , hasUnnamedAddr = True
-            , isConstant = False
-            , Global.type' = PointerType (IntegerType 64) (AddrSpace 0)
-            , initializer = Just $ Constant.Null $ PointerType (IntegerType 64) (AddrSpace 0)
-            , section = Nothing }
-        | reg <- Set.toList $ allRegisters bedrock ] ++
-        defs
-    }
-  where
-    dataLayout = defaultDataLayout LittleEndian
-    defs = execGenModule (mkEnv bedrock) $ do
-            newDefinition $ GlobalDefinition functionDefaults
-                    { name = LLVM.Name "exit"
-                    , returnType = VoidType
-                    , parameters = ([ Parameter (IntegerType 32) (UnName 0) []], False)
-                    }
-            newDefinition $ GlobalDefinition functionDefaults
-                    { name = LLVM.Name "llvm.trap"
-                    , returnType = VoidType
-                    , parameters = ([], False)
-                    }
-            newDefinition $ GlobalDefinition functionDefaults
-                    { name = LLVM.Name "puts"
-                    , returnType = IntegerType 32
-                    , parameters = ([ Parameter (PointerType (IntegerType 8) (AddrSpace 0)) (UnName 0) []], False)
-                    }
-
-            mainDef
-            forM_ (functions bedrock) $ \Bedrock.Function{..} -> do
-                blocks <- genBlocks $ blockToLLVM fnBody
-                newDefinition $ GlobalDefinition functionDefaults
-                    { name = nameToLLVM fnName
-                    , returnType = typesToLLVM fnResults
-                    , parameters = ([ Parameter
-                                        (typeToLLVM variableType)
-                                        (nameToLLVM variableName)
-                                        []
-                                    | Variable{..} <- fnArguments ], False)
-                    , visibility = Default
-                    , linkage = LLVM.Internal
-                    , Global.callingConvention = Fast
-                    , basicBlocks = blocks
-                    , Global.functionAttributes = [Right NoUnwind]
-                    }
-    mainDef = do
-        let wordPtrTy = PointerType (IntegerType 64) (AddrSpace 0)
-            entryCall = Call
-                { tailCallKind = Nothing
-                , callingConvention = Fast
-                , returnAttributes = []
-                , function = Right $ ConstantOperand $ Constant.GlobalReference
-                                VoidType
-                                (nameToLLVM $ entryPoint bedrock)
-                , arguments =
-                    [ (ConstantOperand $ Constant.Null wordPtrTy, [])
-                    , (ConstantOperand $ Constant.Null wordPtrTy, []) ]
-                , functionAttributes = [Right NoUnwind, Right NoReturn]
-                , metadata = [] }
-        newDefinition $ GlobalDefinition functionDefaults
-            { name = LLVM.Name "main"
-            , returnType = IntegerType 32
-            , basicBlocks = [BasicBlock (UnName 0) [Do entryCall] (Do $ Unreachable [])] }
-
-runE :: ExceptT String IO a -> IO a
-runE action = do
-    ret <- runExceptT action
-    case ret of
-        Left msg  -> error msg
-        Right val -> return val
-
-compile :: Bedrock.Module -> FilePath -> IO ()
-compile bedrock dst =
-    withContext $ \ctx -> do
-    let m = toLLVM bedrock
-    writeFile (replaceExtension dst "pretty") (showPretty m)
-    runE $ withModuleFromAST ctx (toLLVM bedrock) $ \llvmModule -> do
-        runE (writeLLVMAssemblyToFile (File dst) llvmModule)
-    return ()
-
-
--}
 cTypeToLLVM :: CType -> LLVM.Type
 cTypeToLLVM cType =
     case cType of
@@ -422,7 +314,7 @@ blockToLLVM = worker
               then do
                 doInst $ Call
                     { tailCallKind = Just Tail
-                    , callingConvention = Fast
+                    , callingConvention = lhcCC
                     , returnAttributes = []
                     , function = Right $ ConstantOperand $ Constant.GlobalReference
                                     fnTy
@@ -438,7 +330,7 @@ blockToLLVM = worker
               else do
                 ret <- anonInst $ Call
                     { tailCallKind = Just Tail
-                    , callingConvention = Fast
+                    , callingConvention = lhcCC
                     , returnAttributes = []
                     , function = Right $ ConstantOperand $ Constant.GlobalReference
                                     fnTy
@@ -475,7 +367,7 @@ blockToLLVM = worker
                             False) (AddrSpace 0))
             doInst $ Call
                 { tailCallKind = Just Tail
-                , callingConvention = Fast
+                , callingConvention = lhcCC
                 , returnAttributes = []
                 , function = Right $ LocalReference
                                 (FunctionType VoidType [] False)
@@ -588,7 +480,7 @@ blockToLLVM = worker
     mkInst retTy (Application fName args) = do
         return Call
             { tailCallKind = Nothing
-            , callingConvention = Fast
+            , callingConvention = lhcCC
             , returnAttributes = []
             , function = Right (ConstantOperand $ Constant.GlobalReference
                                     (FunctionType retTy [] False)
@@ -631,7 +523,7 @@ blockToLLVM = worker
               , metadata = [] }
       return Call
           { tailCallKind = Nothing
-          , callingConvention = Fast
+          , callingConvention = lhcCC
           , returnAttributes = []
           , function = Right $ LocalReference
                           fnTy
