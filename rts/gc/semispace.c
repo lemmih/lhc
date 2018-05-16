@@ -23,7 +23,6 @@ static int size=MIN_HEAP;
 static int live;
 static int factor=2;
 
-static word *hp;
 static word *hp_limit;
 
 static word *from_space;
@@ -35,6 +34,7 @@ word _lhc_semi_allocate(word *hp, word space) {
 }
 
 word* _lhc_semi_init() {
+  void *hp;
   hp = malloc(size*sizeof(word));
   from_space = hp;
   hp_limit = hp+size;
@@ -50,6 +50,7 @@ void _lhc_semi_begin() {
   live = 0;
 }
 word *_lhc_semi_end() {
+  void *hp;
   // All roots have been marked.
   // Start by scavenging the frame stack.
   // Then scavenge the rest of the objects.
