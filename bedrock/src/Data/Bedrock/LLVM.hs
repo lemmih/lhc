@@ -147,36 +147,40 @@ mkEnv bedrock = env
         , envNodeLayout = nodeLayouts
         , envFunctionTypes = Map.fromList fnTypes }
     allNodes =
-        [ ConstructorName name blanks
-        | NodeDefinition name args <- nodes bedrock
-        , blanks <- [0..length args] ] ++
-        [ FunctionName fnName blanks
-        | Bedrock.Function{..} <- functions bedrock
-        , blanks <- [0..length fnArguments] ]
+        [ name
+        | NodeLayout name _prim _ptrs <- modLayouts bedrock ]
+        -- [ ConstructorName name blanks
+        -- | NodeDefinition name args <- nodes bedrock
+        -- , blanks <- [0..length args] ] ++
+        -- [ FunctionName fnName blanks
+        -- | Bedrock.Function{..} <- functions bedrock
+        -- , blanks <- [0..length fnArguments] ]
     nodeLayouts =
-        [ (ConstructorName name blanks, computeNodeLayout (drop blanks $ reverse args))
-        | NodeDefinition name args <- nodes bedrock
-        , blanks <- [0..length args] ] ++
-        [ (FunctionName fnName blanks, computeNodeLayout (drop blanks $ reverse $ map variableType $ filter (not.isHP) fnArguments))
-        | Bedrock.Function{..} <- functions bedrock
-        , blanks <- [0..length fnArguments] ]
+        [ (name, (prim, ptrs))
+        | NodeLayout name prim ptrs <- modLayouts bedrock ]
+        -- [ (ConstructorName name blanks, computeNodeLayout (drop blanks $ reverse args))
+        -- | NodeDefinition name args <- nodes bedrock
+        -- , blanks <- [0..length args] ] ++
+        -- [ (FunctionName fnName blanks, computeNodeLayout (drop blanks $ reverse $ map variableType $ filter (not.isHP) fnArguments))
+        -- | Bedrock.Function{..} <- functions bedrock
+        -- , blanks <- [0..length fnArguments] ]
     fnTypes =
       [ (fnName, FunctionType (typesToLLVM fnResults)
                       [ typeToLLVM variableType
                       | Variable{..} <- fnArguments ] False)
       | Bedrock.Function{..} <- functions bedrock ]
 
-isHP :: Variable -> Bool
-isHP var = variableName var == Bedrock.Name [] "hp" 0
+-- isHP :: Variable -> Bool
+-- isHP var = variableName var == Bedrock.Name [] "hp" 0
 
 -- return number of primitives and number of heap pointers
-computeNodeLayout :: [Bedrock.Type] -> (Int, Int)
-computeNodeLayout = go (0,0)
-  where
-    go (prims, ptrs) [] = (prims, ptrs)
-    go (prims, ptrs) (NodePtr:xs) = go (prims, ptrs+1) xs
-    go (prims, ptrs) (FramePtr:xs) = go (prims, ptrs) xs
-    go (prims, ptrs) (_:xs) = go (prims+1,ptrs) xs
+-- computeNodeLayout :: [Bedrock.Type] -> (Int, Int)
+-- computeNodeLayout = go (0,0)
+--   where
+--     go (prims, ptrs) [] = (prims, ptrs)
+--     go (prims, ptrs) (NodePtr:xs) = go (prims, ptrs+1) xs
+--     go (prims, ptrs) (FramePtr:xs) = go (prims, ptrs) xs
+--     go (prims, ptrs) (_:xs) = go (prims+1,ptrs) xs
 {-
 
 toLLVM :: Bedrock.Module -> LLVM.Module

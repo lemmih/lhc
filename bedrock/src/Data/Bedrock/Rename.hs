@@ -96,14 +96,18 @@ resolve var = do
 uniqModule :: Module -> Uniq Module
 uniqModule m =
     renameAll [ name | NodeDefinition name _args <- nodes m ] $
+    renameAll [ name | NodeLayout (ConstructorName name _) _ _ <- modLayouts m ] $
+    renameAll [ name | NodeLayout (FunctionName name _) _ _ <- modLayouts m ] $
     renameAll (map fnName (functions m)) $ do
         ns  <- mapM uniqNode (nodes m)
+        layouts <- mapM uniqNodeLayout (modLayouts m)
         fns <- mapM uniqFunction (functions m)
         entry <- resolveName (entryPoint m)
         namespace <- get
         return Module
             { modForeigns = modForeigns m
             , nodes = ns
+            , modLayouts = layouts
             , entryPoint = entry
             , functions = fns
             , modNamespace = namespace
@@ -112,6 +116,11 @@ uniqModule m =
 uniqNode :: NodeDefinition -> Uniq NodeDefinition
 uniqNode (NodeDefinition name args) =
     NodeDefinition <$> resolveName name <*> pure args
+
+uniqNodeLayout :: NodeLayout -> Uniq NodeLayout
+uniqNodeLayout (NodeLayout name prim ptrs) =
+    NodeLayout <$> resolveNodeName name <*> pure prim <*> pure ptrs
+
 
 uniqFunction :: Function -> Uniq Function
 uniqFunction (Function name attrs args rets body) = renameVariables args $
@@ -245,6 +254,13 @@ locallyBind name = do
   LUniq $ \_ -> ((), Map.singleton name{nameUnique=0} [name])
   locallyResolve name
 
+locallyBindNode :: NodeName -> LUniq NodeName
+locallyBindNode (ConstructorName name blanks) =
+  ConstructorName <$> locallyBind name <*> pure blanks
+locallyBindNode (FunctionName name blanks) =
+  FunctionName <$> locallyBind name <*> pure blanks
+locallyBindNode UnboxedTupleName = pure UnboxedTupleName
+
 runLUniq :: LUniq a -> a
 runLUniq action = a
   where
@@ -258,16 +274,23 @@ limitScope action = LUniq $ \scope ->
 locallyUnique :: Module -> Module
 locallyUnique m = runLUniq $ do
   ns <- mapM locallyNode (nodes m)
+  layouts <- mapM locallyLayout (modLayouts m)
   entry <- locallyResolve (entryPoint m)
   fns <- mapM locallyFunction (functions m)
   return m
     { nodes = ns
+    , modLayouts = layouts
     , entryPoint = entry
     , functions = fns }
 
 locallyNode :: NodeDefinition -> LUniq NodeDefinition
 locallyNode (NodeDefinition name ty) =
   NodeDefinition <$> locallyBind name <*> pure ty
+
+locallyLayout :: NodeLayout -> LUniq NodeLayout
+locallyLayout (NodeLayout name prims ptrs) =
+  NodeLayout <$> locallyBindNode name <*> pure prims <*> pure ptrs
+
 
 locallyResolve :: Name -> LUniq Name
 locallyResolve name = do

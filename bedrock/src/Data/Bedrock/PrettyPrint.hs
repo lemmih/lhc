@@ -20,6 +20,10 @@ import           Data.Bedrock
 Doc.Empty <+> b = b
 a <+> b = a Doc.<+> b
 
+(<$$>) :: Doc -> Doc -> Doc
+Doc.Empty <$$> b = b
+a <$$> b = a Doc.<$$> b
+
 -------------------------------------------------------------------------------
 -- Pretty print
 
@@ -74,6 +78,11 @@ ppNode UnboxedTupleName args =
   Doc.text "(#" <+> ppList args <+> Doc.text "#)"
 --ppNode (CatchFrame fn blanks) args =
 --  Doc.hsep (Doc.green (ppName fn) : args ++ replicate blanks (Doc.char '_'))
+
+-- layout Node _ : 10 10
+instance Pretty NodeLayout where
+  pretty (NodeLayout name prims ptrs) =
+    text "layout" <+> ppNode name [] <+> char ':' <+> int prims <+> int ptrs
 
 ppPattern :: Pattern -> Doc
 ppPattern pattern =
@@ -206,7 +215,10 @@ instance Pretty Foreign where
 
 instance Pretty Module where
   pretty m =
-    Doc.vsep (map pretty (modForeigns m)) Doc.<$$>
-    Doc.vsep (map pretty (nodes m)) Doc.<$$>
-    ppEntryPoint (entryPoint m) Doc.<$$>
-    Doc.vsep (map pretty (functions m))
+    Doc.vsep (
+      map pretty (modForeigns m) ++
+      map pretty (nodes m) ++
+      map pretty (modLayouts m)) <$$>
+    ppEntryPoint (entryPoint m) <$$>
+    Doc.vsep (
+      map pretty (functions m))

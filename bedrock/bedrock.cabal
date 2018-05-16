@@ -31,6 +31,7 @@ library
                        Data.Bedrock.Transform
                        Data.Bedrock.Misc
                        Data.Bedrock.NodeSizing
+                       Data.Bedrock.NodeLayout
                        Data.Bedrock.SimpleNodeSizing
                        Data.Bedrock.Simplify
                        Data.Bedrock.Simplify.LocalDCE

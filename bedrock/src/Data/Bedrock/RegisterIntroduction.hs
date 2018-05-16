@@ -92,6 +92,7 @@ uniqModule m =
         return Module
             { modForeigns = modForeigns m
             , nodes = ns
+            , modLayouts = modLayouts m
             , entryPoint = entryPoint m
             , functions = fns
             , modNamespace = namespace

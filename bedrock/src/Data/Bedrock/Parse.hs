@@ -308,6 +308,7 @@ parseModule = do
   return Module
     { modForeigns = [ f | TopForeign f <- topLevel ]
     , nodes = [ n | TopNode n <- topLevel ]
+    , modLayouts = []
     , entryPoint = fromMaybe noEntryPoint $ listToMaybe
       [ e | TopEntryPoint e <- topLevel ]
     , functions = [ f | TopFunction f <- topLevel ]

@@ -19,6 +19,7 @@ import           Data.Bedrock.RegisterIntroduction
 import           Data.Bedrock.Rename
 import qualified Data.Bedrock.SimpleNodeSizing     as Simple
 import           Data.Bedrock.Simplify
+import           Data.Bedrock.NodeLayout
 import           Data.Bedrock.Simplify.DCE
 import           Data.Bedrock.Simplify.LocalDCE
 import qualified Data.Bedrock.StackLayout          as StackLayout
@@ -96,6 +97,7 @@ stdPipeline gc =
         -- , "no-laziness"     :?> runGen . lowerEvalApply
         -- , "no-unknown-size" :?> runGen . lowerNodeSize
         , "no-laziness"     :> locallyUnique . runGen Simple.lowerEvalApply
+        , "layout"          :> locallyUnique . finalizeNodeLayout
         , "no-void"         :> locallyUnique . simplify . voidEliminate
         , "no-unknown-size" :> locallyUnique . runGen Simple.lowerNodeSize
 

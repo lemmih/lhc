@@ -127,16 +127,18 @@ anonName = lift $ do
 taggedName :: String -> GenBlocks Name
 taggedName tag = lift $ do
   st <- get
-  if tag `Set.member` genScope st
-    then do
-      let n = genUnique st
-      put st{genUnique = n+1}
-      return $ Name $ fromString $ tag ++ "_" ++ show n
-    else do
-      put st{genScope = Set.insert tag (genScope st)}
-      return $ Name $ fromString tag
+  let uniqueTag = findUniqueName (genScope st) tag
+  put st{genScope = Set.insert uniqueTag (genScope st)}
+  return $ Name $ fromString uniqueTag
 
-
+findUniqueName :: Set String -> String -> String
+findUniqueName scope name =
+    worker (name : [ name ++ "_" ++ show n | n <- [0..]])
+  where
+    worker [] = undefined
+    worker (x:xs)
+      | x `Set.member` scope = worker xs
+      | otherwise            = x
 
 
 

@@ -129,17 +129,18 @@ data Foreign = Foreign
 data Module = Module
   { modForeigns  :: [Foreign]
   , nodes        :: [NodeDefinition]
-  -- , modLayouts   :: [NodeLayout]
+  , modLayouts   :: [NodeLayout]
   , entryPoint   :: Name
   , functions    :: [Function]
   , modNamespace :: AvailableNamespace
   -- CAFs?
   } deriving (Show, Read, Eq, Data, Generic)
 
--- data NodeLayout = NodeLayout
---   { layoutName       :: NodeName
---   , layoutPrimitives :: Int
---   , layoutPointers   :: Int }
+data NodeLayout = NodeLayout
+  { layoutName       :: NodeName
+  , layoutPrimitives :: Int
+  , layoutPointers   :: Int
+  } deriving (Show, Read, Eq, Ord, Data, Generic)
 
 data NodeName
   = ConstructorName Name Int
@@ -310,6 +311,7 @@ instance Arbitrary Module where
   arbitrary = sized (\n -> resize (n`div`10) (Module
     <$> arbitrary
     <*> arbitrary
+    <*> pure []
     <*> arbitrary
     <*> arbitrary
     <*> pure (AvailableNamespace 0 0 0 0)))
