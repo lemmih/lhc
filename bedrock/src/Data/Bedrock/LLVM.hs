@@ -442,6 +442,18 @@ blockToLLVM = worker
                             (nameToLLVM $ variableName b)
             , metadata = []
             }
+    mkInst retTy (CCall "+#" [a, b]) =
+        return $ Add
+            { nsw = False
+            , nuw = False
+            , operand0 = LocalReference
+                            (typeToLLVM $ variableType a)
+                            (nameToLLVM $ variableName a)
+            , operand1 = LocalReference
+                            (typeToLLVM $ variableType b)
+                            (nameToLLVM $ variableName b)
+            , metadata = []
+            }
     mkInst retTy (CCall "sdiv#" [a, b]) =
         return $ SDiv
             { exact = False

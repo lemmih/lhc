@@ -370,6 +370,7 @@ convertDecl' decl =
         mapM_ (convertQualCon True) qualCons
         return []
     HS.TypeSig{} -> return []
+    HS.InlineSig{} -> return []
     _ -> error $ "Compiler.HaskellToCore.convertDecl: " ++ show decl
 
 isPrimitive :: String -> Bool
