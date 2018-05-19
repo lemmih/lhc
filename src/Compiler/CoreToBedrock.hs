@@ -451,7 +451,7 @@ convertExpr lazy expr rest =
       tmp <- newVariable [] "thunk" NodePtr
       Bind [tmp] (Store (FunctionName node (length v)) nodeArgs)
           <$> rest [tmp]
-    Core.Case scrut var Nothing [Core.Alt (Core.UnboxedPat binds) branch]  ->
+    Core.Case scrut var Nothing [Core.Alt (Core.UnboxedPat binds) branch] | not lazy ->
       convertExpr False scrut $ \vals -> do
         binds' <- mapM convertVariable binds
         let worker [] []         = convertExpr False branch rest
