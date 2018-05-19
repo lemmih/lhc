@@ -49,10 +49,15 @@ simpleInline m =
           name = declName decl
           (args, body) = splitArguments (declBody decl)
       (decl', usage) <- listen (uniqueDecl decl)
-      when (usage==Cheap || (usage==Expensive && isOneShot v)) $
+      when (mayInline usage (isOneShot v)) $
         modify $ \st ->
           st{ stInline = Map.insert name (args, body) (stInline st) }
       pure decl'
+
+mayInline :: Cost -> Bool -> Bool
+mayInline (Cheap n) _isOneShot | n < 20 = True
+mayInline Expensive True = True
+mayInline _ _ = False
 
 splitArguments :: Expr -> ([Variable], Expr)
 splitArguments (Lam vars e) = (vars, e)
@@ -66,10 +71,10 @@ data State = State
   , stInline :: Map Name ([Variable], Expr)
   , stCheap  :: Set Name
   }
-data Cost = Prohibitive | Expensive | Cheap deriving (Eq,Show)
+data Cost = Prohibitive | Expensive | Cheap Int deriving (Eq,Show)
 instance Monoid Cost where
-  mempty = Cheap
-  mappend Cheap Cheap = Cheap
+  mempty = Cheap 0
+  mappend (Cheap a) (Cheap b) = Cheap (a+b)
   mappend _ Prohibitive = Prohibitive
   mappend Prohibitive _ = Prohibitive
   mappend _ _ = Expensive
@@ -81,7 +86,8 @@ uniqueDecl decl = do
   return decl{declBody = body}
 
 uniqueExpr :: Expr -> M Expr
-uniqueExpr expr =
+uniqueExpr expr = do
+  tell (Cheap 1)
   case expr of
     _ | (Var var, args) <- collectApp expr -> do
       inline <- gets stInline
