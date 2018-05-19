@@ -1,0 +1,3 @@
+Fix broken unit tests:
+  examples/NoInline.hs
+  examples/Update.hs
