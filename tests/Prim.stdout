@@ -1,0 +1,359 @@
+node LHC.Prim.Int32 LHC.Prim.I32
+node LHC.Prim.I# LHC.Prim.I32
+node LHC.Prim.C# LHC.Prim.I32
+node LHC.Prim.Unit 
+node LHC.Prim.Nil 
+node LHC.Prim.Cons a LHC.Prim.List a
+node LHC.Prim.False 
+node LHC.Prim.True 
+newtype LHC.Prim.IO:(∀ a. (LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)) →  LHC.Prim.IO a)
+LHC.Prim.realworld# : LHC.Prim.RealWorld#
+LHC.Prim.realworld# =
+  void
+LHC.Prim.unIO : ∀ a. LHC.Prim.IO a →  LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)
+LHC.Prim.unIO =
+  ∀ sk_0_a. LHC.Prim.IO sk_0_a →  LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, sk_0_a #) λ LHC.Prim.action:(LHC.Prim.IO a) → 
+  case LHC.Prim.action of
+    scrut:(LHC.Prim.IO sk_0_a)
+    
+    DEFAULT → 
+      scrut^1 ← scrut
+      LHC.Prim.IO LHC.Prim.unit:(LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, sk_0_a #)) ← scrut^1:(LHC.Prim.IO sk_0_a)
+      LHC.Prim.unit
+LHC.Prim.bindIO : ∀ a b. LHC.Prim.IO a →  (a →  LHC.Prim.IO b) →  LHC.Prim.IO b
+LHC.Prim.bindIO =
+  ∀ sk_5_a sk_6_b. LHC.Prim.IO sk_5_a →  (sk_5_a →  LHC.Prim.IO sk_6_b) →  LHC.Prim.IO sk_6_b λ LHC.Prim.f:(LHC.Prim.IO a) LHC.Prim.g:(a →  LHC.Prim.IO b) → 
+  ((∀ a. (LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)) →  LHC.Prim.IO a) @ sk_6_b LHC.Prim.IO)
+    (λ LHC.Prim.s:LHC.Prim.RealWorld# → 
+    case ((∀ a. LHC.Prim.IO a →  LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)) @ sk_5_a LHC.Prim.unIO)
+               LHC.Prim.f LHC.Prim.s of
+      scrut^2:[91mundefined[0m
+      
+      DEFAULT → 
+        scrut^2 ← scrut^2
+        (# LHC.Prim.s', LHC.Prim.a #) ← scrut^2:[91mundefined[0m
+        ((∀ a. LHC.Prim.IO a →  LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)) @ sk_6_b LHC.Prim.unIO)
+            (LHC.Prim.g LHC.Prim.a)
+          LHC.Prim.s')
+LHC.Prim.thenIO : ∀ a b. LHC.Prim.IO a →  LHC.Prim.IO b →  LHC.Prim.IO b
+LHC.Prim.thenIO =
+  ∀ sk_13_a sk_14_b. LHC.Prim.IO sk_13_a →  LHC.Prim.IO sk_14_b →  LHC.Prim.IO sk_14_b λ LHC.Prim.a:(LHC.Prim.IO a) LHC.Prim.b:(LHC.Prim.IO b) → 
+  ((∀ a b. LHC.Prim.IO a →  (a →  LHC.Prim.IO b) →  LHC.Prim.IO b) @ sk_13_a sk_14_b LHC.Prim.bindIO)
+      LHC.Prim.a
+    (λ LHC.Prim.c:sk_13_a → 
+    LHC.Prim.b)
+LHC.Prim.return : ∀ a. a →  LHC.Prim.IO a
+LHC.Prim.return =
+  ∀ sk_20_a. sk_20_a →  LHC.Prim.IO sk_20_a λ LHC.Prim.a:a → 
+  ((∀ a. (LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)) →  LHC.Prim.IO a) @ sk_20_a LHC.Prim.IO)
+    (λ LHC.Prim.s:LHC.Prim.RealWorld# → 
+    (# LHC.Prim.s, LHC.Prim.a #))
+LHC.Prim.unsafePerformIO : ∀ a. LHC.Prim.IO a →  a
+LHC.Prim.unsafePerformIO =
+  ∀ sk_24_a. LHC.Prim.IO sk_24_a →  sk_24_a λ LHC.Prim.action:(LHC.Prim.IO a) → 
+  case ((∀ a. LHC.Prim.IO a →  LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)) @ sk_24_a LHC.Prim.unIO)
+             LHC.Prim.action
+           LHC.Prim.realworld# of
+    scrut^3:[91mundefined[0m
+    
+    DEFAULT → 
+      scrut^3 ← scrut^3
+      (# LHC.Prim.st, LHC.Prim.val #) ← scrut^3:[91mundefined[0m
+      LHC.Prim.val
+LHC.Prim.c_putchar : LHC.Prim.I32 →  LHC.Prim.IO LHC.Prim.Int32
+LHC.Prim.c_putchar =
+  λ arg^4:LHC.Prim.I32 → 
+  λ s^6:LHC.Prim.RealWorld# → 
+  primOut^5:LHC.Prim.I32, s'^7 ← external putchar arg^4
+  (# s'^7, LHC.Prim.Int32
+    primOut^5 #)
+LHC.Prim.indexI8# : LHC.Prim.Addr LHC.Prim.I8 →  LHC.Prim.I8
+LHC.Prim.indexI8# =
+  λ arg^8:(LHC.Prim.Addr LHC.Prim.I8) → 
+  primOut^9:LHC.Prim.I8 ← external indexI8# arg^8
+  primOut^9
+LHC.Prim.addrAdd# : LHC.Prim.Addr LHC.Prim.I8 →  LHC.Prim.I64 →  LHC.Prim.Addr LHC.Prim.I8
+LHC.Prim.addrAdd# =
+  λ arg^10:(LHC.Prim.Addr LHC.Prim.I8) arg^11:LHC.Prim.I64 → 
+  primOut^12:(LHC.Prim.Addr LHC.Prim.I8) ← external addrAdd# arg^10 arg^11
+  primOut^12
+LHC.Prim.i64toi32 : LHC.Prim.I64 →  LHC.Prim.I32
+LHC.Prim.i64toi32 =
+  λ arg^13:LHC.Prim.I64 → 
+  (arg^13 ::: LHC.Prim.I32)
+LHC.Prim.i8toi64 : LHC.Prim.I8 →  LHC.Prim.I64
+LHC.Prim.i8toi64 =
+  λ arg^14:LHC.Prim.I8 → 
+  (arg^14 ::: LHC.Prim.I64)
+LHC.Prim.i8toi32 : LHC.Prim.I8 →  LHC.Prim.I32
+LHC.Prim.i8toi32 =
+  λ arg^15:LHC.Prim.I8 → 
+  (arg^15 ::: LHC.Prim.I32)
+LHC.Prim.i32toi64 : LHC.Prim.I32 →  LHC.Prim.I64
+LHC.Prim.i32toi64 =
+  λ arg^16:LHC.Prim.I32 → 
+  (arg^16 ::: LHC.Prim.I64)
+LHC.Prim.unpackString# : LHC.Prim.Addr LHC.Prim.I8 →  [LHC.Prim.Char]
+LHC.Prim.unpackString# =
+  LHC.Prim.Addr LHC.Prim.I8 →  [LHC.Prim.Char] λ LHC.Prim.ptr:(LHC.Prim.Addr LHC.Prim.I8) → 
+  case LHC.Prim.i8toi64
+           (LHC.Prim.indexI8#
+             LHC.Prim.ptr) of
+    scrut^17:LHC.Prim.I64
+    
+    DEFAULT → 
+      case scrut^17 of
+        scrut^17:LHC.Prim.I64
+        0 → 
+          LHC.Prim.Nil
+        DEFAULT → 
+          let LHC.Prim.char:LHC.Prim.I64 = scrut^17
+          ((∀ a. a →  [a] →  [a]) @ LHC.Prim.Char LHC.Prim.Cons)
+              (LHC.Prim.C# (LHC.Prim.i64toi32
+                  LHC.Prim.char))
+            (LHC.Prim.unpackString#
+              (LHC.Prim.addrAdd# LHC.Prim.ptr
+                1))
+LHC.Prim.c_getchar : LHC.Prim.IO LHC.Prim.Int32
+LHC.Prim.c_getchar =
+  λ  → 
+  λ s^20:LHC.Prim.RealWorld# → 
+  primOut^19:LHC.Prim.I32, s'^21 ← external getchar 
+  (# s'^21, LHC.Prim.Int32
+    primOut^19 #)
+LHC.Prim.getChar : LHC.Prim.IO LHC.Prim.Char
+LHC.Prim.getChar =
+  ((∀ a b. LHC.Prim.IO a →  (a →  LHC.Prim.IO b) →  LHC.Prim.IO b) @ LHC.Prim.Int32 LHC.Prim.Char LHC.Prim.bindIO)
+      LHC.Prim.c_getchar
+    (λ LHC.Prim.c:LHC.Prim.Int32 → 
+    case LHC.Prim.c of
+      scrut^22:LHC.Prim.Int32
+      
+      DEFAULT → 
+        scrut^23 ← scrut^22
+        LHC.Prim.Int32 LHC.Prim.c#:LHC.Prim.I32 ← scrut^23:LHC.Prim.Int32
+        ((∀ a. a →  LHC.Prim.IO a) @ LHC.Prim.Char LHC.Prim.return)
+          (LHC.Prim.C# LHC.Prim.c#))
+LHC.Prim.getLine : LHC.Prim.IO [LHC.Prim.Char]
+LHC.Prim.getLine =
+  ((∀ a b. LHC.Prim.IO a →  (a →  LHC.Prim.IO b) →  LHC.Prim.IO b) @ LHC.Prim.Char [LHC.Prim.Char] LHC.Prim.bindIO)
+      LHC.Prim.getChar
+    (λ LHC.Prim.c:LHC.Prim.Char → 
+    case LHC.Prim.c of
+      scrut^24:LHC.Prim.Char
+      
+      DEFAULT → 
+        scrut^27 ← scrut^24
+        LHC.Prim.C# LHC.Prim.c#:LHC.Prim.I32 ← scrut^27:LHC.Prim.Char
+        case LHC.Prim.c# of
+          scrut^25:LHC.Prim.I32
+          
+          DEFAULT → 
+            case scrut^25 of
+              scrut^25:LHC.Prim.I32
+              '\n' → 
+                ((∀ a. a →  LHC.Prim.IO a) @ [LHC.Prim.Char] LHC.Prim.return)
+                  LHC.Prim.Nil
+              DEFAULT → 
+                ((∀ a b. LHC.Prim.IO a →  (a →  LHC.Prim.IO b) →  LHC.Prim.IO b) @ [LHC.Prim.Char] [LHC.Prim.Char] LHC.Prim.bindIO)
+                    LHC.Prim.getLine
+                  (λ LHC.Prim.cs:[LHC.Prim.Char] → 
+                  ((∀ a. a →  LHC.Prim.IO a) @ [LHC.Prim.Char] LHC.Prim.return)
+                    (((∀ a. a →  [a] →  [a]) @ LHC.Prim.Char LHC.Prim.Cons)
+                        LHC.Prim.c LHC.Prim.cs)))
+LHC.Prim.putStr : [LHC.Prim.Char] →  LHC.Prim.IO ()
+LHC.Prim.putStr =
+  [LHC.Prim.Char] →  LHC.Prim.IO () λ LHC.Prim.lst:[LHC.Prim.Char] → 
+  case LHC.Prim.lst of
+    scrut^28:[LHC.Prim.Char]
+    
+    DEFAULT → 
+      case scrut^28 of
+        scrut^28:[LHC.Prim.Char]
+        LHC.Prim.Nil  → 
+          ((∀ a. a →  LHC.Prim.IO a) @ () LHC.Prim.return)
+            LHC.Prim.Unit
+        DEFAULT → 
+          scrut^31 ← scrut^28
+          LHC.Prim.Cons LHC.Prim.head:LHC.Prim.Char LHC.Prim.tail:[LHC.Prim.Char] ← scrut^31:[LHC.Prim.Char]
+          case LHC.Prim.head of
+            scrut^29:LHC.Prim.Char
+            
+            DEFAULT → 
+              scrut^30 ← scrut^29
+              LHC.Prim.C# LHC.Prim.char:LHC.Prim.I32 ← scrut^30:LHC.Prim.Char
+              ((∀ a b. LHC.Prim.IO a →  LHC.Prim.IO b →  LHC.Prim.IO b) @ LHC.Prim.Int32 () LHC.Prim.thenIO)
+                  (LHC.Prim.c_putchar
+                    LHC.Prim.char) (LHC.Prim.putStr
+                  LHC.Prim.tail)
+LHC.Prim.putStrLn : [LHC.Prim.Char] →  LHC.Prim.IO ()
+LHC.Prim.putStrLn =
+  [LHC.Prim.Char] →  LHC.Prim.IO () λ LHC.Prim.msg:[LHC.Prim.Char] → 
+  ((∀ a b. LHC.Prim.IO a →  LHC.Prim.IO b →  LHC.Prim.IO b) @ () () LHC.Prim.thenIO)
+      (LHC.Prim.putStr LHC.Prim.msg)
+    (LHC.Prim.putStr
+      (LHC.Prim.unpackString# "\n"))
+LHC.Prim.not : LHC.Prim.Bool →  LHC.Prim.Bool
+LHC.Prim.not =
+  LHC.Prim.Bool →  LHC.Prim.Bool λ arg^33:LHC.Prim.Bool → 
+  case arg^33 of
+    arg^35:LHC.Prim.Bool
+    LHC.Prim.False  → 
+      LHC.Prim.True
+    DEFAULT → 
+      arg^34 ← arg^33
+      LHC.Prim.True  ← arg^34:LHC.Prim.Bool
+      LHC.Prim.False
+LHC.Prim.otherwise : LHC.Prim.Bool
+LHC.Prim.otherwise =
+  LHC.Prim.True
+LHC.Prim.+# : LHC.Prim.I32 →  LHC.Prim.I32 →  LHC.Prim.I32
+LHC.Prim.+# =
+  λ arg^36:LHC.Prim.I32 arg^37:LHC.Prim.I32 → 
+  primOut^38:LHC.Prim.I32 ← external +# arg^36 arg^37
+  primOut^38
+LHC.Prim.-# : LHC.Prim.I32 →  LHC.Prim.I32 →  LHC.Prim.I32
+LHC.Prim.-# =
+  λ arg^39:LHC.Prim.I32 arg^40:LHC.Prim.I32 → 
+  primOut^41:LHC.Prim.I32 ← external -# arg^39 arg^40
+  primOut^41
+LHC.Prim.*# : LHC.Prim.I32 →  LHC.Prim.I32 →  LHC.Prim.I32
+LHC.Prim.*# =
+  λ arg^42:LHC.Prim.I32 arg^43:LHC.Prim.I32 → 
+  primOut^44:LHC.Prim.I32 ← external *# arg^42 arg^43
+  primOut^44
+LHC.Prim.+ : LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int
+LHC.Prim.+ =
+  LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int λ arg^45:LHC.Prim.Int arg^46:LHC.Prim.Int → 
+  arg^48 ← arg^45
+  LHC.Prim.I# LHC.Prim.a#:LHC.Prim.I32 ← arg^48:LHC.Prim.Int
+  arg^47 ← arg^46
+  LHC.Prim.I# LHC.Prim.b#:LHC.Prim.I32 ← arg^47:LHC.Prim.Int
+  LHC.Prim.I# (LHC.Prim.+#
+        LHC.Prim.a# LHC.Prim.b#)
+LHC.Prim.- : LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int
+LHC.Prim.- =
+  LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int λ arg^49:LHC.Prim.Int arg^50:LHC.Prim.Int → 
+  arg^52 ← arg^49
+  LHC.Prim.I# LHC.Prim.a#:LHC.Prim.I32 ← arg^52:LHC.Prim.Int
+  arg^51 ← arg^50
+  LHC.Prim.I# LHC.Prim.b#:LHC.Prim.I32 ← arg^51:LHC.Prim.Int
+  LHC.Prim.I# (LHC.Prim.-#
+        LHC.Prim.a# LHC.Prim.b#)
+LHC.Prim.* : LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int
+LHC.Prim.* =
+  LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int λ arg^53:LHC.Prim.Int arg^54:LHC.Prim.Int → 
+  arg^56 ← arg^53
+  LHC.Prim.I# LHC.Prim.a#:LHC.Prim.I32 ← arg^56:LHC.Prim.Int
+  arg^55 ← arg^54
+  LHC.Prim.I# LHC.Prim.b#:LHC.Prim.I32 ← arg^55:LHC.Prim.Int
+  LHC.Prim.I# (LHC.Prim.*#
+        LHC.Prim.a# LHC.Prim.b#)
+LHC.Prim.udiv# : LHC.Prim.I32 →  LHC.Prim.I32 →  LHC.Prim.I32
+LHC.Prim.udiv# =
+  λ arg^57:LHC.Prim.I32 arg^58:LHC.Prim.I32 → 
+  primOut^59:LHC.Prim.I32 ← external udiv# arg^57 arg^58
+  primOut^59
+LHC.Prim.sdiv# : LHC.Prim.I32 →  LHC.Prim.I32 →  LHC.Prim.I32
+LHC.Prim.sdiv# =
+  λ arg^60:LHC.Prim.I32 arg^61:LHC.Prim.I32 → 
+  primOut^62:LHC.Prim.I32 ← external sdiv# arg^60 arg^61
+  primOut^62
+LHC.Prim.urem# : LHC.Prim.I32 →  LHC.Prim.I32 →  LHC.Prim.I32
+LHC.Prim.urem# =
+  λ arg^63:LHC.Prim.I32 arg^64:LHC.Prim.I32 → 
+  primOut^65:LHC.Prim.I32 ← external urem# arg^63 arg^64
+  primOut^65
+LHC.Prim.srem# : LHC.Prim.I32 →  LHC.Prim.I32 →  LHC.Prim.I32
+LHC.Prim.srem# =
+  λ arg^66:LHC.Prim.I32 arg^67:LHC.Prim.I32 → 
+  primOut^68:LHC.Prim.I32 ← external srem# arg^66 arg^67
+  primOut^68
+LHC.Prim.sdiv : LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int
+LHC.Prim.sdiv =
+  LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int λ arg^69:LHC.Prim.Int arg^70:LHC.Prim.Int → 
+  arg^72 ← arg^69
+  LHC.Prim.I# LHC.Prim.a#:LHC.Prim.I32 ← arg^72:LHC.Prim.Int
+  arg^71 ← arg^70
+  LHC.Prim.I# LHC.Prim.b#:LHC.Prim.I32 ← arg^71:LHC.Prim.Int
+  LHC.Prim.I# (LHC.Prim.sdiv#
+        LHC.Prim.a# LHC.Prim.b#)
+LHC.Prim.srem : LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int
+LHC.Prim.srem =
+  LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int λ arg^73:LHC.Prim.Int arg^74:LHC.Prim.Int → 
+  arg^76 ← arg^73
+  LHC.Prim.I# LHC.Prim.a#:LHC.Prim.I32 ← arg^76:LHC.Prim.Int
+  arg^75 ← arg^74
+  LHC.Prim.I# LHC.Prim.b#:LHC.Prim.I32 ← arg^75:LHC.Prim.Int
+  LHC.Prim.I# (LHC.Prim.srem#
+        LHC.Prim.a# LHC.Prim.b#)
+LHC.Prim.mapM_ : ∀ a. (a →  LHC.Prim.IO ()) →  [a] →  LHC.Prim.IO ()
+LHC.Prim.mapM_ =
+  ∀ sk_62_a. (sk_62_a →  LHC.Prim.IO ()) →  [sk_62_a] →  LHC.Prim.IO () λ LHC.Prim.fn:(a →  LHC.Prim.IO ()) LHC.Prim.lst:[a] → 
+  case LHC.Prim.lst of
+    scrut^77:[sk_62_a]
+    
+    DEFAULT → 
+      case scrut^77 of
+        scrut^77:[sk_62_a]
+        LHC.Prim.Nil  → 
+          ((∀ a. a →  LHC.Prim.IO a) @ () LHC.Prim.return)
+            LHC.Prim.Unit
+        DEFAULT → 
+          scrut^78 ← scrut^77
+          LHC.Prim.Cons LHC.Prim.x:sk_62_a LHC.Prim.xs:[sk_62_a] ← scrut^78:[sk_62_a]
+          ((∀ a b. LHC.Prim.IO a →  LHC.Prim.IO b →  LHC.Prim.IO b) @ () () LHC.Prim.thenIO)
+              (LHC.Prim.fn LHC.Prim.x)
+            (((∀ a. (a →  LHC.Prim.IO ()) →  [a] →  LHC.Prim.IO ()) @ sk_62_a LHC.Prim.mapM_)
+                LHC.Prim.fn LHC.Prim.xs)
+LHC.Prim.le# : LHC.Prim.I32 →  LHC.Prim.I32 →  LHC.Prim.I32
+LHC.Prim.le# =
+  λ arg^80:LHC.Prim.I32 arg^81:LHC.Prim.I32 → 
+  primOut^82:LHC.Prim.I32 ← external le# arg^80 arg^81
+  primOut^82
+LHC.Prim.<= : LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Bool
+LHC.Prim.<= =
+  LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Bool λ arg^83:LHC.Prim.Int arg^84:LHC.Prim.Int → 
+  arg^88 ← arg^83
+  LHC.Prim.I# LHC.Prim.a#:LHC.Prim.I32 ← arg^88:LHC.Prim.Int
+  arg^87 ← arg^84
+  LHC.Prim.I# LHC.Prim.b#:LHC.Prim.I32 ← arg^87:LHC.Prim.Int
+  case LHC.Prim.le# LHC.Prim.a#
+           LHC.Prim.b# of
+    scrut^85:LHC.Prim.I32
+    
+    DEFAULT → 
+      case scrut^85 of
+        scrut^85:LHC.Prim.I32
+        '\NUL' → 
+          LHC.Prim.False
+        DEFAULT → 
+          LHC.Prim.True
+LHC.Prim.max : LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int
+LHC.Prim.max =
+  LHC.Prim.Int →  LHC.Prim.Int →  LHC.Prim.Int λ LHC.Prim.a:LHC.Prim.Int LHC.Prim.b:LHC.Prim.Int → 
+  case LHC.Prim.<= LHC.Prim.a
+           LHC.Prim.b of
+    scrut^89:LHC.Prim.Bool
+    
+    DEFAULT → 
+      case scrut^89 of
+        scrut^92:LHC.Prim.Bool
+        LHC.Prim.True  → 
+          LHC.Prim.b
+        DEFAULT → 
+          scrut^90 ← scrut^89
+          LHC.Prim.False  ← scrut^90:LHC.Prim.Bool
+          LHC.Prim.a
+LHC.Prim.length : ∀ a. [a] →  LHC.Prim.Int
+LHC.Prim.length =
+  ∀ sk_76_a. [sk_76_a] →  LHC.Prim.Int λ LHC.Prim.lst:[a] → 
+  ((∀ a. [a] →  LHC.Prim.Int) @ sk_76_a LHC.Prim.length)
+    LHC.Prim.lst
+LHC.Prim.emptyString : [LHC.Prim.Char]
+LHC.Prim.emptyString =
+  LHC.Prim.Nil
+LHC.Prim.id : ∀ a. a →  a
+LHC.Prim.id =
+  ∀ sk_79_a. sk_79_a →  sk_79_a λ LHC.Prim.x:a → 
+  LHC.Prim.x

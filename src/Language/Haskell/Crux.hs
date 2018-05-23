@@ -1,0 +1,249 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+module Language.Haskell.Crux where
+
+import           Data.List
+import           Language.Haskell.TypeCheck        (Proof (..), Type (..))
+import           Language.Haskell.TypeCheck.Pretty
+import qualified LLVM.AST                          as LLVM (Type)
+import qualified Text.PrettyPrint.ANSI.Leijen      as Doc
+
+data Module = Module
+    { cruxForeigns :: [Foreign]
+    , cruxDecls    :: [Declaration]
+    , cruxNodes    :: [NodeDefinition]
+    , cruxNewTypes :: [NewType]
+    } deriving (Show)
+
+data Foreign = Foreign
+  { foreignName      :: String
+  , foreignReturn    :: LLVM.Type
+  , foreignArguments :: [LLVM.Type]
+  } deriving (Show, Read, Eq )
+
+data Name = Name
+  { nameModule     :: [String]
+  , nameIdentifier :: String
+  , nameUnique     :: Int
+  } deriving (Show, Read, Eq, Ord)
+
+data Declaration = Declaration
+  { declType :: Type
+  , declName :: Name
+  , declBody :: Expr }
+  deriving (Show)
+
+data NodeDefinition = NodeDefinition Name [Type]
+    deriving (Show)
+
+newtype NewType = IsNewType Variable deriving (Show)
+
+data Variable = Variable
+    { varName :: Name
+    , varType :: Type
+    } deriving ( Show, Eq, Ord )
+
+data Expr
+    = Var Variable
+    | Con Variable
+    | UnboxedTuple [Expr]
+    | Lit Literal
+    | WithExternal Variable Variable String [Expr] Expr Expr
+    | ExternalPure Variable String [Expr] Expr
+    | App Expr Expr
+    | Lam [Variable] Expr
+    | Let LetBind Expr
+    | LetStrict Variable Expr Expr
+    | Case Expr Variable (Maybe Expr) [Alt]
+    | Cast Expr Type
+    | Id
+    | WithProof Proof Expr
+    -- WithCoercion Coercion Expr
+    deriving ( Show )
+
+data LetBind
+    = NonRec Variable Expr
+    | Rec [(Variable, Expr)]
+    deriving ( Show )
+
+data Alt = Alt Pattern Expr
+    deriving ( Show )
+
+data Pattern
+    = ConPat Variable [Variable]
+    | LitPat Literal
+    | UnboxedPat [Variable]
+    -- VarPat Variable
+    deriving ( Show )
+
+-- All unlifted.
+data Literal
+    = LitChar Char
+    | LitString String
+    | LitInt Integer
+    | LitWord Integer
+    | LitFloat Rational
+    | LitDouble Rational
+    | LitVoid
+    deriving ( Show )
+
+
+--------------------------------------------------------------
+-- Instances
+
+
+
+instance Monoid Module where
+    mempty = Module [] [] [] []
+    mappend a b = Module
+        { cruxForeigns = cruxForeigns a ++ cruxForeigns b
+        , cruxDecls = cruxDecls a ++ cruxDecls b
+        , cruxNodes = cruxNodes a ++ cruxNodes b
+        , cruxNewTypes = cruxNewTypes a ++ cruxNewTypes b }
+
+instance Pretty Module where
+    pretty m = vsep $ concat
+        [ map pretty (cruxNodes m)
+        , map pretty (cruxNewTypes m)
+        , map pretty (cruxDecls m)
+        ]
+
+instance Pretty Name where
+  pretty name =
+    text (intercalate "." (nameModule name ++ [nameIdentifier name]))
+    <> unique
+    where
+      unique = if nameUnique name == 0
+        then Doc.empty
+        else char '^' <> int (nameUnique name)
+
+instance Pretty LLVM.Type where
+  pretty _ = text "<LLVM.Type>"
+
+instance Pretty Foreign where
+  pretty f =
+    ppSyntax "foreign" <+> pretty (foreignReturn f) <+>
+    text (foreignName f) <>
+    Doc.parens (ppList (map pretty $ foreignArguments f))
+
+instance Pretty Declaration where
+    pretty (Declaration ty name expr) =
+        pretty name <+> colon <+> pretty ty <$$>
+        pretty name <+> equals <$$> indent 2 (pretty expr)
+
+instance Pretty NodeDefinition where
+    pretty (NodeDefinition name args) =
+        text "node" <+> pretty name <+> hsep (map pretty args)
+
+instance Pretty NewType where
+    pretty (IsNewType con) =
+        text "newtype" <+> ppTypedVariable con
+
+rarrow :: Doc
+rarrow = text "→ "
+ppVars :: [Expr] -> Doc
+ppVars = hsep . map (prettyPrec appPrecedence)
+
+ppTypedVars :: [Variable] -> Doc
+ppTypedVars = hsep . map ppTypedVariable
+
+appPrecedence :: Int
+appPrecedence = 2
+
+instance Pretty Expr where
+  prettyPrec p expr =
+    case expr of
+      Var var -> pretty var
+      -- Var var -> ppTypedVariable var
+      Con name -> pretty name -- <+> ppVars vars
+      UnboxedTuple args ->
+        text "(#" <+>
+        (hsep $ punctuate comma $ map pretty args) <+>
+        text "#)"
+      Lit lit -> pretty lit
+      App a b -> parensIf (p >= appPrecedence) $ nest 2 $
+        prettyPrec 1 a </> prettyPrec appPrecedence b
+      Lam vars e -> parensIf (p > 0) $
+        char 'λ' <+> ppTypedVars vars <+> rarrow <$$> pretty e
+      Case scrut var Nothing [Alt pattern e] -> parensIf (p > 0) $
+        pretty var <+> text "←" <+> align (pretty scrut) <$$>
+        pretty pattern <+> text "←" <+> ppTypedVariable var <$$>
+        pretty e
+      Case scrut var Nothing alts -> parensIf (p > 0) $
+        text "case" <+> hang 2 (pretty scrut) <+> text "of" <$$>
+        indent 2 (ppTypedVariable var <$$> vsep (map pretty alts))
+      Case scrut var (Just defaultBranch) alts -> parensIf (p > 0) $
+        text "case" <+> hang 2 (pretty scrut) <+> text "of" <$$>
+        indent 2 ( ppTypedVariable var <$$> vsep (map pretty alts) <$$>
+          text "DEFAULT" <+> rarrow <$$> indent 2 (pretty defaultBranch))
+      Cast scrut ty ->
+        parens (pretty scrut <+> text ":::" <+> pretty ty)
+      Id -> text "id"
+      -- WithCoercion CoerceId e -> pretty e
+      -- WithCoercion (CoerceAp tys) e -> parensIf (p > 0) $
+      --   pretty e <+> fillSep (map (prettyPrec appPrecedence) tys)
+      -- WithCoercion c e -> parensIf (p > 0) $
+      --   pretty c <+> pretty e
+      WithProof proof e -> parensIf (p > 0) $
+        pretty proof <+> pretty e
+      WithExternal outV outS cName args _st cont ->
+        ppTypedVariable outV <> comma <+> pretty outS <+> text "←" <+>
+          text "external" <+> text cName <+> ppVars args <$$>
+        pretty cont
+      ExternalPure outV cName args cont ->
+        ppTypedVariable outV <+> text "←" <+>
+          text "external" <+> text cName <+> ppVars args <$$>
+        pretty cont
+      Let (NonRec name e1) e2 ->
+          text "let" <+> ppTypedVariable name <+> equals <+> align (pretty e1) <$$>
+          pretty e2
+      Let (Rec binds) e2 ->
+          text "let" <$$>
+          indent 2 (vsep [ ppTypedVariable var <+>
+                           equals <+>
+                           hang 0 (pretty body)
+                         | (var,body) <- binds ]) <$$>
+          text "in" <$$>
+          indent 2 (pretty e2)
+      LetStrict name e1 e2 ->
+          text "let" <+> char '!' <> ppTypedVariable name <+> equals <+> pretty e1 <$$>
+          pretty e2
+
+ppTypedVariable :: Variable -> Doc
+ppTypedVariable var =
+    pretty (varName var) <> colon <> prettyPrec 2 (varType var)
+
+instance Pretty Variable where
+  -- pretty = ppTypedVariable
+  pretty var = pretty (varName var)
+
+instance Pretty Alt where
+    pretty (Alt pattern expr) =
+        pretty pattern <+> rarrow <$$> indent 2 (pretty expr)
+
+instance Pretty Pattern where
+    pretty pattern =
+        case pattern of
+            ConPat name vars ->
+                pretty name <+> ppTypedVars vars
+            LitPat lit -> pretty lit
+            UnboxedPat vars ->
+                text "(#" <+>
+                (hsep $ punctuate comma $ map pretty vars) <+>
+                text "#)"
+            -- VarPat var ->
+            --     ppTypedVariable var
+
+instance Pretty Literal where
+    pretty lit =
+        case lit of
+            LitChar c     -> text $ show c
+            LitInt i      -> integer i
+            LitString str -> text $ show str
+            LitVoid       -> text "void"
+            _             -> text "{literal}"
+
+ppSyntax :: String -> Doc
+ppSyntax = Doc.green . text
+
+ppList :: [Doc] -> Doc
+ppList = Doc.hsep . Doc.punctuate (Doc.char ',')

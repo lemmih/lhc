@@ -1,0 +1,19 @@
+resolver: lts-10.10
+
+allow-newer: true
+
+packages:
+- '.'
+
+- location:
+    git: https://github.com/haskell-suite/haskell-tc.git
+    commit: 050021d82c5ada766afd31d2a92886fe8a1864ba
+  extra-dep: true
+
+- location:
+    git: https://github.com/haskell-suite/haskell-scope.git
+    commit: 5d77593110a0455745da4f376a5bcdb9e511784c
+  extra-dep: true
+
+extra-deps:
+- haskell-src-exts-1.20.2
