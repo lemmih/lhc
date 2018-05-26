@@ -13,12 +13,15 @@ linkRTS :: FilePath -> IO ()
 linkRTS target = do
   rtsDir <- getDataFileName "rts"
   semispace <- getDataFileName "rts/gc/semispace.c"
+  api <- getDataFileName "rts/api.c"
   clang <- findLLVMExecutable "clang"
   link <- findLLVMExecutable "llvm-link"
   tmpDir <- getTemporaryDirectory
-  let dst = tmpDir </> "semispace.ll"
-  assertProcess clang ["-I"++rtsDir, semispace, "-emit-llvm", "-S", "-o",dst]
-  assertProcess link [target, dst, "-S", "-o", target]
+  let semi_dst = tmpDir </> "semispace.ll"
+      api_dst = tmpDir </> "api.ll"
+  assertProcess clang ["-O2", "-I"++rtsDir, semispace, "-emit-llvm", "-S", "-o",semi_dst]
+  assertProcess clang ["-O2", "-I"++rtsDir, api, "-emit-llvm", "-S", "-o",api_dst]
+  assertProcess link [target, semi_dst, api_dst, "-S", "-o", target]
 
 
 

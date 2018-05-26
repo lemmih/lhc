@@ -142,7 +142,7 @@ void evacuate(word **object_address) {
   //   *object_address = INDIRECTION(object);
   //   *object = *object_address;
   // }
-  table = &_lhc_info_tables[*object];
+  table = &_lhc_info_tables[_lhc_getTag(*object)];
   size = (1+table->nPrimitives+table->nHeapPointers);
 
   memcpy(free_space, object, size*sizeof(word));
@@ -153,7 +153,7 @@ void evacuate(word **object_address) {
 void scavenge() {
   InfoTable *table;
   while(scavenged < free_space) {
-    table = &_lhc_info_tables[*scavenged];
+    table = &_lhc_info_tables[_lhc_getTag(*scavenged)];
     // printf("SemiSpace: Scavenge: %ld = %ld", scavenged-to_space, *scavenged);
     for(int i=0;i<table->nPrimitives;i++) {
       // printf(" (%lu)", *(scavenged+1+i));

@@ -72,6 +72,16 @@ toLLVM bedrock = LLVM.Module
               , returnType = IntegerType 32
               , parameters = ([ Parameter (PointerType (IntegerType 8) (AddrSpace 0)) (UnName 0) []], False)
               }
+      newDefinition $ GlobalDefinition functionDefaults
+              { name = LLVM.Name "_lhc_mkTag"
+              , returnType = IntegerType 64
+              , parameters = ([ Parameter (IntegerType 64) (UnName 0) []], False)
+              }
+      newDefinition $ GlobalDefinition functionDefaults
+              { name = LLVM.Name "_lhc_getTag"
+              , returnType = IntegerType 64
+              , parameters = ([ Parameter (IntegerType 64) (UnName 0) []], False)
+              }
       getLayoutDef
 
       mainDef
@@ -589,7 +599,19 @@ blockToLLVM = worker
             , maybeAtomicity = Nothing
             , alignment = 1
             , metadata = [] }
-        return $ castReference (IntegerType 64) word retTy
+        if variableType == NodePtr && offset == 0
+          then return Call
+              { tailCallKind = Nothing
+              , callingConvention = C
+              , returnAttributes = []
+              , function = Right (ConstantOperand $ Constant.GlobalReference
+                                      (FunctionType (IntegerType 64) [IntegerType 64] False)
+                                      (LLVM.Name "_lhc_getTag"))
+              , arguments =
+                  [ (LocalReference (IntegerType 64) word, []) ]
+              , functionAttributes = []
+              , metadata = [] }
+          else return $ castReference (IntegerType 64) word retTy
     mkInst retTy (Write dst offset var) = do
         casted <- anonInst $ castReference
                     (typeToLLVM $ variableType var)
@@ -628,11 +650,23 @@ blockToLLVM = worker
           , type' = retTy
           , metadata = [] }
     mkInst retTy (MkNode nodeName []) = do
-        ident <- resolveNodeName nodeName
-        return BitCast
-            { operand0 = ConstantOperand $ Constant.Int 64 ident
-            , type' = retTy
-            , metadata = [] }
+      ident <- resolveNodeName nodeName
+      header <- anonInst $ Call
+          { tailCallKind = Nothing
+          , callingConvention = C
+          , returnAttributes = []
+          , function = Right (ConstantOperand $ Constant.GlobalReference
+                                  (FunctionType (IntegerType 64) [IntegerType 64] False)
+                                  (LLVM.Name "_lhc_mkTag"))
+          , arguments =
+              [ (ConstantOperand (Constant.Int 64 (fromIntegral ident)), []) ]
+          , functionAttributes = []
+          , metadata = [] }
+
+      return BitCast
+          { operand0 = LocalReference (IntegerType 64) header
+          , type' = retTy
+          , metadata = [] }
     mkInst retTy (Literal (LiteralInt i)) = return BitCast
         { operand0 = ConstantOperand $ Constant.Int (bitSize retTy) i
         , type' = retTy

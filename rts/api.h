@@ -1,3 +1,7 @@
+#ifndef __LHC_API__
+#define __LHC_API__
+
+#include <stdbool.h>
 #include <stdint.h>
 
 /*
@@ -48,3 +52,12 @@ typedef uint64_t word;
 //   flags: 14 bits
 //   trunk: 32 bits // only on 64 bit systems.
 #define OBJECT_HEADER(hp) (*hp)
+
+
+bool _lhc_isIndirection(word);
+word* _lhc_getIndirection(word);
+word _lhc_getTag(word);
+word _lhc_mkIndirection(word*);
+word _lhc_mkTag(word);
+
+#endif // __LHC_API__

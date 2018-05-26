@@ -13,6 +13,7 @@ cabal-version:	     >= 1.10
 extra-source-files:
 data-files:
   rts/*.h
+  rts/*.c
   rts/gc/*.c
 
 Source-repository head
@@ -54,6 +55,7 @@ Executable lhc
                      directory,
 
                      bedrock,
+                     haskell-crux,
                      haskell-scope,
                      haskell-tc
 
