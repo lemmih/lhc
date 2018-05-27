@@ -216,5 +216,8 @@ uniqExpression expr =
                 <*> pure fn <*> resolveMany fnArgs
         InvokeReturn fn vars ->
           InvokeReturn fn <$> resolveMany vars
+        Builtin "isIndirection" [PVariable obj] -> do
+          (tag:_) <- resolve obj
+          pure (Builtin "isIndirection" [PVariable tag])
         Builtin{} -> pure expr
         Literal{} -> pure expr

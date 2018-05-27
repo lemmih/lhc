@@ -57,6 +57,8 @@ toLLVM bedrock = LLVM.Module
     }
   where
     defs = execGenModule (mkEnv bedrock) $ do
+      let wordTy = IntegerType 64
+          pTy t = PointerType t (AddrSpace 0)
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "exit"
               , returnType = VoidType
@@ -81,6 +83,22 @@ toLLVM bedrock = LLVM.Module
               { name = LLVM.Name "_lhc_getTag"
               , returnType = IntegerType 64
               , parameters = ([ Parameter (IntegerType 64) (UnName 0) []], False)
+              }
+      newDefinition $ GlobalDefinition functionDefaults
+              { name = LLVM.Name "_lhc_isIndirectionP"
+              , returnType = wordTy
+              , parameters = ([ Parameter (pTy wordTy) (UnName 0) []], False)
+              }
+      newDefinition $ GlobalDefinition functionDefaults
+              { name = LLVM.Name "_lhc_getIndirectionP"
+              , returnType = pTy wordTy
+              , parameters = ([ Parameter (pTy wordTy) (UnName 0) []], False)
+              }
+      newDefinition $ GlobalDefinition functionDefaults
+              { name = LLVM.Name "_lhc_setIndirection"
+              , returnType = VoidType
+              , parameters = ([ Parameter (pTy wordTy) (UnName 0) []
+                              , Parameter (pTy wordTy) (UnName 1) []], False)
               }
       getLayoutDef
 
@@ -687,6 +705,54 @@ blockToLLVM = worker
 
     mkInst retTy (TypeCast Variable{..}) = return $
         castReference (typeToLLVM variableType) (nameToLLVM variableName) retTy
+    mkInst retTy (Bedrock.Builtin "isIndirection" [PVariable arg]) = do
+      let ty = PointerType (IntegerType 64) (AddrSpace 0)
+      pure Call
+          { tailCallKind = Nothing
+          , callingConvention = C
+          , returnAttributes = []
+          , function = Right (ConstantOperand $ Constant.GlobalReference
+                                  (FunctionType (IntegerType 64) [ty] False)
+                                  (LLVM.Name "_lhc_isIndirectionP"))
+          , arguments =
+              [ (LocalReference
+                              (typeToLLVM $ variableType arg)
+                              (nameToLLVM $ variableName arg), []) ]
+          , functionAttributes = []
+          , metadata = [] }
+    mkInst retTy (Bedrock.Builtin "getIndirection" [PVariable arg]) = do
+      let ty = PointerType (IntegerType 64) (AddrSpace 0)
+      pure Call
+          { tailCallKind = Nothing
+          , callingConvention = C
+          , returnAttributes = []
+          , function = Right (ConstantOperand $ Constant.GlobalReference
+                                  (FunctionType ty [ty] False)
+                                  (LLVM.Name "_lhc_getIndirectionP"))
+          , arguments =
+              [ (LocalReference
+                              (typeToLLVM $ variableType arg)
+                              (nameToLLVM $ variableName arg), []) ]
+          , functionAttributes = []
+          , metadata = [] }
+    mkInst retTy (Bedrock.Builtin "setIndirection" [PVariable ptr, PVariable newVal]) = do
+      let ty = PointerType (IntegerType 64) (AddrSpace 0)
+      pure Call
+          { tailCallKind = Nothing
+          , callingConvention = C
+          , returnAttributes = []
+          , function = Right (ConstantOperand $ Constant.GlobalReference
+                                  (FunctionType VoidType [ty, ty] False)
+                                  (LLVM.Name "_lhc_setIndirection"))
+          , arguments =
+              [ (LocalReference
+                              (typeToLLVM $ variableType ptr)
+                              (nameToLLVM $ variableName ptr), [])
+              , (LocalReference
+                              (typeToLLVM $ variableType newVal)
+                              (nameToLLVM $ variableName newVal), [])]
+          , functionAttributes = []
+          , metadata = [] }
 
     mkInst retTy expr = error $ "Data.Bedrock.LLVM: Unhandled expression: " ++ show expr
         -- return BitCast

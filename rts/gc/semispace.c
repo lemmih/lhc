@@ -138,10 +138,10 @@ void evacuate(word **object_address) {
   size_t size;
   word *object = *object_address;
   // if(!IN_FROM_SPACE(object)) return;
-  // if(IS_INDIRECTION(object)) {
-  //   *object_address = INDIRECTION(object);
-  //   *object = *object_address;
-  // }
+  if(_lhc_isIndirectionP(object)) {
+    *object_address = _lhc_getIndirectionP(object);
+    object = *object_address;
+  }
   table = &_lhc_info_tables[_lhc_getTag(*object)];
   size = (1+table->nPrimitives+table->nHeapPointers);
 

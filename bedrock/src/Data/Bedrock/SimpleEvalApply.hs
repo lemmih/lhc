@@ -44,12 +44,23 @@ lowerEvalApply = do
 
   evalBody <- do
     obj <- newVariable "obj" Node
-    Bind [obj] (Fetch arg) <$>
-      Case obj (Just defaultEval) <$> sequence
-        [ mkEvalAlternative fn
-        | fn <- fs
-        , fnName fn /= entrypoint
-        , fnResults fn == [NodePtr] ]
+    header <- newVariable "header" IWord
+    ind <- newVariable "ind" IWord
+    target <- newVariable "target" NodePtr
+    nonIndirection <-
+      Bind [obj] (Fetch arg) <$>
+        Case obj (Just defaultEval) <$> sequence
+          [ mkEvalAlternative arg fn
+          | fn <- fs
+          , fnName fn /= entrypoint
+          , fnResults fn == [NodePtr] ]
+    --Bind [header] (Load arg 0) <$>
+    pure $ Bind [ind] (Builtin "isIndirection" [PVariable arg]) $
+      Case ind (Just nonIndirection) [Alternative (LitPat (LiteralInt 1)) $
+        Bind [target] (Builtin "getIndirection" [PVariable arg]) $
+        Return [target]
+      ]
+
   pushFunction Function
     { fnName       = evalName
     , fnAttributes = []
@@ -136,12 +147,13 @@ blockNodes block =
     Bind _vars _ rest -> blockNodes rest
     _ -> Set.empty
 
-mkEvalAlternative :: Function -> Gen Alternative
-mkEvalAlternative fn = do
+mkEvalAlternative :: Variable -> Function -> Gen Alternative
+mkEvalAlternative ptr fn = do
     newVal <- newVariable "new" NodePtr
     args <- mapM (newVariable "arg" .variableType) (fnArguments fn)
     return $ Alternative (NodePat nodeName args) $
       Bind [newVal] (Application (fnName fn) args) $
+      Bind [] (Builtin "setIndirection" [PVariable ptr, PVariable newVal]) $
       -- XXX: Should be an 'Update arg (Indirection new)' here.
       Return [newVal]
   where
@@ -152,8 +164,8 @@ replaceEvalApply applys eval = fix $ \loop block ->
   case block of
     Case scrut mbBlock alts ->
       Case scrut (fmap loop mbBlock)
-        [ Alternative pattern (loop block)
-        | Alternative pattern block <- alts ]
+        [ Alternative pat (loop block)
+        | Alternative pat block <- alts ]
     Bind vars expr rest -> Bind vars (worker (map variableType vars) expr) (loop rest)
     Return vars -> Return vars
     Raise var -> Raise var

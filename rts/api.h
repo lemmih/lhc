@@ -54,8 +54,11 @@ typedef uint64_t word;
 #define OBJECT_HEADER(hp) (*hp)
 
 
-bool _lhc_isIndirection(word);
+word _lhc_isIndirection(word);
+word _lhc_isIndirectionP(word*);
 word* _lhc_getIndirection(word);
+word* _lhc_getIndirectionP(word*);
+void _lhc_setIndirection(word*, word*);
 word _lhc_getTag(word);
 word _lhc_mkIndirection(word*);
 word _lhc_mkTag(word);
