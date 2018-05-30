@@ -9,6 +9,7 @@ type.
 module Data.Bedrock.VoidElimination ( voidEliminate ) where
 
 import Data.Bedrock
+import qualified LLVM.AST            as LLVM (Type (..))
 
 voidEliminate :: Module -> Module
 voidEliminate m = m
@@ -73,7 +74,7 @@ voidVariables :: [Variable] -> [Variable]
 voidVariables = filter (not.isVoidVariable)
 
 isVoidType :: Type -> Bool
-isVoidType (Primitive CVoid) = True
+isVoidType (Primitive LLVM.VoidType) = True
 isVoidType _ = False
 
 isVoidVariable :: Variable -> Bool

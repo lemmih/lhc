@@ -36,4 +36,4 @@ lower block =
   where
     nodeSize [] = 0
     nodeSize (Alternative (NodePat _ args) _ : xs) = max (1+length args) (nodeSize xs)
-    nodeSize (x:xs) = nodeSize xs -- XXX: This shouldn't happen
+    nodeSize (_x:xs) = nodeSize xs -- XXX: This shouldn't happen

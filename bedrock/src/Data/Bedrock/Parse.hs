@@ -1,6 +1,6 @@
 module Data.Bedrock.Parse where
 
-import           Control.Monad                          (guard, msum)
+import           Control.Monad                          (guard)
 import           Data.Char
 import           Data.Maybe
 import           Text.ParserCombinators.Parsec
@@ -8,6 +8,7 @@ import qualified Text.ParserCombinators.Parsec.Language as P
 import qualified Text.ParserCombinators.Parsec.Token    as P
 
 import           Data.Bedrock
+import qualified LLVM.AST            as LLVM (Type (..))
 
 -------------------------------------------------------------------------------
 -- Parsing
@@ -76,26 +77,12 @@ parseType = choice
   , try $ do
       symbol "@"
       return $ FramePtr
-  , Primitive <$> parseCType ]
+  , Primitive <$> parseLLVMType ]
   <?> "type"
 
 -- i8 i32 i64 void i64*
-parseCType :: Parser CType
-parseCType = msum
-    [ try $ CFunction <$> base <*> parens (commaSep parseCType)
-    , base
-    ]
-  where
-    base = do
-      ty <- prim
-      p <- length <$> many (symbol "*")
-      return $ foldr (.) id (replicate p CPointer) ty
-    prim = choice
-      [ reserved "i8" >> return I8
-      , reserved "i32" >> return I32
-      , reserved "i64" >> return I64
-      , reserved "void" >> return CVoid
-      ]
+parseLLVMType :: Parser LLVM.Type
+parseLLVMType = error "parsing llvm types not defined"
 
 parseVariable :: Parser Variable
 parseVariable = do
@@ -283,9 +270,9 @@ parseForeignName = identifier
 parseForeign :: Parser Foreign
 parseForeign = do
   reserved "foreign"
-  ret <- parseCType
+  ret <- parseLLVMType
   name <- parseForeignName
-  args <- parens $ commaSep parseCType
+  args <- parens $ commaSep parseLLVMType
   return $ Foreign name ret args
 
 data TopLevel

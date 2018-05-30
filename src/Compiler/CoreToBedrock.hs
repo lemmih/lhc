@@ -2,12 +2,12 @@
 module Compiler.CoreToBedrock where
 
 
-import           Compiler.Core              hiding (NodeDefinition (..),
-                                             UnboxedPat, Variable (..))
-import qualified Compiler.Core              as Core
 import           Data.Bedrock               as Bedrock
-import           Data.Bedrock.Misc
 import           Data.Bedrock.Transform     (freeVariables)
+import           Language.Haskell.Crux      hiding (Foreign (..), Name (..),
+                                             NodeDefinition (..), UnboxedPat,
+                                             Variable (..))
+import qualified Language.Haskell.Crux      as Core
 
 import           Control.Monad.Reader
 import           Control.Monad.RWS          (MonadState (..), RWS, execRWS)
@@ -17,6 +17,8 @@ import           Data.Map                   (Map)
 import qualified Data.Map                   as Map
 import           Data.Maybe
 import qualified Data.Set                   as Set
+import qualified LLVM.AST                   as LLVM (Type (..))
+import           LLVM.AST.AddrSpace
 
 import           Language.Haskell.Scope     (QualifiedName (..))
 import qualified Language.Haskell.TypeCheck as TC (Proof, Qualified (..),
@@ -29,34 +31,43 @@ entrypointName = Name ["Main"] "entrypoint" 0
 
 convert :: Core.Module -> Bedrock.Module
 convert m = Bedrock.Module
-  { modForeigns  = Core.coreForeigns m
-  , nodes        = map convertNodeDefinition (Core.coreNodes m)
+  { modForeigns  = map convertForeign (Core.cruxForeigns m)
+  , nodes        = map convertNodeDefinition (Core.cruxNodes m)
   , modLayouts   = []
   , entryPoint   = entrypointName
   , functions    = fns
-  , modNamespace = ns }
+  , modNamespace = AvailableNamespace ns ns ns ns }
   where
-    (fns, ns) = runM (convertModule m) (Core.coreNewTypes m) (Core.coreNamespace m)
+    (fns, ns) = runM (convertModule m) (Core.cruxNewTypes m) 0
+
+convertForeign :: Core.Foreign -> Foreign
+convertForeign core = Foreign
+  { foreignName = Core.foreignName core
+  , foreignReturn = Core.foreignReturn core
+  , foreignArguments = Core.foreignArguments core }
+
+convertName :: Core.Name -> Name
+convertName (Core.Name prefix ident uniq) = Name prefix ident uniq
 
 convertNodeDefinition :: Core.NodeDefinition -> NodeDefinition
 convertNodeDefinition (Core.NodeDefinition name tys) =
-    NodeDefinition name (map convertTcType tys)
+    NodeDefinition (convertName name) (map convertTcType tys)
 
 convertModule :: Core.Module -> M ()
 convertModule m = setArities arities $ do
-    mapM_ convertDecl (Core.coreDecls m)
+    mapM_ convertDecl (Core.cruxDecls m)
   where
     arities =
-      [ (fn, arity)
-      | Core.Decl _ty fn expr <- coreDecls m
+      [ (convertName fn, arity)
+      | Core.Declaration _ty fn expr <- cruxDecls m
       , let arity = case expr of
                       Lam vars _ -> length vars
                       -- WithCoercion _ (Lam vars _) -> length vars
                       _          -> 0 ] ++
-      [ (name, length args)
-      | Core.NodeDefinition name args <- coreNodes m ] ++
-      [ (Core.varName con, 1)
-      | Core.IsNewType con <- coreNewTypes m ]
+      [ (convertName name, length args)
+      | Core.NodeDefinition name args <- cruxNodes m ] ++
+      [ (convertName $ Core.varName con, 1)
+      | Core.IsNewType con <- cruxNewTypes m ]
 
 data Env = Env
     { envArity    :: Map Name Int
@@ -64,12 +75,12 @@ data Env = Env
     , envLocation :: [String]
     , envNewTypes :: [NewType]
     }
-newtype M a = M { unM :: RWS Env [Function] AvailableNamespace a }
+newtype M a = M { unM :: RWS Env [Function] Int a }
     deriving
         ( Monad, MonadWriter [Function], MonadReader Env
-        , MonadState AvailableNamespace
+        , MonadState Int
         , Applicative, Functor )
-runM ::  M a -> [NewType] -> AvailableNamespace -> ([Function], AvailableNamespace)
+runM ::  M a -> [NewType] -> Int -> ([Function], Int)
 runM action newtypes ns = (fns, ns')
   where
     (ns',fns) = execRWS (unM action) env ns
@@ -94,9 +105,8 @@ lookupArity fn = asks $ Map.lookup fn . envArity
 newName :: [String] -> String -> M Name
 newName orig ident = do
   ns <- get
-  let (idNum, ns') = newGlobalID ns
-  put ns'
-  return $ Name orig ident idNum
+  put (ns+1)
+  return $ Name orig ident ns
 
 newVariable :: [String] -> String -> Type -> M Variable
 newVariable orig ident ty = do
@@ -142,7 +152,7 @@ blockType block =
 -- XXX: Lookup the kind to find the bedrock type.
 convertVariable :: Core.Variable -> M Variable
 convertVariable var = return $
-    Variable (Core.varName var) (convertTcType (Core.varType var))
+    Variable (convertName $ Core.varName var) (convertTcType (Core.varType var))
 
 convertTcType :: TC.Type -> Type
 convertTcType tcTy =
@@ -150,20 +160,20 @@ convertTcType tcTy =
     TC.TyApp (TC.TyCon qname) sub
         | qname == QualifiedName "LHC.Prim" "Addr"
             -> case convertTcType sub of
-                 Primitive prim -> Primitive (CPointer prim)
+                 Primitive prim -> Primitive (mkPointer prim)
                  _ -> error $ "CoreToBedrock: Addr must be primitive: " ++ show sub
     TC.TyCon qname
         | qname == QualifiedName "LHC.Prim" "I8"
-             -> Primitive I8
+             -> Primitive (LLVM.IntegerType 8)
     TC.TyCon qname
         | qname == QualifiedName "LHC.Prim" "I32"
-             -> Primitive I32
+             -> Primitive (LLVM.IntegerType 32)
     TC.TyCon qname
         | qname == QualifiedName "LHC.Prim" "I64"
-             -> Primitive I64
+             -> Primitive (LLVM.IntegerType 64)
     TC.TyCon qname
         | qname == QualifiedName "LHC.Prim" "RealWorld#"
-         -> Primitive CVoid
+         -> Primitive LLVM.VoidType
     TC.TyFun{} -> NodePtr
     TC.TyRef{} -> NodePtr
     TC.TyCon{} -> NodePtr
@@ -212,20 +222,20 @@ convertResultType args tcTy =
       (TC.TyCon qname, [sub])
         | qname == QualifiedName "LHC.Prim" "Addr"
             -> case convertTcType sub of
-                 Primitive prim -> return [Primitive (CPointer prim)]
+                 Primitive prim -> return [Primitive (LLVM.PointerType prim (AddrSpace 0))]
                  _ -> error $ "CoreToBedrock: Addr must be primitive: " ++ show sub
       (TC.TyCon qname, [])
         | qname == QualifiedName "LHC.Prim" "I8"
-             -> return [Primitive I8]
+             -> return [Primitive $ LLVM.IntegerType 8]
       (TC.TyCon qname, [])
         | qname == QualifiedName "LHC.Prim" "I32"
-             -> return [Primitive I32]
+             -> return [Primitive $ LLVM.IntegerType 32]
       (TC.TyCon qname, [])
         | qname == QualifiedName "LHC.Prim" "I64"
-             -> return [Primitive I64]
+             -> return [Primitive $ LLVM.IntegerType 64]
       (TC.TyCon qname, [])
         | qname == QualifiedName "LHC.Prim" "RealWorld#"
-             -> return [Primitive CVoid]
+             -> return [Primitive LLVM.VoidType]
       (TC.TyCon qname, conArgs) -> do
         mbExpanded <- expandNewType qname conArgs
         case mbExpanded of
@@ -259,7 +269,7 @@ newtypeSubstitution :: NewType -> (QualifiedName, [TC.Type] -> TC.Type)
 newtypeSubstitution (IsNewType var) =
     split (Core.varType var)
   where
-    split (TC.TyForall tcvars ([] TC.:=> ty)) = split ty
+    split (TC.TyForall _tcvars ([] TC.:=> ty)) = split ty
     split (TC.TyFun a b) =
       case collect [] b of
         (TC.TyCon newtypeName, conArgs) -> (newtypeName, \args -> subst (zip conArgs args) a)
@@ -281,34 +291,34 @@ isPrimitive :: Type -> Bool
 isPrimitive Primitive{} = True
 isPrimitive _           = False
 
-convertDecl :: Core.Decl -> M ()
-convertDecl (Core.Decl ty name (Lam vars expr)) = do
+convertDecl :: Core.Declaration -> M ()
+convertDecl (Core.Declaration ty name (Lam vars expr)) = do
   vars' <- mapM convertVariable vars
-  body <- local (\env -> env{envRoot = name}) $
+  body <- local (\env -> env{envRoot = convertName name}) $
           convertExpr False expr (pure . Return)
   retTys <- convertResultType vars' ty
   let fn = Function
-          { fnName = name
+          { fnName = convertName name
           , fnAttributes = []
           , fnArguments = vars'
           , fnResults = retTys
-          , fnBody = if name == entrypointName
+          , fnBody = if convertName name == entrypointName
                       then setProgramExit body
                       else body
           }
   tell [fn]
 -- convertDecl (Core.Decl _ty name (WithCoercion _ expr)) =
 --   convertDecl (Core.Decl _ty name expr)
-convertDecl (Core.Decl ty name expr) = do
-  body <- local (\env -> env{envRoot = name}) $
+convertDecl (Core.Declaration ty name expr) = do
+  body <- local (\env -> env{envRoot = convertName name}) $
           convertExpr False expr (pure . Return)
   retTys <- convertResultType [] ty
   let fn = Function
-          { fnName = name
+          { fnName = convertName name
           , fnAttributes = []
           , fnArguments = []
           , fnResults = retTys
-          , fnBody = if name == entrypointName
+          , fnBody = if convertName name == entrypointName
                       then setProgramExit body
                       else body
           }
@@ -362,17 +372,15 @@ collectApps = worker []
 convertExpr :: Bool -> Core.Expr -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
 convertExpr lazy expr rest =
   case expr of
-    UnboxedTuple args -> do
-      tmp <- newVariable [] "unboxed" Node
-      convertExprs args rest
-    _ | (Con con, coercion, args) <- collectApps expr ->
+    UnboxedTuple args -> convertExprs args rest
+    _ | (Con con, _coercion, args) <- collectApps expr ->
       convertExprs args $ \args' -> do
         tmp <- newVariable [] "con" NodePtr
-        let name = Core.varName con
+        let name = convertName $ Core.varName con
         Just arity <- lookupArity name
         Bind [tmp] (Store (ConstructorName name (arity-length args)) args')
             <$> rest [tmp]
-    _ | (Var v, coercion, args) <- collectApps expr, lazy ->
+    _ | (Var v, _coercion, args) <- collectApps expr, lazy ->
       convertExprs args $ \args' -> do
         v' <- convertVariable v
         let fn = variableName v'
@@ -398,7 +406,7 @@ convertExpr lazy expr rest =
             tmp <- newVariable [] "ap" NodePtr
             Bind [tmp] (Store (FunctionName node 0) nodeArgs)
               <$> rest [tmp]
-    _ | (Var v, coercion, args) <- collectApps expr, not lazy ->
+    _ | (Var v, _coercion, args) <- collectApps expr, not lazy ->
       convertExprs args $ \args' -> do
         v' <- convertVariable v
         let fn = variableName v'
@@ -428,19 +436,19 @@ convertExpr lazy expr rest =
             Bind [tmp] (Store (FunctionName fn (arity-length args')) args')
               <$> rest [tmp]
     Core.Lit (Core.LitString str) -> do
-        tmp <- newVariable [] "lit" (Primitive (CPointer I8))
+        tmp <- newVariable [] "lit" (Primitive $ mkPointer (mkIntTy 8))
         Bind [tmp] (Bedrock.Literal (LiteralString str))
             <$> rest [tmp]
     Core.Lit (Core.LitInt int) -> do
-        tmp <- newVariable [] "int" (Primitive I64)
+        tmp <- newVariable [] "int" (Primitive $ mkIntTy 64)
         Bind [tmp] (Bedrock.Literal (LiteralInt int))
             <$> rest [tmp]
     Core.Lit (Core.LitChar c) -> do
-        tmp <- newVariable [] "char" (Primitive I32)
+        tmp <- newVariable [] "char" (Primitive $ mkIntTy 32)
         Bind [tmp] (Bedrock.Literal (LiteralInt $ fromIntegral $ ord c))
             <$> rest [tmp]
     Core.Lit Core.LitVoid -> do
-        tmp <- newVariable [] "void" (Primitive CVoid)
+        tmp <- newVariable [] "void" (Primitive LLVM.VoidType)
         Bind [tmp] (Bedrock.Literal (LiteralInt 0))
             <$> rest [tmp]
     Lam v sub | lazy -> do
@@ -451,7 +459,7 @@ convertExpr lazy expr rest =
       tmp <- newVariable [] "thunk" NodePtr
       Bind [tmp] (Store (FunctionName node (length v)) nodeArgs)
           <$> rest [tmp]
-    Core.Case scrut var Nothing [Core.Alt (Core.UnboxedPat binds) branch] | not lazy ->
+    Core.Case scrut _var Nothing [Core.Alt (Core.UnboxedPat binds) branch] | not lazy ->
       convertExpr False scrut $ \vals -> do
         binds' <- mapM convertVariable binds
         let worker [] []         = convertExpr False branch rest
@@ -490,7 +498,7 @@ convertExpr lazy expr rest =
       convertExpr False e $ \[val] -> do
         var <- deriveVariable val "val" (convertTcType ty)
         Bind [var] (Bedrock.TypeCast val) <$> rest [var]
-    WithExternal binder retS external args st scoped ->
+    WithExternal binder retS external args _st scoped ->
       convertExprs args $ \args' -> do
         binder' <- convertVariable binder
         retS' <- convertVariable retS
@@ -536,7 +544,7 @@ convertExprs (x:xs) fn =
     fn (v ++ vs)
 
 applyMany :: [Type] -> Variable -> [Variable] -> ([Variable] -> M Block) -> M Block
-applyMany fianlTy node [] fn = fn [node]
+applyMany _finalTy node [] fn = fn [node]
 applyMany finalTy node [x] fn = do
     ret <- mapM (deriveVariable node "apply") finalTy
     Bind ret (Apply node x)
@@ -557,7 +565,7 @@ convertAlt (Alt pattern branch) =
     case pattern of
         ConPat con args -> do
             args' <- mapM convertVariable args
-            let name = Core.varName con
+            let name = convertName $ Core.varName con
             Alternative (NodePat (ConstructorName name 0) args')
                 <$> convertExpr False branch (pure . Return)
         Core.LitPat lit ->

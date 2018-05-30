@@ -73,7 +73,7 @@ resolveArgs fn vars = do
     fnArgs <- asks (\env -> envSignatures env Map.! fn)
     let n = sum
             [ case variableType arg of
-                StaticNode n -> n
+                StaticNode size -> size
                 _ -> 1
             | arg <- fnArgs ]
     resolved <- resolveMany vars
@@ -119,12 +119,12 @@ bindMany lst rest =
 uniqBlock :: Block -> Uniq Block
 uniqBlock block =
     case block of
-        Case scrut Nothing [Alternative (NodePat UnboxedTupleName args) block] -> do
+        Case scrut Nothing [Alternative (NodePat UnboxedTupleName args) branch] -> do
             scruts <- resolve scrut
             lowerMany args $ do
                 flatVars <- resolveMany args
                 bindMany (zip flatVars scruts)
-                    <$> uniqBlock block
+                    <$> uniqBlock branch
         Case scrut mbBranch alts -> do
             scruts <- resolve scrut
             case scruts of

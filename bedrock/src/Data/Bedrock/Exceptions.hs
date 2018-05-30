@@ -13,6 +13,7 @@ import qualified Data.Map               as Map
 
 import           Data.Bedrock
 import           Data.Bedrock.Transform
+import qualified LLVM.AST            as LLVM (Type (..))
 
 -- stackFrameName :: Name
 -- stackFrameName = Name ["bedrock"] "StackFrame" 0
@@ -127,11 +128,9 @@ cpsExpression size slots origin frameVar binds simple rest =
   where
     mkContinuation use = do
 
-        fnPtr <- newVariable "fnPtr" (Primitive $ CPointer (CFunction CVoid [CPointer I8]))
+        fnPtr <- newVariable "fnPtr" (Primitive $ mkPointer (LLVM.FunctionType LLVM.VoidType [mkPointer $ mkIntTy 8] False))
 
         framePtr <- newVariable "bedrock.stackframe.cont" FramePtr
-        prevFrame <- newVariable "bedrock.stackframe.cont" FramePtr
-        prevFrameMarked <- newVariable "bedrock.stackframe.cont" FramePtr
 
         contFnName <- tagName "continuation" (fnName origin)
 

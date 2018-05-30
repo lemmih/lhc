@@ -31,7 +31,7 @@ unique m = evalState (runReaderT (unUniq (uniqModule m)) env) st
 
 
 newUnique :: Maybe Type -> Uniq Int
-newUnique mbTy = do
+newUnique _mbTy = do
     ns <- get
     let (idNum, ns') = newGlobalID ns
     -- let (idNum, ns') = case mbTy of
@@ -228,7 +228,7 @@ type Scope = Map Name [Name]
 data LUniq a = LUniq {unLUniq :: Scope -> (a, Scope)}
 
 instance Monad LUniq where
-    return x = LUniq $ \scope -> (x,mempty)
+    return x = LUniq $ \_scope -> (x,mempty)
     f >>= g = LUniq $ \scope ->
         let (a, scope') = unLUniq f scope
             (b, scope'') = unLUniq (g a) scope

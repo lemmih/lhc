@@ -36,7 +36,7 @@ getFunctionCost name = do
 blockCost :: Block -> M (Maybe (Int, ([Variable] -> Block) -> Block))
 blockCost block =
   case block of
-    Case scrut defaultBranch alts -> return Nothing
+    Case _scrut _defaultBranch _alts -> return Nothing
     Bind vars expr rest ->
       fmap (step (exprCost expr) (Bind vars expr)) <$> (blockCost rest)
     Return rets -> return $ Just (0, \mk -> mk rets)

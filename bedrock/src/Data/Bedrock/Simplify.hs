@@ -67,12 +67,12 @@ simplifyBlock block =
         Bind rets (Builtin "apply" [PVariable ptr, PVariable arg]) rest -> do
             mbConst <- lookupStore ptr
             case mbConst of
-                Just (FunctionName fnName 1, args) ->
+                Just (FunctionName name 1, args) ->
                     simplifyBlock $
-                        Bind rets (Application fnName (args ++ [arg])) rest
-                Just (FunctionName fnName n, args) ->
+                        Bind rets (Application name (args ++ [arg])) rest
+                Just (FunctionName name n, args) ->
                     simplifyBlock $
-                        Bind rets (Store (FunctionName fnName (n-1)) (args ++ [arg])) rest
+                        Bind rets (Store (FunctionName name (n-1)) (args ++ [arg])) rest
                 _Nothing -> do
                   ptr' <- resolve ptr
                   arg' <- resolve arg
@@ -119,15 +119,15 @@ simplifyBlock block =
                 <*> (Just <$> simplifyBlock defaultBranch)
                 <*> mapM simplifyAlternative alts
         Return vars -> Return <$> mapM resolve vars
-        TailCall fnName vars -> TailCall fnName <$> mapM resolve vars
+        TailCall name vars -> TailCall name <$> mapM resolve vars
         Exit -> pure Exit
         Panic msg -> pure $ Panic msg
         Invoke cont vars -> Invoke <$> resolve cont <*> mapM resolve vars
         Raise var -> Raise <$> resolve var
 
 simplifyAlternative :: Alternative -> M Alternative
-simplifyAlternative (Alternative pattern branch) =
-    Alternative pattern <$> simplifyBlock branch
+simplifyAlternative (Alternative pat branch) =
+    Alternative pat <$> simplifyBlock branch
 
 
 simplifyExpression :: Expression -> M Expression
@@ -145,10 +145,10 @@ simplifyExpression expr =
                 Nothing -> Eval <$> resolve var
                 -- FIXME: We should update the heap object with
                 --        an indirection to the newly created object.
-                Just (FunctionName fnName 0, args) ->
+                Just (FunctionName name 0, args) ->
                     simplifyExpression $
-                    Application fnName args
-                Just (nodeName, args) ->
+                    Application name args
+                Just (_nodeName, _args) ->
                     simplifyExpression $ TypeCast var
         MkNode name vars -> MkNode name <$> mapM resolve vars
         TypeCast var -> TypeCast <$> resolve var
@@ -186,7 +186,7 @@ mergeAllocsModule m =
                    | fn <- functions m] }
 
 mergeAllocs :: Block -> Block
-mergeAllocs block0 = applyAlloc 0 n block'
+mergeAllocs block0 = applyAlloc 0 nFinal block'
   where
     applyAlloc slob allocs block =
         case slob `compare` allocs of
@@ -196,7 +196,7 @@ mergeAllocs block0 = applyAlloc 0 n block'
             GT -> block -- Bind [] (BumpHeapPtr (negate (slob-allocs))) block
             EQ -> block
             LT -> Bind [] (Alloc (allocs-slob)) block
-    (n, block') = worker 0 block0
+    (nFinal, block') = worker 0 block0
     worker n block =
         case block of
             -- Hoist allocs out of case alternatives iff:
@@ -209,8 +209,8 @@ mergeAllocs block0 = applyAlloc 0 n block'
                     maxBranchAlloc = maximum (0:branches)
                     branches = maybe id (:) (fmap fst def) (map fst alts')
                     def = fmap (worker 0) defaultBranch
-                    alts' = [ (branchAlloc, Alternative pattern branch'')
-                            | Alternative pattern branch <- alts
+                    alts' = [ (branchAlloc, Alternative pat branch'')
+                            | Alternative pat branch <- alts
                             , let (branchAlloc, branch') = worker 0 branch
                             , let branch'' = applyAlloc slob branchAlloc branch' ]
                     blockAlloc

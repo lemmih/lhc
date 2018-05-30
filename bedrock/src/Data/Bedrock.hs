@@ -2,6 +2,9 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE PatternSynonyms    #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+{-# OPTIONS_GHC -fno-warn-missing-pattern-synonym-signatures #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-|
 Bedrock is a strict, first-order language designed for graph reduction.
 
@@ -78,8 +81,9 @@ module Data.Bedrock where
 import           Control.Applicative (pure, (<$>), (<*>))
 import           Data.Data
 import           GHC.Generics
--- import qualified LLVM.AST.Type       as LLVM
-import           Test.QuickCheck hiding (Function)
+import qualified LLVM.AST            as LLVM (Type (..), mkName)
+import           LLVM.AST.AddrSpace
+import           Test.QuickCheck     hiding (Function)
 
 data Name = Name
   { nameModule     :: [String]
@@ -92,8 +96,7 @@ data Type
   | Node
   | StaticNode NodeSize
   | IWord
-  | Primitive CType
-  -- | LLVMPrimitive LLVM.Type
+  | Primitive LLVM.Type
   | FramePtr
   deriving (Show, Read, Eq, Ord, Data, Generic)
 data Variable = Variable
@@ -108,22 +111,22 @@ data AvailableNamespace = AvailableNamespace
   , nsNextGlobalId    :: Int
   } deriving (Show, Read, Eq, Data, Generic)
 
--- XXX: Rename to FFIType? ForeignType?
-data CType
-  = I8
-  | I32
-  | I64
-  | CPointer CType
-  | CVoid
-  | CFunction CType [CType]
-  -- CFloat
-  -- CDouble
-  deriving (Show, Read, Eq, Ord, Data, Generic)
+-- -- XXX: Rename to FFIType? ForeignType?
+-- data CType
+--   = I8
+--   | I32
+--   | I64
+--   | CPointer CType
+--   | CVoid
+--   | CFunction CType [CType]
+--   -- CFloat
+--   -- CDouble
+--   deriving (Show, Read, Eq, Ord, Data, Generic)
 
 data Foreign = Foreign
   { foreignName      :: String
-  , foreignReturn    :: CType
-  , foreignArguments :: [CType]
+  , foreignReturn    :: LLVM.Type
+  , foreignArguments :: [LLVM.Type]
   } deriving (Show, Read, Eq, Data, Generic)
 
 data Module = Module
@@ -247,6 +250,14 @@ data Block
   deriving (Show, Read, Eq, Data, Generic)
 
 
+mkPointer :: LLVM.Type -> LLVM.Type
+mkPointer ty = LLVM.PointerType ty (AddrSpace 0)
+
+mkIntTy :: Int -> LLVM.Type
+mkIntTy n = LLVM.IntegerType (fromIntegral n)
+
+wordTy :: LLVM.Type
+wordTy = LLVM.NamedTypeReference (LLVM.mkName "word")
 
 
 
@@ -262,10 +273,8 @@ upperName = Name <$> listOf upperString <*> upperString <*> fmap abs arbitrary
 instance Arbitrary Name where
   arbitrary = Name
     <$> listOf upperString
-    <*> variableName
+    <*> listOf1 (elements ['a'..'z'])
     <*> fmap abs arbitrary
-    where
-      variableName = listOf1 (elements ['a'..'z'])
 
 instance Arbitrary Type where
   arbitrary = oneof
@@ -286,20 +295,20 @@ recursive deep shallow =
     0 -> shallow
     n -> resize (n`div`2) $ oneof [deep, shallow]
 
-instance Arbitrary CType where
-  arbitrary =
-    recursive
-      (CFunction <$> base <*> arbitrary)
-      base
-    where
-      base =
-        recursive
-          (CPointer <$> base)
-          (elements
-            [ I8
-            , I32
-            , I64
-            , CVoid ])
+instance Arbitrary LLVM.Type where
+  arbitrary = pure (LLVM.IntegerType 8)
+    -- recursive
+    --   (CFunction <$> base <*> arbitrary)
+    --   base
+    -- where
+    --   base =
+    --     recursive
+    --       (CPointer <$> base)
+    --       (elements
+    --         [ I8
+    --         , I32
+    --         , I64
+    --         , CVoid ])
 
 instance Arbitrary Foreign where
   arbitrary = Foreign
@@ -392,12 +401,12 @@ instance Arbitrary Expression where
     ]
 
 instance Arbitrary Block where
-  shrink (Case scrut (Just def) alts) =
+  shrink (Case _scrut (Just def) alts) =
     def : [ block | Alternative _ block <- alts ]
-  shrink (Case scrut Nothing alts) =
+  shrink (Case _scrut Nothing alts) =
     [ block | Alternative _ block <- alts ]
   shrink (Bind _ _ rest) = [rest]
-  shrink x = []
+  shrink _ = []
   arbitrary = recursive (oneof
     [ Case <$> arbitrary <*> arbitrary <*> arbitrary
     , Bind <$> arbitrary <*> arbitrary <*> arbitrary

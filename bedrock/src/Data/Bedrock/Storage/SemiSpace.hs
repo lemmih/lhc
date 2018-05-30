@@ -2,38 +2,39 @@ module Data.Bedrock.Storage.SemiSpace where
 
 import Data.Bedrock
 import Data.Bedrock.Storage.Pluggable
+import qualified LLVM.AST            as LLVM (Type (..))
 
 semiSpaceGC :: GC StorageManager
 semiSpaceGC = do
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_init"
-        , foreignReturn = CPointer I64
+        , foreignReturn = mkPointer $ mkIntTy 64
         , foreignArguments = [] }
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_begin"
-        , foreignReturn = CVoid
+        , foreignReturn = LLVM.VoidType
         , foreignArguments = [] }
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_end"
-        , foreignReturn = CPointer I64
+        , foreignReturn = mkPointer $ mkIntTy 64
         , foreignArguments = [] }
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_allocate"
-        , foreignReturn = I64
-        , foreignArguments = [CPointer I64, I64] }
+        , foreignReturn = mkIntTy 64
+        , foreignArguments = [mkPointer $ mkIntTy 64, mkIntTy 64] }
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_mark"
-        , foreignReturn = CPointer I64
-        , foreignArguments = [CPointer I64] }
+        , foreignReturn = mkPointer $ mkIntTy 64
+        , foreignArguments = [mkPointer $ mkIntTy 64] }
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_mark_frame"
-        , foreignReturn = CPointer I64
-        , foreignArguments = [CPointer I64] }
+        , foreignReturn = mkPointer $ mkIntTy 64
+        , foreignArguments = [mkPointer $ mkIntTy 64] }
 
 
     initName <- newName "semi_gc_init"
-    rawPtr <- newVariable "ptr" (Primitive (CPointer I64))
-    hp <- newVariable "hp" NodePtr
+    rawPtr <- newVariable "ptr" (Primitive (mkPointer $ mkIntTy 64))
+    hpVar <- newVariable "hp" NodePtr
     beginName <- newName "semi_gc_begin"
     endName <- newName "semi_gc_end"
     markName <- newName "semi_gc_mark"
@@ -43,15 +44,15 @@ semiSpaceGC = do
     markFrame  <- newVariable "frame" FramePtr
     let initFn = Function initName [] [] [] $
             Bind [rawPtr] (CCall "_lhc_semi_init" []) $
-            Bind [hp] (TypeCast rawPtr) $
-            Bind [] (WriteGlobal "hp" hp) $
+            Bind [hpVar] (TypeCast rawPtr) $
+            Bind [] (WriteGlobal "hp" hpVar) $
             Return []
         beginFn = Function beginName [] [] [] $
             Bind [] (CCall "_lhc_semi_begin" []) $ Return []
         endFn = Function endName [] [] [NodePtr] $
             Bind [rawPtr] (CCall "_lhc_semi_end" []) $
-            Bind [hp] (TypeCast rawPtr) $
-            Return [hp]
+            Bind [hpVar] (TypeCast rawPtr) $
+            Return [hpVar]
         markFn = Function markName [] [markPtr] [NodePtr] $
             Bind [markRet] (CCall "_lhc_semi_mark" [markPtr]) $ Return [markRet]
         markFrameFn = Function markFrameName [] [markFrame] [FramePtr] $

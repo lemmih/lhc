@@ -19,13 +19,13 @@ fixedGC :: GC StorageManager
 fixedGC = do
     pushForeign $ Foreign
         { foreignName = "calloc"
-        , foreignReturn = CPointer I8
-        , foreignArguments = [I32, I32] }
+        , foreignReturn = mkPointer $ mkIntTy 8
+        , foreignArguments = [mkIntTy 32, mkIntTy 32] }
     initName <- newName "fixed_gc_init"
-    rawPtr <- newVariable "ptr" (Primitive (CPointer I8))
+    rawPtr <- newVariable "ptr" (Primitive (mkPointer $ mkIntTy 8))
     hp <- newVariable "hp" NodePtr
-    wordSize <- newVariable "size" (Primitive I32)
-    heapSize <- newVariable "heapSize" (Primitive I32)
+    wordSize <- newVariable "size" (Primitive $ mkIntTy 32)
+    heapSize <- newVariable "heapSize" (Primitive $ mkIntTy 32)
     beginName <- newName "fixed_gc_begin"
     endName <- newName "fixed_gc_end"
     markName <- newName "fixed_gc_mark"

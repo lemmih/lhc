@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE Haskell2010                #-}
 {- Heap Points-To analysis -}
-module Data.Bedrock.HPT
+module Data.Bedrock.HPT () where {-
     ( runHPT
     , HPTResult(..)
     , NameSet
@@ -793,3 +793,4 @@ analyseUsage m =
             Catch _ exhVars _ vars -> pushMany exhVars >> pushMany vars
             Literal{}              -> return ()
             _                      -> return ()
+-}

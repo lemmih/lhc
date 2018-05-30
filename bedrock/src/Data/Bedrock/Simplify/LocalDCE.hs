@@ -34,7 +34,7 @@ dceFunction fn =
     dirty = findUsed root out
 
 findUsed :: Variable -> Out -> Set Variable
-findUsed root (Out m) = worker [root] m
+findUsed root (Out m0) = worker [root] m0
   where
     worker [] _     = Set.empty
     worker (x:xs) m =
@@ -84,7 +84,7 @@ dceBlock root block =
     Raise var -> do
       useMany [root] [var]
       return block
-    TailCall fn args -> do
+    TailCall _fn args -> do
       useMany [root] args
       return block
     Invoke a args -> do

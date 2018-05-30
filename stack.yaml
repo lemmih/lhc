@@ -13,7 +13,7 @@ packages:
 
 - location:
     git: https://github.com/Lemmih/haskell-crux
-    commit: 82f362cbbdc0f26995e1b1596780db504f2f46b9
+    commit: 113ab24b10315e83e3f183e15100092683c6f4f4
   extra-dep: true
 
 - location:

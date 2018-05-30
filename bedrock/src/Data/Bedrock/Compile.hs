@@ -7,7 +7,7 @@ import           Text.Printf
 
 import           Data.Bedrock.Exceptions
 import           Data.Bedrock.GlobalVariables
-import           Data.Bedrock.HPT
+-- import           Data.Bedrock.HPT
 import qualified Data.Bedrock.SimpleEvalApply      as Simple
 -- import           Data.Bedrock.Invoke
 import           Data.Bedrock
@@ -34,11 +34,11 @@ type Verbose = Bool
 type Pipeline = [Step]
 data Step
     = String :> (Module -> Module)
-    | String :?> (HPTResult -> Module -> Module)
-    | PerformHPT
+    -- | String :?> (HPTResult -> Module -> Module)
+    -- | PerformHPT
 
 infixr 9 :>
-infixr 9 :?>
+-- infixr 9 :?>
 
 runPipeline :: KeepIntermediateFiles -> Verbose
             -> String -> Module -> Pipeline -> IO Module
@@ -51,16 +51,16 @@ runPipeline keepIntermediateFiles verbose title m0 =
             tag :> action -> do
                 m' <- runAction n m tag action
                 worker hpt (n+1) m' steps
-            tag :?> action -> do
-                m' <- runAction n m tag (action hpt)
-                worker hpt (n+1) m' steps
-            PerformHPT -> do
-                let m' = unique m
-                when verbose $
-                    printf "** HPT Analysis\n"
-                let hpt' = runHPT m'
-                when verbose $ ppHPTResult hpt'
-                worker hpt' n m' steps
+            -- tag :?> action -> do
+            --     m' <- runAction n m tag (action hpt)
+            --     worker hpt (n+1) m' steps
+            -- PerformHPT -> do
+            --     let m' = unique m
+            --     when verbose $
+            --         printf "** HPT Analysis\n"
+            --     let hpt' = runHPT m'
+            --     when verbose $ ppHPTResult hpt'
+            --     worker hpt' n m' steps
     runAction n m tag action = do
         when verbose $
             printf "[%d] Running step %s\n" (n::Int) (show tag)
@@ -68,7 +68,7 @@ runPipeline keepIntermediateFiles verbose title m0 =
         when keepIntermediateFiles $
             writeFile (dstFile n tag) (show $ pretty m')
         return m'
-    hpt0 = runHPT m0
+    hpt0 = () -- runHPT m0
     dstFile n tag = title <.> show n <.> tag <.> "rock"
 
 compileModule :: KeepIntermediateFiles -> Verbose -> GC StorageManager -> Module -> FilePath -> IO ()
@@ -112,6 +112,7 @@ stdPipeline gc =
         -- , "pretty"          :> locallyUnique
         ]
   where
+    simplifySteps :: Int -> Module -> Module
     simplifySteps 0 = deadCodeElimination
     simplifySteps n = simplifySteps (n-1) . unique . localDCE . simplify . inline
         -- [ "rename"          :> simplify . unique

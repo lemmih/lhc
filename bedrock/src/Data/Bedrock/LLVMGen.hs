@@ -6,21 +6,21 @@ import           Control.Monad.RWS
 import           Control.Monad.State
 import           Control.Monad.Writer
 import           Data.Char
-import           Data.List                  (nub)
-import           Data.Map                   (Map)
-import qualified Data.Map                   as Map
-import           Data.Set                   (Set)
-import qualified Data.Set                   as Set
+import           Data.List              (nub)
+import           Data.Map               (Map)
+import qualified Data.Map               as Map
+import           Data.Set               (Set)
+import qualified Data.Set               as Set
 import           Data.String
-import           LLVM.AST                   as LLVM
-import           LLVM.AST.CallingConvention as LLVM
-import qualified LLVM.AST.Constant          as Constant
-import           LLVM.AST.Global            as Global
-import           LLVM.AST.Linkage           as LLVM
-import           LLVM.AST.Visibility        as LLVM
+import           LLVM.AST               as LLVM
+import qualified LLVM.AST.Constant      as Constant
+import           LLVM.AST.Global        as Global (initializer, isConstant,
+                                                   linkage, unnamedAddr)
+import qualified LLVM.AST.Global        as Global
+import           LLVM.AST.Linkage       as LLVM
 
-import           Data.Bedrock               (NodeName)
-import qualified Data.Bedrock as Bedrock
+import           Data.Bedrock           (NodeName)
+import qualified Data.Bedrock           as Bedrock
 
 data Env = Env
     { envNodeMapping   :: Map NodeName Integer
@@ -85,7 +85,7 @@ anonGlobal global = do
   n <- get
   put $ n+1
   let name = Name (fromString $ "global_"++show n)
-  newDefinition $ GlobalDefinition global{ name = name }
+  newDefinition $ GlobalDefinition global{ Global.name = name }
   return name
 
 globalString :: Monad m => String -> GenT m Name
@@ -133,7 +133,7 @@ taggedName tag = lift $ do
 
 findUniqueName :: Set String -> String -> String
 findUniqueName scope name =
-    worker (name : [ name ++ "_" ++ show n | n <- [0..]])
+    worker (name : [ name ++ "_" ++ show n | n <- [0::Int ..]])
   where
     worker [] = undefined
     worker (x:xs)
@@ -146,13 +146,13 @@ findUniqueName scope name =
 ----------------------------
 -- tests
 
-
+{-
 testModule :: GenModule ()
 testModule = do
   let name = Name $ fromString "blah"
   blocks <- genBlocks testFn
   tell [GlobalDefinition $ functionDefaults
-    { name = name
+    { Global.name = name
     , returnType = VoidType
     , parameters = ([], False)
     , visibility = Default
@@ -175,3 +175,4 @@ testFn = do
           , indices = []
           , metadata = [] }
   return $ Ret Nothing []
+-}

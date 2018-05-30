@@ -1,4 +1,4 @@
-module Data.Bedrock.NodeSizing
+module Data.Bedrock.NodeSizing () where {-
     ( lowerNodeSize ) where
 
 import           Control.Applicative     (pure, (<$>), (<*>))
@@ -74,3 +74,4 @@ traversePattern hpt pattern =
         NodePat node vars -> NodePat node (map (setVariableSize hpt) vars)
         LitPat{} -> pattern
         -- VarPat var -> VarPat (setVariableSize hpt var)
+-}

@@ -13,26 +13,24 @@ import           System.IO
 import           Language.Haskell.Scope             hiding (Interface)
 import           Language.Haskell.TypeCheck
 
-import qualified Compiler.Core                      as Core
-import qualified Compiler.Core.DCE                  as Core
-import qualified Compiler.Core.NewType              as NewType
-import qualified Compiler.Core.SimpleEta            as Core
-import qualified Compiler.Core.SimpleInline         as Core
-import qualified Compiler.Core.Simplify             as Core
-import qualified Compiler.Core.Unique               as Core
 import qualified Compiler.CoreToBedrock             as Core
-import qualified Compiler.HaskellToCore             as Haskell
-import           Compiler.Interface
 import           Control.Monad
-import           Data.Bedrock                       (Name (..))
 import qualified Data.Bedrock.Compile               as Bedrock
 import           Data.Bedrock.Storage.Fixed
 import           Data.Bedrock.Storage.SemiSpace
-import           Data.Binary
 import           Data.IORef
 import           Data.List                          (intercalate)
 import           Data.Monoid                        (mconcat, (<>))
 import qualified Distribution.ModuleName            as Dist
+import qualified Language.Haskell.Crux              as Core
+import qualified Language.Haskell.Crux.DCE          as Core
+import qualified Language.Haskell.Crux.FromHaskell  as Haskell
+import           Language.Haskell.Crux.Interface
+import qualified Language.Haskell.Crux.NewType      as NewType
+import qualified Language.Haskell.Crux.SimpleEta    as Core
+import qualified Language.Haskell.Crux.SimpleInline as Core
+import qualified Language.Haskell.Crux.Simplify     as Core
+import qualified Language.Haskell.Crux.Unique       as Core
 import           Options.Applicative
 import           RTS                                (linkRTS)
 import           System.Directory
@@ -44,6 +42,9 @@ import           Distribution.InstalledPackageInfo  (ExposedModule (..),
                                                      exposedModules,
                                                      libraryDirs)
 import           Distribution.Version
+import           Data.Compact
+import           Data.Compact.Serialize
+
 
 import           Paths_lhc
 
@@ -140,7 +141,7 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
                 coreFile = buildDir </> moduleFile m' <.> "core"
                 complete = Core.simplify $ Core.simplify $ NewType.lower $ Core.simplify $ Core.simplify core
                 (_,etaAbs) = Core.simpleEta Core.emptySimpleEtaAnnotation complete
-            encodeFile coreFile etaAbs
+            writeCompact coreFile =<< compact etaAbs
             writeFile (coreFile <.> "pretty") (show $ pretty etaAbs)
             writeIORef resolveEnvRef resolveEnv'
             writeIORef tiEnvRef tiEnv'
@@ -152,8 +153,11 @@ loadLibrary pkgInfo =
     Just hiFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath (exposedName exposedModule) <.> "hi")
     Just coreFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath (exposedName exposedModule) <.> "core")
     iface <- readInterface hiFile
-    core <- decodeFile coreFile
-    return (intercalate "." (Dist.components $ exposedName exposedModule), (iface, core))
+    ret <- unsafeReadCompact coreFile
+    case ret of
+      Left msg   -> error msg
+      Right core ->
+        return (intercalate "." (Dist.components $ exposedName exposedModule), (iface, getCompact core))
 
 -- Load dependencies interface files
 -- convert to scope interfaces
@@ -191,7 +195,7 @@ compileExecutable verbose keepIntermediateFiles gcStrategy file = do
   when verbose $ putStrLn "Converting to core..."
   let core = Haskell.convert env' typedModule
       libraryCore = mconcat (map (snd . snd) ifaces)
-      entrypoint = Name ["Main"] "entrypoint" 0
+      entrypoint = Core.Name ["Main"] "entrypoint" 0
       base = Core.deadCodeElimination entrypoint $
              NewType.lower $ mappend libraryCore core
       complete =

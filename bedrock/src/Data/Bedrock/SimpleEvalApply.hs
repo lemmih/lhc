@@ -44,7 +44,6 @@ lowerEvalApply = do
 
   evalBody <- do
     obj <- newVariable "obj" Node
-    header <- newVariable "header" IWord
     ind <- newVariable "ind" IWord
     target <- newVariable "target" NodePtr
     nonIndirection <-
@@ -77,10 +76,10 @@ lowerEvalApply = do
     pushFunction fn{fnBody = replaceEvalApply (Map.fromList applys) evalName (fnBody fn)}
 
 mkApplyFn :: (([Type], Type), [(NodeName, [Type])]) -> Gen Name
-mkApplyFn ((retTys, arg), nodeNames) = do
+mkApplyFn ((retTys, argTy), nodeNames) = do
     applyName <- newName "apply"
     fn <- newVariable "fn" NodePtr
-    arg <- newVariable "arg" arg
+    arg <- newVariable "arg" argTy
     obj <- newVariable "obj" Node
     applyBody <-
       Bind [obj] (Fetch fn) <$>
@@ -164,8 +163,8 @@ replaceEvalApply applys eval = fix $ \loop block ->
   case block of
     Case scrut mbBlock alts ->
       Case scrut (fmap loop mbBlock)
-        [ Alternative pat (loop block)
-        | Alternative pat block <- alts ]
+        [ Alternative pat (loop branch)
+        | Alternative pat branch <- alts ]
     Bind vars expr rest -> Bind vars (worker (map variableType vars) expr) (loop rest)
     Return vars -> Return vars
     Raise var -> Raise var

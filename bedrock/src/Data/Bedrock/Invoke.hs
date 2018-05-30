@@ -1,4 +1,4 @@
-module Data.Bedrock.Invoke
+module Data.Bedrock.Invoke () where {-
     ( lowerInvoke ) where
 
 import           Control.Monad.State
@@ -139,3 +139,4 @@ traverseAlternative hpt origin alternative =
     case alternative of
         Alternative pattern branch ->
             Alternative pattern <$> traverseBlock hpt origin branch
+-}

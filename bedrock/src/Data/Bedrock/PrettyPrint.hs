@@ -5,13 +5,17 @@ module Data.Bedrock.PrettyPrint
   , module Data.Bedrock.PrettyPrint
   ) where
 
-import           Data.List
-import           Language.Haskell.TypeCheck.Pretty (Pretty(..))
-import           Text.PrettyPrint.ANSI.Leijen      (Doc, char, int, text,
-                                                    (<>), empty, brackets, parens)
-import qualified Text.PrettyPrint.ANSI.Leijen      as Doc
-import qualified Text.PrettyPrint.ANSI.Leijen.Internal      as Doc
 import           Data.Bedrock
+import           Data.List                             (intercalate)
+import Data.Text.Lazy (unpack)
+import           Language.Haskell.TypeCheck.Pretty     (Pretty (..))
+import           Text.PrettyPrint.ANSI.Leijen          (Doc, brackets, char,
+                                                        empty, int, parens,
+                                                        text, (<>))
+import qualified Text.PrettyPrint.ANSI.Leijen          as Doc
+import qualified Text.PrettyPrint.ANSI.Leijen.Internal as Doc
+import qualified LLVM.AST                   as LLVM (Type (..))
+import LLVM.Pretty
 
 -------------------------------------------------------------------------------
 -- Pretty print helpers
@@ -44,14 +48,15 @@ instance Pretty Type where
   pretty (Primitive ty) = pretty ty
   pretty FramePtr       = Doc.red (Doc.char '@')
 
-instance Pretty CType where
-  pretty I8 = text "i8"
-  pretty I32 = text "i32"
-  pretty I64 = text "i64"
-  pretty (CPointer ty) = pretty ty <> Doc.char '*'
-  pretty (CFunction retTy argTys) =
-    pretty retTy <> Doc.parens (ppList (map pretty argTys))
-  pretty CVoid = text "void"
+instance Pretty LLVM.Type where
+  pretty ty = text (unpack $ ppll ty)
+  -- pretty I8 = text "i8"
+  -- pretty I32 = text "i32"
+  -- pretty I64 = text "i64"
+  -- pretty (CPointer ty) = pretty ty <> Doc.char '*'
+  -- pretty (CFunction retTy argTys) =
+  --   pretty retTy <> Doc.parens (ppList (map pretty argTys))
+  -- pretty CVoid = text "void"
 
 instance Pretty NodeDefinition where
   pretty (NodeDefinition name args) =
