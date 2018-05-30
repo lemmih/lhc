@@ -82,7 +82,6 @@ import           Control.Applicative (pure, (<$>), (<*>))
 import           Data.Data
 import           GHC.Generics
 import qualified LLVM.AST            as LLVM (Type (..), mkName)
-import           LLVM.AST.AddrSpace
 import           Test.QuickCheck     hiding (Function)
 
 data Name = Name
@@ -249,12 +248,6 @@ data Block
   | Panic String
   deriving (Show, Read, Eq, Data, Generic)
 
-
-mkPointer :: LLVM.Type -> LLVM.Type
-mkPointer ty = LLVM.PointerType ty (AddrSpace 0)
-
-mkIntTy :: Int -> LLVM.Type
-mkIntTy n = LLVM.IntegerType (fromIntegral n)
 
 wordTy :: LLVM.Type
 wordTy = LLVM.NamedTypeReference (LLVM.mkName "word")

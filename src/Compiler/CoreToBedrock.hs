@@ -19,6 +19,7 @@ import           Data.Maybe
 import qualified Data.Set                   as Set
 import qualified LLVM.AST                   as LLVM (Type (..))
 import           LLVM.AST.AddrSpace
+import qualified LLVM.AST.Type              as LLVM
 
 import           Language.Haskell.Scope     (QualifiedName (..))
 import qualified Language.Haskell.TypeCheck as TC (Proof, Qualified (..),
@@ -160,17 +161,17 @@ convertTcType tcTy =
     TC.TyApp (TC.TyCon qname) sub
         | qname == QualifiedName "LHC.Prim" "Addr"
             -> case convertTcType sub of
-                 Primitive prim -> Primitive (mkPointer prim)
+                 Primitive prim -> Primitive (LLVM.ptr prim)
                  _ -> error $ "CoreToBedrock: Addr must be primitive: " ++ show sub
     TC.TyCon qname
         | qname == QualifiedName "LHC.Prim" "I8"
-             -> Primitive (LLVM.IntegerType 8)
+             -> Primitive LLVM.i8
     TC.TyCon qname
         | qname == QualifiedName "LHC.Prim" "I32"
-             -> Primitive (LLVM.IntegerType 32)
+             -> Primitive LLVM.i32
     TC.TyCon qname
         | qname == QualifiedName "LHC.Prim" "I64"
-             -> Primitive (LLVM.IntegerType 64)
+             -> Primitive LLVM.i64
     TC.TyCon qname
         | qname == QualifiedName "LHC.Prim" "RealWorld#"
          -> Primitive LLVM.VoidType
@@ -436,15 +437,15 @@ convertExpr lazy expr rest =
             Bind [tmp] (Store (FunctionName fn (arity-length args')) args')
               <$> rest [tmp]
     Core.Lit (Core.LitString str) -> do
-        tmp <- newVariable [] "lit" (Primitive $ mkPointer (mkIntTy 8))
+        tmp <- newVariable [] "lit" (Primitive $ LLVM.ptr LLVM.i8)
         Bind [tmp] (Bedrock.Literal (LiteralString str))
             <$> rest [tmp]
     Core.Lit (Core.LitInt int) -> do
-        tmp <- newVariable [] "int" (Primitive $ mkIntTy 64)
+        tmp <- newVariable [] "int" (Primitive LLVM.i64)
         Bind [tmp] (Bedrock.Literal (LiteralInt int))
             <$> rest [tmp]
     Core.Lit (Core.LitChar c) -> do
-        tmp <- newVariable [] "char" (Primitive $ mkIntTy 32)
+        tmp <- newVariable [] "char" (Primitive LLVM.i32)
         Bind [tmp] (Bedrock.Literal (LiteralInt $ fromIntegral $ ord c))
             <$> rest [tmp]
     Core.Lit Core.LitVoid -> do

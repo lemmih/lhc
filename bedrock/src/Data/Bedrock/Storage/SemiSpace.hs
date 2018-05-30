@@ -3,12 +3,13 @@ module Data.Bedrock.Storage.SemiSpace where
 import Data.Bedrock
 import Data.Bedrock.Storage.Pluggable
 import qualified LLVM.AST            as LLVM (Type (..))
+import           LLVM.AST.Type          as LLVM
 
 semiSpaceGC :: GC StorageManager
 semiSpaceGC = do
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_init"
-        , foreignReturn = mkPointer $ mkIntTy 64
+        , foreignReturn = ptr i64
         , foreignArguments = [] }
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_begin"
@@ -16,24 +17,24 @@ semiSpaceGC = do
         , foreignArguments = [] }
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_end"
-        , foreignReturn = mkPointer $ mkIntTy 64
+        , foreignReturn = ptr i64
         , foreignArguments = [] }
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_allocate"
-        , foreignReturn = mkIntTy 64
-        , foreignArguments = [mkPointer $ mkIntTy 64, mkIntTy 64] }
+        , foreignReturn = i64
+        , foreignArguments = [ptr i64, i64] }
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_mark"
-        , foreignReturn = mkPointer $ mkIntTy 64
-        , foreignArguments = [mkPointer $ mkIntTy 64] }
+        , foreignReturn = ptr i64
+        , foreignArguments = [ptr i64] }
     pushForeign $ Foreign
         { foreignName = "_lhc_semi_mark_frame"
-        , foreignReturn = mkPointer $ mkIntTy 64
-        , foreignArguments = [mkPointer $ mkIntTy 64] }
+        , foreignReturn = ptr i64
+        , foreignArguments = [ptr i64] }
 
 
     initName <- newName "semi_gc_init"
-    rawPtr <- newVariable "ptr" (Primitive (mkPointer $ mkIntTy 64))
+    rawPtr <- newVariable "ptr" (Primitive (ptr i64))
     hpVar <- newVariable "hp" NodePtr
     beginName <- newName "semi_gc_begin"
     endName <- newName "semi_gc_end"

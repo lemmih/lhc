@@ -21,6 +21,7 @@ import           LLVM.AST.CallingConvention
 import qualified LLVM.AST.Constant            as Constant
 import           LLVM.AST.Global              as Global
 import           LLVM.AST.Linkage             as LLVM
+import qualified LLVM.AST.Type                as LLVM
 import           LLVM.AST.Visibility
 import           LLVM.Pretty                  as LLVM
 
@@ -57,8 +58,7 @@ toLLVM bedrock = LLVM.Module
     }
   where
     defs = execGenModule (mkEnv bedrock) $ do
-      let pTy = mkPointer
-      newDefinition $ TypeDefinition (mkName "word") (Just $ mkIntTy 64)
+      newDefinition $ TypeDefinition (mkName "word") (Just LLVM.i64)
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "exit"
               , returnType = VoidType
@@ -87,18 +87,18 @@ toLLVM bedrock = LLVM.Module
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "_lhc_isIndirectionP"
               , returnType = wordTy
-              , parameters = ([ Parameter (pTy wordTy) (UnName 0) []], False)
+              , parameters = ([ Parameter (LLVM.ptr wordTy) (UnName 0) []], False)
               }
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "_lhc_getIndirectionP"
-              , returnType = pTy wordTy
-              , parameters = ([ Parameter (pTy wordTy) (UnName 0) []], False)
+              , returnType = LLVM.ptr wordTy
+              , parameters = ([ Parameter (LLVM.ptr wordTy) (UnName 0) []], False)
               }
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "_lhc_setIndirection"
               , returnType = VoidType
-              , parameters = ([ Parameter (pTy wordTy) (UnName 0) []
-                              , Parameter (pTy wordTy) (UnName 1) []], False)
+              , parameters = ([ Parameter (LLVM.ptr wordTy) (UnName 0) []
+                              , Parameter (LLVM.ptr wordTy) (UnName 1) []], False)
               }
       getLayoutDef
 
@@ -270,9 +270,9 @@ nodeNameTag nodeName =
 patternTag :: Pattern -> String
 patternTag pat =
   case pat of
-    NodePat nodeName [] -> nodeNameTag nodeName
+    NodePat nodeName []   -> nodeNameTag nodeName
     LitPat (LiteralInt i) -> "literal " ++ show i
-    _ -> ""
+    _                     -> ""
 
 toLocalReference :: Variable -> Operand
 toLocalReference var =

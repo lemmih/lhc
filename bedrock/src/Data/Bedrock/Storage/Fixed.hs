@@ -2,6 +2,7 @@ module Data.Bedrock.Storage.Fixed where
 
 import Data.Bedrock
 import Data.Bedrock.Storage.Pluggable
+import           LLVM.AST.Type          as LLVM
 
 {- Allocate a fixed buffer at program start, bump allocate into it.
 
@@ -19,13 +20,13 @@ fixedGC :: GC StorageManager
 fixedGC = do
     pushForeign $ Foreign
         { foreignName = "calloc"
-        , foreignReturn = mkPointer $ mkIntTy 8
-        , foreignArguments = [mkIntTy 32, mkIntTy 32] }
+        , foreignReturn = ptr i8
+        , foreignArguments = [i32, i32] }
     initName <- newName "fixed_gc_init"
-    rawPtr <- newVariable "ptr" (Primitive (mkPointer $ mkIntTy 8))
+    rawPtr <- newVariable "ptr" (Primitive (ptr i8))
     hp <- newVariable "hp" NodePtr
-    wordSize <- newVariable "size" (Primitive $ mkIntTy 32)
-    heapSize <- newVariable "heapSize" (Primitive $ mkIntTy 32)
+    wordSize <- newVariable "size" (Primitive i32)
+    heapSize <- newVariable "heapSize" (Primitive i32)
     beginName <- newName "fixed_gc_begin"
     endName <- newName "fixed_gc_end"
     markName <- newName "fixed_gc_mark"

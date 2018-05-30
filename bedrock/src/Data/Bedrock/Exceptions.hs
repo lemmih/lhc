@@ -13,7 +13,8 @@ import qualified Data.Map               as Map
 
 import           Data.Bedrock
 import           Data.Bedrock.Transform
-import qualified LLVM.AST            as LLVM (Type (..))
+import qualified LLVM.AST               as LLVM (Type (..))
+import           LLVM.AST.Type          as LLVM
 
 -- stackFrameName :: Name
 -- stackFrameName = Name ["bedrock"] "StackFrame" 0
@@ -128,7 +129,7 @@ cpsExpression size slots origin frameVar binds simple rest =
   where
     mkContinuation use = do
 
-        fnPtr <- newVariable "fnPtr" (Primitive $ mkPointer (LLVM.FunctionType LLVM.VoidType [mkPointer $ mkIntTy 8] False))
+        fnPtr <- newVariable "fnPtr" (Primitive $ ptr (LLVM.FunctionType LLVM.VoidType [ptr i8] False))
 
         framePtr <- newVariable "bedrock.stackframe.cont" FramePtr
 
