@@ -468,6 +468,8 @@ toCType ty =
                 LLVM.IntegerType 8
             | qname == QualifiedName "LHC.Prim" "I32" ->
                 LLVM.IntegerType 32
+            | qname == QualifiedName "LHC.Prim" "Int32" ->
+                LLVM.IntegerType 32
             | qname == QualifiedName "LHC.Prim" "I64" ->
                 LLVM.IntegerType 64
             | qname == QualifiedName "LHC.Prim" "Unit" ->
