@@ -110,7 +110,7 @@ Not supported. Will eventually use libicu.
  └───────┬───────┘
   ┌──────┴───────┐
   │  Desugaring  │
-  │ haskell-core │
+  │ haskell-crux │
   └──────┬───────┘
 ┌────────┴────────┐
 │ Optimizing Core │
