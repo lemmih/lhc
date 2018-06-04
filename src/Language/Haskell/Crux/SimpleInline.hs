@@ -71,6 +71,13 @@ data State = State
   , stCheap  :: Set Name
   }
 data Cost = Prohibitive | Expensive | Cheap Int deriving (Eq,Show)
+
+instance Semigroup Cost where
+  Cheap a <> Cheap b = Cheap (a+b)
+  _ <> Prohibitive = Prohibitive
+  Prohibitive <> _ = Prohibitive
+  _ <> _ = Expensive
+
 instance Monoid Cost where
   mempty = Cheap 0
   mappend (Cheap a) (Cheap b) = Cheap (a+b)

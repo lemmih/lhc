@@ -31,6 +31,16 @@ data Scope = Scope
     , scopeTcEnv        :: TcEnv
     , scopeArity        :: Map Entity Int
     }
+
+instance Semigroup Scope where
+  a<>b = Scope
+      { scopeVariables    = w scopeVariables
+      , scopeNodes        = w scopeNodes
+      , scopeConstructors = w scopeConstructors
+      , scopeTcEnv        = scopeTcEnv a
+      , scopeArity        = w scopeArity }
+    where w f = mappend (f a) (f b)
+
 instance Monoid Scope where
     mempty = Scope
         { scopeVariables    = Map.empty
@@ -42,13 +52,6 @@ instance Monoid Scope where
             }
         , scopeArity         = Map.empty
         }
-    mappend a b = Scope
-        { scopeVariables    = w scopeVariables
-        , scopeNodes        = w scopeNodes
-        , scopeConstructors = w scopeConstructors
-        , scopeTcEnv        = scopeTcEnv a
-        , scopeArity        = w scopeArity }
-        where w f = mappend (f a) (f b)
 
 data Env = Env
     { envScope        :: Scope
@@ -59,6 +62,16 @@ data Env = Env
     , envConstructors :: Map Name Name
     }
 
+instance Semigroup Env where
+  a<>b = Env
+      { envScope    = w envScope
+      , envForeigns = w envForeigns
+      , envNodes    = w envNodes
+      , envNewTypes = w envNewTypes
+      , envDecls    = w envDecls
+      , envConstructors = w envConstructors
+      }
+    where w f = mappend (f a) (f b)
 instance Monoid Env where
     mempty = Env
         { envScope    = mempty
@@ -68,15 +81,6 @@ instance Monoid Env where
         , envDecls    = mempty
         , envConstructors = mempty
         }
-    mappend a b = Env
-        { envScope    = w envScope
-        , envForeigns = w envForeigns
-        , envNodes    = w envNodes
-        , envNewTypes = w envNewTypes
-        , envDecls    = w envDecls
-        , envConstructors = w envConstructors
-        }
-        where w f = mappend (f a) (f b)
 
 newtype M a = M { unM :: RWS Scope Env Int a }
     deriving

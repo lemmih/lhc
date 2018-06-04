@@ -27,7 +27,7 @@ library
   -- other-modules:
   other-extensions:    GeneralizedNewtypeDeriving,
                        LambdaCase
-  build-depends:       base >=4.10 && <4.11,
+  build-depends:       base >=4.9,
                        haskell-src-exts >=1.20 && <1.21,
                        haskell-scope >=0.1 && <0.2,
                        haskell-tc >=0.1 && <0.2,

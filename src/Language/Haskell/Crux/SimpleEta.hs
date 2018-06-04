@@ -51,11 +51,13 @@ type Env = (SimpleEtaAnnotation, [Variable])
 data Out = Empty
          | Limit [Variable]
 
+instance Semigroup Out where
+  Empty <> b             = b
+  a <> Empty             = a
+  Limit a <> Limit b     = Limit (zipWith const a b)
+
 instance Monoid Out where
   mempty = Empty
-  mappend Empty b             = b
-  mappend a Empty             = a
-  mappend (Limit a) (Limit b) = Limit (zipWith const a b)
 
 
 
