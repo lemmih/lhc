@@ -21,6 +21,7 @@ import           LLVM.AST.CallingConvention
 import qualified LLVM.AST.Constant            as Constant
 import           LLVM.AST.Global              as Global
 import           LLVM.AST.Linkage             as LLVM
+import           LLVM.AST.Type                (i32, i64, i8)
 import qualified LLVM.AST.Type                as LLVM
 import           LLVM.AST.Visibility
 import           LLVM.Pretty                  as LLVM
@@ -62,7 +63,7 @@ toLLVM bedrock = LLVM.Module
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "exit"
               , returnType = VoidType
-              , parameters = ([ Parameter (IntegerType 32) (UnName 0) []], False)
+              , parameters = ([ Parameter i32 (UnName 0) []], False)
               }
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "llvm.trap"
@@ -71,18 +72,18 @@ toLLVM bedrock = LLVM.Module
               }
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "puts"
-              , returnType = IntegerType 32
-              , parameters = ([ Parameter (PointerType (IntegerType 8) (AddrSpace 0)) (UnName 0) []], False)
+              , returnType = i32
+              , parameters = ([ Parameter (LLVM.ptr i8) (UnName 0) []], False)
               }
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "_lhc_mkTag"
-              , returnType = IntegerType 64
-              , parameters = ([ Parameter (IntegerType 64) (UnName 0) []], False)
+              , returnType = i64
+              , parameters = ([ Parameter i64 (UnName 0) []], False)
               }
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "_lhc_getTag"
-              , returnType = IntegerType 64
-              , parameters = ([ Parameter (IntegerType 64) (UnName 0) []], False)
+              , returnType = i64
+              , parameters = ([ Parameter i64 (UnName 0) []], False)
               }
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "_lhc_isIndirectionP"
@@ -122,7 +123,7 @@ toLLVM bedrock = LLVM.Module
             , Global.functionAttributes = [Right NoUnwind]
             }
     mainDef = do
-      let wordPtrTy = PointerType (IntegerType 64) (AddrSpace 0)
+      let wordPtrTy = LLVM.ptr i64
           entryCall = Call
               { tailCallKind = Nothing
               , callingConvention = lhcCC
@@ -137,12 +138,12 @@ toLLVM bedrock = LLVM.Module
               , metadata = [] }
       newDefinition $ GlobalDefinition functionDefaults
         { name = LLVM.Name "main"
-        , returnType = IntegerType 32
+        , returnType = i32
         , basicBlocks = [BasicBlock (UnName 0) [Do entryCall] (Do $ Unreachable [])] }
     getLayoutDef = do
       layouts <- asks envNodeLayout
       let nLayouts = fromIntegral (length layouts)
-          infoTableType = StructureType False [IntegerType 32, IntegerType 32]
+          infoTableType = StructureType False [i32, i32]
           infoTablesType = ArrayType nLayouts infoTableType
       newDefinition $ GlobalDefinition globalVariableDefaults
         { name = LLVM.Name "_lhc_info_tables"
@@ -209,12 +210,12 @@ typesToLLVM lst  = StructureType False (map typeToLLVM lst)
 typeToLLVM :: Bedrock.Type -> LLVM.Type
 typeToLLVM ty =
     case ty of
-        NodePtr         -> PointerType (IntegerType 64) (AddrSpace 0)
-        Node            -> IntegerType 64
-        StaticNode{}    -> IntegerType 64
-        IWord           -> IntegerType 64
+        NodePtr         -> LLVM.ptr wordTy
+        Node            -> wordTy
+        StaticNode{}    -> wordTy
+        IWord           -> wordTy
         Primitive cType -> cType
-        FramePtr{}      -> PointerType (IntegerType 64) (AddrSpace 0)
+        FramePtr{}      -> LLVM.ptr wordTy
 
 bitSize :: LLVM.Type -> Word32
 bitSize (IntegerType n) = n
@@ -235,7 +236,7 @@ traceLLVM msg = do
         { inBounds = True
         , address = ConstantOperand $ Constant.GlobalReference
                         (PointerType
-                            (ArrayType (fromIntegral (length msg)+1) (IntegerType 8))
+                            (ArrayType (fromIntegral (length msg)+1) i8)
                             (AddrSpace 0))
                         strGlobal
         , indices = [ConstantOperand $ Constant.Int 64 0, ConstantOperand $ Constant.Int 64 0]
@@ -245,10 +246,10 @@ traceLLVM msg = do
         , callingConvention = C
         , returnAttributes = []
         , function = Right $ ConstantOperand $ Constant.GlobalReference
-                        (FunctionType (IntegerType 32) [PointerType (IntegerType 8) (AddrSpace 0)] False)
+                        (FunctionType i32 [LLVM.ptr i8] False)
                         (LLVM.Name "puts")
         , arguments =
-            [ (LocalReference (PointerType (IntegerType 8) (AddrSpace 0)) str, []) ]
+            [ (LocalReference (LLVM.ptr i8) str, []) ]
         , functionAttributes = []
         , metadata = [] }
     return ()
@@ -587,18 +588,18 @@ blockToLLVM = worker
               , callingConvention = C
               , returnAttributes = []
               , function = Right (ConstantOperand $ Constant.GlobalReference
-                                      (FunctionType (IntegerType 64) [IntegerType 64] False)
+                                      (FunctionType wordTy [wordTy] False)
                                       (LLVM.Name "_lhc_getTag"))
               , arguments =
-                  [ (LocalReference (IntegerType 64) word, []) ]
+                  [ (LocalReference i64 word, []) ]
               , functionAttributes = []
               , metadata = [] }
-          else return $ castReference (IntegerType 64) word retTy
+          else return $ castReference i64 word retTy
     mkInst _retTy (Write dst offset var) = do
         casted <- anonInst $ castReference
                     (typeToLLVM $ variableType var)
                     (nameToLLVM $ variableName var)
-                    (IntegerType 64)
+                    i64
         offsetPtr <- anonInst $ GetElementPtr
             { inBounds = True
             , address = LocalReference
@@ -612,7 +613,7 @@ blockToLLVM = worker
                             (typeToLLVM (variableType dst))
                             offsetPtr
             , value = LocalReference
-                            (IntegerType 64)
+                            i64
                             casted
             , maybeAtomicity = Nothing
             , alignment = 1
@@ -638,7 +639,7 @@ blockToLLVM = worker
           , callingConvention = C
           , returnAttributes = []
           , function = Right (ConstantOperand $ Constant.GlobalReference
-                                  (FunctionType (IntegerType 64) [IntegerType 64] False)
+                                  (FunctionType i64 [i64] False)
                                   (LLVM.Name "_lhc_mkTag"))
           , arguments =
               [ (ConstantOperand (Constant.Int 64 (fromIntegral ident)), []) ]
@@ -646,7 +647,7 @@ blockToLLVM = worker
           , metadata = [] }
 
       return BitCast
-          { operand0 = LocalReference (IntegerType 64) header
+          { operand0 = LocalReference i64 header
           , type' = retTy
           , metadata = [] }
     mkInst retTy (Literal (LiteralInt i)) = return BitCast
@@ -658,9 +659,8 @@ blockToLLVM = worker
         return GetElementPtr
             { inBounds = True
             , address = ConstantOperand $ Constant.GlobalReference
-                            (PointerType
-                                (ArrayType (fromIntegral (length str)+1) (IntegerType 8))
-                                (AddrSpace 0))
+                            (LLVM.ptr
+                                (ArrayType (fromIntegral (length str)+1) i8))
                             strGlobal
             , indices =
                 [ ConstantOperand $ Constant.Int 64 0
@@ -670,13 +670,13 @@ blockToLLVM = worker
     mkInst retTy (TypeCast Variable{..}) = return $
         castReference (typeToLLVM variableType) (nameToLLVM variableName) retTy
     mkInst _retTy (Bedrock.Builtin "isIndirection" [PVariable arg]) = do
-      let ty = PointerType (IntegerType 64) (AddrSpace 0)
+      let ty = LLVM.ptr i64
       pure Call
           { tailCallKind = Nothing
           , callingConvention = C
           , returnAttributes = []
           , function = Right (ConstantOperand $ Constant.GlobalReference
-                                  (FunctionType (IntegerType 64) [ty] False)
+                                  (FunctionType i64 [ty] False)
                                   (LLVM.Name "_lhc_isIndirectionP"))
           , arguments =
               [ (LocalReference
@@ -685,7 +685,7 @@ blockToLLVM = worker
           , functionAttributes = []
           , metadata = [] }
     mkInst _retTy (Bedrock.Builtin "getIndirection" [PVariable arg]) = do
-      let ty = PointerType (IntegerType 64) (AddrSpace 0)
+      let ty = LLVM.ptr i64
       pure Call
           { tailCallKind = Nothing
           , callingConvention = C
@@ -700,7 +700,7 @@ blockToLLVM = worker
           , functionAttributes = []
           , metadata = [] }
     mkInst _retTy (Bedrock.Builtin "setIndirection" [PVariable ptr, PVariable newVal]) = do
-      let ty = PointerType (IntegerType 64) (AddrSpace 0)
+      let ty = LLVM.ptr i64
       pure Call
           { tailCallKind = Nothing
           , callingConvention = C

@@ -18,6 +18,7 @@ import           LLVM.AST.Global        as Global (initializer, isConstant,
                                                    linkage, unnamedAddr)
 import qualified LLVM.AST.Global        as Global
 import           LLVM.AST.Linkage       as LLVM
+import           LLVM.AST.Type          (i8)
 
 import           Data.Bedrock           (NodeName)
 import qualified Data.Bedrock           as Bedrock
@@ -91,10 +92,10 @@ anonGlobal global = do
 globalString :: Monad m => String -> GenT m Name
 globalString str =
   anonGlobal globalVariableDefaults
-    { initializer = Just $ Constant.Array (IntegerType 8)
+    { initializer = Just $ Constant.Array i8
         [ Constant.Int 8 (fromIntegral $ ord c)
         | c <- str++"\0" ]
-    , Global.type' = (ArrayType (fromIntegral (length str)+1) (IntegerType 8))
+    , Global.type' = (ArrayType (fromIntegral (length str)+1) i8)
     , linkage = Internal
     , isConstant = True
     , unnamedAddr = Just GlobalAddr
