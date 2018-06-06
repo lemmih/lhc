@@ -37,6 +37,7 @@ toLLVM bedrock = LLVM.Module
     , moduleDataLayout = Nothing
     , moduleTargetTriple = Nothing
     , moduleDefinitions =
+        TypeDefinition (mkName "word") (Just i64) :
         [ GlobalDefinition functionDefaults
             { name = LLVM.Name (fromString foreignName)
             , returnType = foreignReturn
@@ -51,15 +52,14 @@ toLLVM bedrock = LLVM.Module
             , addrSpace = AddrSpace 0
             , unnamedAddr = Just GlobalAddr
             , isConstant = False
-            , Global.type' = LLVM.ptr LLVM.i64
-            , initializer = Just $ Constant.Null $ LLVM.ptr LLVM.i64
+            , Global.type' = LLVM.ptr wordTy
+            , initializer = Just $ Constant.Null $ LLVM.ptr wordTy
             , section = Nothing }
         | reg <- Set.toList $ allRegisters bedrock ] ++
         defs
     }
   where
     defs = execGenModule (mkEnv bedrock) $ do
-      newDefinition $ TypeDefinition (mkName "word") (Just LLVM.i64)
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "exit"
               , returnType = VoidType
@@ -77,13 +77,13 @@ toLLVM bedrock = LLVM.Module
               }
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "_lhc_mkTag"
-              , returnType = i64
-              , parameters = ([ Parameter i64 (UnName 0) []], False)
+              , returnType = wordTy
+              , parameters = ([ Parameter wordTy (UnName 0) []], False)
               }
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "_lhc_getTag"
-              , returnType = i64
-              , parameters = ([ Parameter i64 (UnName 0) []], False)
+              , returnType = wordTy
+              , parameters = ([ Parameter wordTy (UnName 0) []], False)
               }
       newDefinition $ GlobalDefinition functionDefaults
               { name = LLVM.Name "_lhc_isIndirectionP"
@@ -123,7 +123,7 @@ toLLVM bedrock = LLVM.Module
             , Global.functionAttributes = [Right NoUnwind]
             }
     mainDef = do
-      let wordPtrTy = LLVM.ptr i64
+      let wordPtrTy = LLVM.ptr wordTy
           entryCall = Call
               { tailCallKind = Nothing
               , callingConvention = lhcCC
@@ -219,6 +219,7 @@ typeToLLVM ty =
 
 bitSize :: LLVM.Type -> Word32
 bitSize (IntegerType n) = n
+bitSize (NamedTypeReference (LLVM.Name "word")) = 64
 bitSize ty              = error $ "Data.Bedrock.LLVM.bitSize: " ++ show ty
 
 nameToLLVM :: Bedrock.Name -> LLVM.Name
@@ -591,15 +592,15 @@ blockToLLVM = worker
                                       (FunctionType wordTy [wordTy] False)
                                       (LLVM.Name "_lhc_getTag"))
               , arguments =
-                  [ (LocalReference i64 word, []) ]
+                  [ (LocalReference wordTy word, []) ]
               , functionAttributes = []
               , metadata = [] }
-          else return $ castReference i64 word retTy
+          else return $ castReference wordTy word retTy
     mkInst _retTy (Write dst offset var) = do
         casted <- anonInst $ castReference
                     (typeToLLVM $ variableType var)
                     (nameToLLVM $ variableName var)
-                    i64
+                    wordTy
         offsetPtr <- anonInst $ GetElementPtr
             { inBounds = True
             , address = LocalReference
@@ -613,7 +614,7 @@ blockToLLVM = worker
                             (typeToLLVM (variableType dst))
                             offsetPtr
             , value = LocalReference
-                            i64
+                            wordTy
                             casted
             , maybeAtomicity = Nothing
             , alignment = 1
@@ -639,7 +640,7 @@ blockToLLVM = worker
           , callingConvention = C
           , returnAttributes = []
           , function = Right (ConstantOperand $ Constant.GlobalReference
-                                  (FunctionType i64 [i64] False)
+                                  (FunctionType wordTy [wordTy] False)
                                   (LLVM.Name "_lhc_mkTag"))
           , arguments =
               [ (ConstantOperand (Constant.Int 64 (fromIntegral ident)), []) ]
@@ -647,7 +648,7 @@ blockToLLVM = worker
           , metadata = [] }
 
       return BitCast
-          { operand0 = LocalReference i64 header
+          { operand0 = LocalReference wordTy header
           , type' = retTy
           , metadata = [] }
     mkInst retTy (Literal (LiteralInt i)) = return BitCast
@@ -670,13 +671,12 @@ blockToLLVM = worker
     mkInst retTy (TypeCast Variable{..}) = return $
         castReference (typeToLLVM variableType) (nameToLLVM variableName) retTy
     mkInst _retTy (Bedrock.Builtin "isIndirection" [PVariable arg]) = do
-      let ty = LLVM.ptr i64
       pure Call
           { tailCallKind = Nothing
           , callingConvention = C
           , returnAttributes = []
           , function = Right (ConstantOperand $ Constant.GlobalReference
-                                  (FunctionType i64 [ty] False)
+                                  (FunctionType wordTy [LLVM.ptr wordTy] False)
                                   (LLVM.Name "_lhc_isIndirectionP"))
           , arguments =
               [ (LocalReference
@@ -685,13 +685,12 @@ blockToLLVM = worker
           , functionAttributes = []
           , metadata = [] }
     mkInst _retTy (Bedrock.Builtin "getIndirection" [PVariable arg]) = do
-      let ty = LLVM.ptr i64
       pure Call
           { tailCallKind = Nothing
           , callingConvention = C
           , returnAttributes = []
           , function = Right (ConstantOperand $ Constant.GlobalReference
-                                  (FunctionType ty [ty] False)
+                                  (FunctionType (LLVM.ptr wordTy) [LLVM.ptr wordTy] False)
                                   (LLVM.Name "_lhc_getIndirectionP"))
           , arguments =
               [ (LocalReference
@@ -700,13 +699,12 @@ blockToLLVM = worker
           , functionAttributes = []
           , metadata = [] }
     mkInst _retTy (Bedrock.Builtin "setIndirection" [PVariable ptr, PVariable newVal]) = do
-      let ty = LLVM.ptr i64
       pure Call
           { tailCallKind = Nothing
           , callingConvention = C
           , returnAttributes = []
           , function = Right (ConstantOperand $ Constant.GlobalReference
-                                  (FunctionType VoidType [ty, ty] False)
+                                  (FunctionType VoidType [LLVM.ptr wordTy, LLVM.ptr wordTy] False)
                                   (LLVM.Name "_lhc_setIndirection"))
           , arguments =
               [ (LocalReference
@@ -731,8 +729,12 @@ castReference origType origName destType =
         destType
         []
   where
-    cons PointerType{} IntegerType{}     = PtrToInt
-    cons IntegerType{} PointerType{}     = IntToPtr
+    cons PointerType{} PointerType{}     = BitCast
+    cons PointerType{} _                 = PtrToInt
+    cons _ PointerType{}                 = IntToPtr
     cons (IntegerType a) (IntegerType b) | a > b = Trunc
     cons (IntegerType a) (IntegerType b) | a < b = ZExt
+    cons a b
+      | bitSize a > bitSize b = Trunc
+      | bitSize a < bitSize b = ZExt
     cons _ _                             = BitCast
