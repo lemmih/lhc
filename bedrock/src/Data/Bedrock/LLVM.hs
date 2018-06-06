@@ -50,8 +50,8 @@ toLLVM bedrock = LLVM.Module
             , addrSpace = AddrSpace 0
             , unnamedAddr = Just GlobalAddr
             , isConstant = False
-            , Global.type' = PointerType (IntegerType 64) (AddrSpace 0)
-            , initializer = Just $ Constant.Null $ PointerType (IntegerType 64) (AddrSpace 0)
+            , Global.type' = LLVM.ptr LLVM.i64
+            , initializer = Just $ Constant.Null $ LLVM.ptr LLVM.i64
             , section = Nothing }
         | reg <- Set.toList $ allRegisters bedrock ] ++
         defs

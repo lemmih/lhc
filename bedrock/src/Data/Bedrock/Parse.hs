@@ -9,6 +9,7 @@ import qualified Text.ParserCombinators.Parsec.Token    as P
 
 import           Data.Bedrock
 import qualified LLVM.AST            as LLVM (Type (..))
+import qualified LLVM.AST.Type       as LLVM
 
 -------------------------------------------------------------------------------
 -- Parsing
@@ -82,7 +83,22 @@ parseType = choice
 
 -- i8 i32 i64 void i64*
 parseLLVMType :: Parser LLVM.Type
-parseLLVMType = error "parsing llvm types not defined"
+parseLLVMType = withPtrs (try fnType <|> base)
+  where
+    fnType = do
+      ret <- withPtrs base
+      args <- parens (parseLLVMType `sepBy` comma)
+      return $ LLVM.FunctionType ret args False
+    withPtrs p = do
+      a <- p
+      ptrs <- many (symbol "*")
+      return $ foldl (\b _ -> LLVM.ptr b) a ptrs
+    base = choice
+      [ reserved "i8" >> return LLVM.i8
+      , reserved "i16" >> return LLVM.i16
+      , reserved "i32" >> return LLVM.i32
+      , reserved "i64" >> return LLVM.i64
+      , reserved "void" >> return LLVM.VoidType ]
 
 parseVariable :: Parser Variable
 parseVariable = do

@@ -82,6 +82,7 @@ import           Control.Applicative (pure, (<$>), (<*>))
 import           Data.Data
 import           GHC.Generics
 import qualified LLVM.AST            as LLVM (Type (..), mkName)
+import qualified LLVM.AST.Type       as LLVM
 import           Test.QuickCheck     hiding (Function)
 
 data Name = Name
@@ -289,19 +290,19 @@ recursive deep shallow =
     n -> resize (n`div`2) $ oneof [deep, shallow]
 
 instance Arbitrary LLVM.Type where
-  arbitrary = pure (LLVM.IntegerType 8)
-    -- recursive
-    --   (CFunction <$> base <*> arbitrary)
-    --   base
-    -- where
-    --   base =
-    --     recursive
-    --       (CPointer <$> base)
-    --       (elements
-    --         [ I8
-    --         , I32
-    --         , I64
-    --         , CVoid ])
+  arbitrary =
+    recursive
+      (LLVM.FunctionType <$> base <*> arbitrary <*> pure False)
+      base
+    where
+      base =
+        recursive
+          (LLVM.ptr <$> base)
+          (elements
+            [ LLVM.i8
+            , LLVM.i32
+            , LLVM.i64
+            , LLVM.VoidType ])
 
 instance Arbitrary Foreign where
   arbitrary = Foreign
