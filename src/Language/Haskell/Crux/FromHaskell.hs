@@ -318,7 +318,7 @@ convertDecl decl =
     mapM_ pushDecl =<< convertDecl' decl
 
 reifyTypeVariables :: TC.Type -> Expr -> Expr
-reifyTypeVariables (TC.TyForall tvs _) = Lam (map tcVarToVariable tvs)
+-- reifyTypeVariables (TC.TyForall tvs _) = Lam (map tcVarToVariable tvs)
 reifyTypeVariables _                   = id
 
 convertDecl' :: HS.Decl Typed -> M [Declaration]
@@ -640,15 +640,16 @@ unpackString = Var (Variable name ty)
 
 
 findProof :: HS.QName Typed -> Expr -> Expr
-findProof name =
-    case tyDecl of
-      TC.Coerced _ _ proof -> convertProof proof
-      TC.Scoped{}          -> id
-  where
-    tyDecl =
-      case name of
-        HS.UnQual _ qname -> HS.ann qname
-        _                 -> HS.ann name
+findProof _ = id
+-- findProof name =
+--     case tyDecl of
+--       TC.Coerced _ _ proof -> convertProof proof
+--       TC.Scoped{}          -> id
+--   where
+--     tyDecl =
+--       case name of
+--         HS.UnQual _ qname -> HS.ann qname
+--         _                 -> HS.ann name
 
 tcVarToVariable :: TC.TcVar -> Variable
 tcVarToVariable (TC.TcVar name _loc) =
@@ -663,6 +664,9 @@ convertProof p = error $ "Weird proof: " ++ show p
 
 tyToExpr :: TC.Type -> Expr
 tyToExpr (TC.TyRef ref) = Var (tcVarToVariable ref)
+tyToExpr (TC.TyList elt) = App (Con listCon) (tyToExpr elt)
+tyToExpr (TC.TyCon (QualifiedName m ident)) = Con (Variable (Name [m] ident 0) TC.TyStar)
+tyToExpr (TC.TyTuple []) = Con unitTCon
 tyToExpr ty             = error $ "Weird type: " ++ show ty
 
 
@@ -887,6 +891,10 @@ charCon :: Variable
 charCon = Variable (Name ["LHC.Prim"] "C#" 0)
   (i32 `TC.TyFun` charTy)
 
+listCon :: Variable
+listCon = Variable (Name ["@","LHC","Prim"] "List" 0)
+  (TC.TyFun TC.TyStar TC.TyStar)
+
 -- data List a = Nil | Cons a (List a)
 nilCon :: Variable
 nilCon = Variable (Name ["LHC.Prim"] "Nil" 0)
@@ -900,6 +908,10 @@ consCon = Variable (Name ["LHC.Prim"] "Cons" 0)
     (TC.TyForall [a] ([] :=> (TC.TyRef a `TC.TyFun` TC.TyList (TC.TyRef a) `TC.TyFun` TC.TyList (TC.TyRef a))))
   where
     a = TcVar "a" []
+
+unitTCon :: Variable
+unitTCon = Variable (Name ["@","LHC.Prim"] "Unit" 0)
+  (TC.TyStar)
 
 -- data Unit = Unit
 unitCon :: Variable
