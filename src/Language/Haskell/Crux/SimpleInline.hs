@@ -1,16 +1,17 @@
 module Language.Haskell.Crux.SimpleInline
   ( simpleInline ) where
 
-import           Data.Map (Map)
-import           Data.Set (Set)
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import           Data.Graph
-import           Data.Array
 import           Control.Monad.Reader
-import           Control.Monad.State         ( modify, gets )
-import           Control.Monad.RWS           ( RWS, evalRWS )
-import           Control.Monad.Writer        ( listen, tell )
+import           Control.Monad.RWS                   (RWS, evalRWS)
+import           Control.Monad.State                 (gets, modify)
+import           Control.Monad.Writer                (listen, tell)
+import           Data.Array
+import           Data.Graph
+import           Data.Map                            (Map)
+import qualified Data.Map                            as Map
+import           Data.Semigroup
+import           Data.Set                            (Set)
+import qualified Data.Set                            as Set
 
 import           Language.Haskell.Crux
 import           Language.Haskell.Crux.FreeVariables
@@ -55,13 +56,13 @@ simpleInline m =
 
 mayInline :: Cost -> Bool -> Bool
 mayInline (Cheap n) _isOneShot | n < 20 = True
-mayInline Expensive True = True
-mayInline _ _ = False
+mayInline Expensive True       = True
+mayInline _ _                  = False
 
 splitArguments :: Expr -> ([Variable], Expr)
 splitArguments (Lam vars e) = (vars, e)
 -- splitArguments (WithCoercion _ e) = splitArguments e
-splitArguments e = ([], e)
+splitArguments e            = ([], e)
 
 
 type Env = Map Name Expr
@@ -80,10 +81,7 @@ instance Semigroup Cost where
 
 instance Monoid Cost where
   mempty = Cheap 0
-  mappend (Cheap a) (Cheap b) = Cheap (a+b)
-  mappend _ Prohibitive = Prohibitive
-  mappend Prohibitive _ = Prohibitive
-  mappend _ _ = Expensive
+  mappend = (<>)
 type M a = RWS Env Cost State a
 
 uniqueDecl :: Declaration -> M Declaration
@@ -178,7 +176,7 @@ collectApp = worker []
       case expr of
         App a b -> worker (b:acc) a
         -- WithCoercion _ e -> worker acc e
-        _ -> (expr, acc)
+        _       -> (expr, acc)
 
 consume :: Variable -> M ()
 consume var = do
@@ -198,7 +196,7 @@ bind var action = do
 bindMany :: [Variable] -> ([Variable] -> M a) -> M a
 bindMany vars action = worker [] vars
   where
-    worker acc [] = action (reverse acc)
+    worker acc []     = action (reverse acc)
     worker acc (x:xs) = bind x $ \x' -> worker (x':acc) xs
 
 replace :: Variable -> Expr -> M a -> M a
@@ -207,7 +205,7 @@ replace old new = local (Map.insert (varName old) new)
 replaceMany :: [(Variable, Expr)] -> M a -> M a
 replaceMany vars action = worker vars
   where
-    worker [] = action
+    worker []             = action
     worker ((key,val):xs) = replace key val $ worker xs
 
 

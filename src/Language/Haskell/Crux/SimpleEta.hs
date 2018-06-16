@@ -13,6 +13,7 @@ import           Data.Graph                          (SCC (..),
                                                       stronglyConnComp)
 import           Data.Map                            (Map)
 import qualified Data.Map                            as Map
+import           Data.Semigroup
 import qualified Data.Set                            as Set
 
 -- 1. order by scc
@@ -58,7 +59,7 @@ instance Semigroup Out where
 
 instance Monoid Out where
   mempty = Empty
-
+  mappend = (<>)
 
 
 etaTopLevel :: SimpleEtaAnnotation -> Expr -> ([Variable], Expr)

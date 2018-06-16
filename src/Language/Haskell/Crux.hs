@@ -2,6 +2,7 @@
 module Language.Haskell.Crux where
 
 import           Data.List
+import qualified Data.Semigroup as Semigroup
 import           Language.Haskell.TypeCheck        (Proof (..), Type (..))
 import           Language.Haskell.TypeCheck.Pretty
 import qualified LLVM.AST                          as LLVM (Type)
@@ -91,14 +92,15 @@ data Literal
 -- Instances
 
 
-instance Semigroup Module where
-  a<>b = Module
+instance Semigroup.Semigroup Module where
+  a <> b = Module
     { cruxForeigns = cruxForeigns a ++ cruxForeigns b
     , cruxDecls = cruxDecls a ++ cruxDecls b
     , cruxNodes = cruxNodes a ++ cruxNodes b
     , cruxNewTypes = cruxNewTypes a ++ cruxNewTypes b }
 instance Monoid Module where
     mempty = Module [] [] [] []
+    mappend = (Semigroup.<>)
 
 instance Pretty Module where
     pretty m = vsep $ concat

@@ -12,6 +12,7 @@ import           Data.List                  (transpose)
 import           Data.Map                   (Map)
 import qualified Data.Map                   as Map
 import           Data.Maybe
+import           Data.Semigroup
 import qualified Language.Haskell.Exts      as HS
 
 import           Language.Haskell.Crux
@@ -42,7 +43,7 @@ instance Semigroup Scope where
     where w f = mappend (f a) (f b)
 
 instance Monoid Scope where
-    mempty = Scope
+  mempty = Scope
         { scopeVariables    = Map.empty
         , scopeNodes        = Map.empty
         , scopeConstructors = Map.empty
@@ -52,6 +53,7 @@ instance Monoid Scope where
             }
         , scopeArity         = Map.empty
         }
+  mappend = (<>)
 
 data Env = Env
     { envScope        :: Scope
@@ -81,6 +83,7 @@ instance Monoid Env where
         , envDecls    = mempty
         , envConstructors = mempty
         }
+    mappend = (<>)
 
 newtype M a = M { unM :: RWS Scope Env Int a }
     deriving
@@ -314,27 +317,32 @@ convertDecl :: HS.Decl Typed -> M ()
 convertDecl decl =
     mapM_ pushDecl =<< convertDecl' decl
 
+reifyTypeVariables :: TC.Type -> Expr -> Expr
+reifyTypeVariables (TC.TyForall tvs _) = Lam (map tcVarToVariable tvs)
+reifyTypeVariables _                   = id
+
 convertDecl' :: HS.Decl Typed -> M [Declaration]
 convertDecl' decl =
   case decl of
     HS.FunBind tyDecl matches -> do
-      let mbProof =
+      let proof =
             case tyDecl of
-              TC.Coerced _ _ proof -> WithProof proof
-              TC.Scoped{}          -> id
+              TC.Coerced _ _ proof -> proof
+              TC.Scoped{}          -> error "missing proof"
       let name = matchInfo matches
           fnArgNames = matchArgNames matches
           -- arity = length fnArgNames
       -- let Origin _ src = HS.ann name
       -- coercion <- findCoercion src
-      ty <- lookupType name
+      -- ty <- lookupType name
+      let ty = TC.reifyProof proof
       let argTys = splitTy ty -- (applyCoercion coercion ty)
       argNames <- forM fnArgNames $ maybe (newName "arg") bindName
       let args = zipWith Variable argNames argTys
       decl' <- Declaration
           <$> pure ty
           <*> bindName name
-          <*> (mbProof . Lam args
+          <*> (reifyTypeVariables ty <$> Lam args
                   <$> convertMatches args matches)
       return [decl']
     HS.PatBind _ (HS.PVar _ name) rhs _binds -> do
@@ -634,13 +642,29 @@ unpackString = Var (Variable name ty)
 findProof :: HS.QName Typed -> Expr -> Expr
 findProof name =
     case tyDecl of
-      TC.Coerced _ _ proof -> WithProof proof
+      TC.Coerced _ _ proof -> convertProof proof
       TC.Scoped{}          -> id
   where
     tyDecl =
       case name of
         HS.UnQual _ qname -> HS.ann qname
         _                 -> HS.ann name
+
+tcVarToVariable :: TC.TcVar -> Variable
+tcVarToVariable (TC.TcVar name _loc) =
+  Variable (Name ["@"] name 0) TC.TyStar
+
+convertProof :: TC.Proof -> Expr -> Expr
+convertProof (TC.ProofAbs tvs p) = Lam (map tcVarToVariable tvs) . convertProof p
+convertProof TC.ProofSrc{} = id
+convertProof (TC.ProofAp p args) =
+  \e -> foldl App (convertProof p e) (map tyToExpr args)
+convertProof p = error $ "Weird proof: " ++ show p
+
+tyToExpr :: TC.Type -> Expr
+tyToExpr (TC.TyRef ref) = Var (tcVarToVariable ref)
+tyToExpr ty             = error $ "Weird type: " ++ show ty
+
 
 convertExp :: HS.Exp Typed -> M Expr
 convertExp expr =
@@ -818,13 +842,14 @@ exprType :: Expr -> M TC.Type
 exprType expr =
     case expr of
         Var v -> return (varType v)
+        Con c -> return (varType c)
         App a _b -> do
             aType <- exprType a
             case aType of
                 TC.TyFun _ ret                       -> return ret
                 TC.TyForall _ (_ :=> TC.TyFun _ ret) -> return ret
                 _                                    -> return TC.TyUndefined
-        -- WithCoercion _ e -> exprType e
+        WithProof _ e -> exprType e
         Let _ e -> exprType e
         LetStrict _ _ e -> exprType e
         Case _ _ (Just e) _ -> exprType e
