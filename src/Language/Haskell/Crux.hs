@@ -134,7 +134,7 @@ instance Pretty Declaration where
 
 instance Pretty NodeDefinition where
     pretty (NodeDefinition name args) =
-        text "node" <+> pretty name <+> hsep (map pretty args)
+        text "node" <+> pretty name <+> hsep (map (prettyPrec appPrecedence) args)
 
 instance Pretty NewType where
     pretty (IsNewType con) =
