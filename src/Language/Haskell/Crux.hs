@@ -3,7 +3,7 @@ module Language.Haskell.Crux where
 
 import           Data.List
 import qualified Data.Semigroup as Semigroup
-import           Language.Haskell.TypeCheck        (Proof (..), Type (..))
+import           Language.Haskell.TypeCheck        (Type (..))
 import           Language.Haskell.TypeCheck.Pretty
 import qualified LLVM.AST                          as LLVM (Type)
 import qualified Text.PrettyPrint.ANSI.Leijen      as Doc
