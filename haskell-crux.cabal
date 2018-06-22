@@ -15,7 +15,6 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Language.Haskell.Crux,
-                       Language.Haskell.Crux.NewType,
                        Language.Haskell.Crux.FreeVariables,
                        Language.Haskell.Crux.SimpleEta,
                        Language.Haskell.Crux.Interface,
