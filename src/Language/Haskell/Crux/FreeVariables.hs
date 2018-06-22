@@ -44,10 +44,8 @@ freeVariablesExpr expr =
       freeVariablesExpr scrut `Set.union`
       maybe Set.empty freeVariablesExpr mbDefault `Set.union`
       Set.unions (map freeVariablesAlt alts)
-    Cast e _ty -> freeVariablesExpr e
+    Convert e _ty -> freeVariablesExpr e
     Id{} -> Set.empty
-    WithProof _p e -> freeVariablesExpr e
-    -- WithCoercion _coercion e -> freeVariablesExpr e
 
 freeVariablesAlt :: Alt -> Set Name
 freeVariablesAlt (Alt pattern e) =

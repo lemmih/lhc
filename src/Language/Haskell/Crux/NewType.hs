@@ -24,7 +24,7 @@ lower m = m
         Lit{} -> e
         WithExternal{} -> e
         ExternalPure{} -> e
-        App (Con con) b | isNewtype con -> expr b
+        App (App (Con con) _) b | isNewtype con -> expr b
         App a b -> App (expr a) (expr b)
         Lam vars rest -> Lam vars (expr rest)
         Let bind rest -> Let (letBind bind) (expr rest)
@@ -32,10 +32,8 @@ lower m = m
         Case scrut _ _def [Alt (ConPat con [arg]) branch]
           | isNewtype con -> Let (NonRec arg scrut) (expr branch)
         Case scrut var defaultBranch alts -> Case (expr scrut) var (fmap expr defaultBranch) (map alt alts)
-        Cast rest ty -> Cast (expr rest) ty
+        Convert rest ty -> Convert (expr rest) ty
         Id -> e
-        WithProof p e' -> WithProof p (expr e')
-        -- WithCoercion coercion rest -> WithCoercion coercion (expr rest)
     alt (Alt pattern branch) = Alt pattern (expr branch)
     letBind (NonRec bind rhs) = NonRec bind (expr rhs)
     letBind (Rec binds) = Rec [ (bind, expr rhs) | (bind, rhs) <- binds ]

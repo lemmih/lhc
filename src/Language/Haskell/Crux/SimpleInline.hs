@@ -143,10 +143,9 @@ uniqueExpr expr = do
           <*> pure scrut'
           <*> uniqueMaybe uniqueExpr mbDef
           <*> mapM uniqueAlt alts
-    Cast e ty ->
-      Cast <$> uniqueExpr e <*> pure ty
+    Convert e ty ->
+      Convert <$> uniqueExpr e <*> pure ty
     Id -> pure Id
-    WithProof p e -> WithProof p <$> uniqueExpr e
 
 uniqueAlt :: Alt -> M Alt
 uniqueAlt (Alt pattern e) =

@@ -38,9 +38,8 @@ moduleGraph m =
           exprDependencies scrut ++
           maybe [] exprDependencies defaultBranch ++
           concatMap alternativeDependencies alts
-        Cast e _ty -> exprDependencies e
+        Convert e _ty -> exprDependencies e
         Id -> []
-        WithProof _p e -> exprDependencies e
         -- WithCoercion _Coercion e -> exprDependencies e
     alternativeDependencies (Alt _pattern branch) = exprDependencies branch
     letBindDependencies (NonRec _var e) = exprDependencies e

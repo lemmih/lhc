@@ -33,7 +33,7 @@ data Declaration = Declaration
   , declBody :: Expr }
   deriving (Show)
 
-data NodeDefinition = NodeDefinition Name [Type]
+data NodeDefinition = NodeDefinition Variable
     deriving (Show)
 
 newtype NewType = IsNewType Variable deriving (Show)
@@ -55,10 +55,9 @@ data Expr
     | Let LetBind Expr
     | LetStrict Variable Expr Expr
     | Case Expr Variable (Maybe Expr) [Alt]
-    | Cast Expr Type
+    | Convert Expr Type
     | Id
-    | WithProof Proof Expr
-    -- WithCoercion Coercion Expr
+    | Cast
     deriving ( Show )
 
 data LetBind
@@ -133,8 +132,10 @@ instance Pretty Declaration where
         pretty name <+> equals <$$> indent 2 (pretty expr)
 
 instance Pretty NodeDefinition where
-    pretty (NodeDefinition name args) =
-        text "node" <+> pretty name <+> hsep (map (prettyPrec appPrecedence) args)
+  pretty (NodeDefinition node) =
+    text "node" <+> ppTypedVariable node
+    -- pretty (NodeDefinition name args) =
+    --     text "node" <+> pretty name <+> hsep (map (prettyPrec appPrecedence) args)
 
 instance Pretty NewType where
     pretty (IsNewType con) =
@@ -177,16 +178,18 @@ instance Pretty Expr where
         text "case" <+> hang 2 (pretty scrut) <+> text "of" <$$>
         indent 2 ( ppTypedVariable var <$$> vsep (map pretty alts) <$$>
           text "DEFAULT" <+> rarrow <$$> indent 2 (pretty defaultBranch))
-      Cast scrut ty ->
+      Convert scrut ty ->
         parens (pretty scrut <+> text ":::" <+> pretty ty)
+      Cast ->
+        text "cast"
       Id -> text "id"
       -- WithCoercion CoerceId e -> pretty e
       -- WithCoercion (CoerceAp tys) e -> parensIf (p > 0) $
       --   pretty e <+> fillSep (map (prettyPrec appPrecedence) tys)
       -- WithCoercion c e -> parensIf (p > 0) $
       --   pretty c <+> pretty e
-      WithProof proof e -> parensIf (p > 0) $
-        pretty proof <+> pretty e
+      -- WithProof proof e -> parensIf (p > 0) $
+      --   pretty proof <+> pretty e
       WithExternal outV outS cName args _st cont ->
         ppTypedVariable outV <> comma <+> pretty outS <+> text "←" <+>
           text "external" <+> text cName <+> ppVars args <$$>

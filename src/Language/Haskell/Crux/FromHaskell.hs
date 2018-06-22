@@ -30,7 +30,7 @@ data Scope = Scope
     , scopeNodes        :: Map QualifiedName Name
     , scopeConstructors :: Map Entity Name -- XXX: Merge with scopeNodes?
     , scopeTcEnv        :: TcEnv
-    , scopeArity        :: Map Entity Int
+    , scopeNewTypes     :: [Variable]
     }
 
 instance Semigroup Scope where
@@ -39,7 +39,8 @@ instance Semigroup Scope where
       , scopeNodes        = w scopeNodes
       , scopeConstructors = w scopeConstructors
       , scopeTcEnv        = scopeTcEnv a
-      , scopeArity        = w scopeArity }
+      , scopeNewTypes     = w scopeNewTypes
+      }
     where w f = mappend (f a) (f b)
 
 instance Monoid Scope where
@@ -51,7 +52,7 @@ instance Monoid Scope where
             { -- Globals such as Nothing, Just, etc
               tcEnvValues    = Map.empty
             }
-        , scopeArity         = Map.empty
+        , scopeNewTypes = []
         }
   mappend = (<>)
 
@@ -141,22 +142,22 @@ nameFromEntity entity =
   case entityName entity of
     QualifiedName m ident -> Name [m] ident 0
 
-bindName :: HS.Name Typed -> M Name
-bindName hsName =
+expectEntity :: HS.Name Typed -> Entity
+expectEntity hsName =
   case nameInfo hsName of
-    Scope.Resolved entity -> do
-      let name = nameFromEntity entity
-      tell $ mempty{envScope = mempty
-          { scopeVariables = Map.singleton entity name } }
-      return name
-    Scope.Binding entity -> do
-      let name = nameFromEntity entity
-      tell $ mempty{envScope = mempty
-          { scopeVariables = Map.singleton entity name } }
-      return name
-    -- Scope.Binding _ -> error "bindName: Binding"
-    Scope.None -> error "bindName: None"
-    Scope.ScopeError err -> error $ "bindName: ScopeError " ++ show err
+    Scope.Resolved entity -> entity
+    Scope.Binding entity -> entity
+    Scope.None -> error "expectEntity: None"
+    Scope.ScopeError err -> error $ "expectEntity: ScopeError " ++ show err
+
+bindName :: HS.Name Typed -> M Name
+bindName hsName = do
+    tell $ mempty{envScope = mempty
+      { scopeVariables = Map.singleton entity name } }
+    return name
+  where
+    entity = expectEntity hsName
+    name = nameFromEntity entity
 
 bindVariable :: HS.Name Typed -> M Variable
 bindVariable hsName = do
@@ -187,8 +188,7 @@ bindConstructor dataCon arity =
             let n = Name [m] ident 0
             tell $ mempty{envScope = mempty
                 { scopeNodes = Map.singleton qname n
-                , scopeVariables = Map.singleton entity n
-                , scopeArity = Map.singleton entity arity } }
+                , scopeVariables = Map.singleton entity n } }
             return n
         Scope.Resolved _ -> error "bindConstructor: Resolved"
         Scope.None -> error "bindConstructor: None"
@@ -272,7 +272,9 @@ convert tcEnv (HS.Module _ _ _ _ decls) = Module
     , cruxNewTypes  = envNewTypes env }
   where
     (_ns, env) = runM tcEnv $ do
-        mapM_ convertDecl decls
+        nts <- catMaybes <$> mapM convertNewTypes decls
+        local (\s -> s{scopeNewTypes = nts}) $
+          mapM_ convertDecl decls
 convert _ _ = error "HaskellToCore.convert"
 
 -- Return function name.
@@ -318,8 +320,19 @@ convertDecl decl =
     mapM_ pushDecl =<< convertDecl' decl
 
 reifyTypeVariables :: TC.Type -> Expr -> Expr
--- reifyTypeVariables (TC.TyForall tvs _) = Lam (map tcVarToVariable tvs)
+reifyTypeVariables (TC.TyForall tvs _) = Lam (map tcVarToVariable tvs)
 reifyTypeVariables _                   = id
+
+convertNewTypes :: HS.Decl Typed -> M (Maybe Variable)
+convertNewTypes decl =
+  case decl of
+    HS.DataDecl _ HS.NewType{} _ctx _dhead [HS.QualConDecl _ _tyvars _ (HS.ConDecl _ name tys)] _deriving -> do
+        conName <- bindConstructor name (length tys)
+        ty <- lookupType name
+        let nt = Variable conName ty
+        pushNewType $ IsNewType nt
+        return $ Just nt
+    _ -> return Nothing
 
 convertDecl' :: HS.Decl Typed -> M [Declaration]
 convertDecl' decl =
@@ -368,9 +381,10 @@ convertDecl' decl =
 
         return [decl']
 
-    HS.DataDecl _ HS.DataType{} _ctx _dhead qualCons _deriving -> do
-        mapM_ (convertQualCon False) qualCons
-        return []
+    HS.DataDecl _ HS.DataType{} _ctx dhead qualCons _deriving -> do
+      dheadToNode dhead
+      mapM_ (convertQualCon False) qualCons
+      return []
     HS.DataDecl _ HS.NewType{} _ctx _dhead qualCons _deriving -> do
         mapM_ (convertQualCon True) qualCons
         return []
@@ -385,6 +399,18 @@ isPrimitive "-#"         = True
 isPrimitive "sdiv#"      = True
 isPrimitive "srem#"      = True
 isPrimitive _            = False
+
+annotateName :: String -> Name -> Name
+annotateName ns (Name m ident uniq) = Name (ns:m) ident uniq
+
+dheadToNode :: HS.DeclHead Typed -> M ()
+dheadToNode dhead = do
+    let (hsName, args) = split dhead []
+    let name = annotateName "@" $ nameFromEntity $ expectEntity hsName
+    pushNode $ NodeDefinition (Variable name (foldr TC.TyFun TC.TyStar args))
+  where
+    split (HS.DHead _ name) acc = (name, reverse acc)
+    split (HS.DHApp _ dh _ty) acc = split dh (TC.TyStar : acc)
 
 convertMatches :: [Variable] -> [HS.Match Typed] -> M Expr
 convertMatches _args [] = error "Compiler.HaskellToCore.convertMatches"
@@ -435,7 +461,7 @@ convertConDecl isNewtype con =
             ty <- lookupType name
             if isNewtype
                 then pushNewType $ IsNewType $ Variable conName ty
-                else pushNode $ NodeDefinition conName (init $ splitTy ty)
+                else pushNode $ NodeDefinition (Variable conName ty) -- (init $ splitTy ty)
         --HS.RecDecl _ name fieldDecls -> do
         _ -> error "convertCon"
 
@@ -512,7 +538,7 @@ convertExternal :: String -> TC.Type -> M Expr
 convertExternal "realworld#" _ty = return (Lit LitVoid)
 convertExternal "cast" ty = do
     arg <- Variable <$> newName "arg" <*> pure argType
-    return $ Lam [arg] $ Cast (Var arg) retType
+    return $ Lam [arg] $ Convert (Var arg) retType
   where
     ([argType], _isIO, retType) = ffiTypes ty
 convertExternal cName ty
@@ -640,16 +666,16 @@ unpackString = Var (Variable name ty)
 
 
 findProof :: HS.QName Typed -> Expr -> Expr
-findProof _ = id
--- findProof name =
---     case tyDecl of
---       TC.Coerced _ _ proof -> convertProof proof
---       TC.Scoped{}          -> id
---   where
---     tyDecl =
---       case name of
---         HS.UnQual _ qname -> HS.ann qname
---         _                 -> HS.ann name
+-- findProof _ = id
+findProof name =
+    case tyDecl of
+      TC.Coerced _ _ proof -> convertProof proof
+      TC.Scoped{}          -> id
+  where
+    tyDecl =
+      case name of
+        HS.UnQual _ qname -> HS.ann qname
+        _                 -> HS.ann name
 
 tcVarToVariable :: TC.TcVar -> Variable
 tcVarToVariable (TC.TcVar name _loc) =
@@ -678,7 +704,10 @@ convertExp expr =
       return $ findProof name (Var var)
     HS.Con _ name -> do
       var <- resolveQName name
-      return $ findProof name (Con var)
+      nts <- asks scopeNewTypes
+      if var `elem` nts
+        then return Cast
+        else return $ findProof name (Con var)
     HS.App _ a b ->
       App
         <$> convertExp a
@@ -701,8 +730,20 @@ convertExp expr =
     HS.Case _ scrut alts -> do
       scrut' <- convertExp scrut
       scrutVar <- Variable <$> newName "scrut" <*> exprType scrut'
-      def <- convertAlts scrutVar alts
-      return $ Case scrut' scrutVar (Just def) []
+      nts <- asks scopeNewTypes
+      case alts of
+        [HS.Alt _ (HS.PApp _ name [rest]) rhs Nothing] -> do
+          var <- resolveQName name
+          if var `elem` nts
+            then do
+              branch <- convertAltPat scrutVar Nothing rest =<< convertRhs rhs
+              return $ Case (App Cast scrut') scrutVar (Just branch) []
+            else do
+              def <- convertAlts scrutVar alts
+              return $ Case scrut' scrutVar (Just def) []
+        _ -> do
+          def <- convertAlts scrutVar alts
+          return $ Case scrut' scrutVar (Just def) []
     HS.Lit _ (HS.Char _ c _) ->
       pure $ Con charCon `App` Lit (LitChar c)
     HS.Lit _ (HS.Int _ i _) ->
@@ -716,9 +757,8 @@ convertExp expr =
       Let (Rec [ (Variable name ty, body)
                | Declaration ty name body <- concat decls ])
           <$> convertExp inExpr
-    HS.List _ [] ->
-      -- coercion <- requireCoercion src
-      return {- $ WithCoercion coercion-} (Con nilCon)
+    HS.List (TC.Coerced _ _ proof) [] ->
+      return $ convertProof proof (Con nilCon)
     HS.Do _ stmts ->
       convertStmts stmts
     _ -> error $ "H->C convertExp: " ++ show expr
@@ -851,9 +891,10 @@ exprType expr =
             aType <- exprType a
             case aType of
                 TC.TyFun _ ret                       -> return ret
-                TC.TyForall _ (_ :=> TC.TyFun _ ret) -> return ret
+                TC.TyForall [] (_ :=> TC.TyFun _ ret) -> return ret
+                TC.TyForall (_:tvs) (_ :=> ty) -> return $ TC.TyForall tvs ([] :=> ty)
+                -- _ -> error $ "Unknown type: " ++ show (aType, _b)
                 _                                    -> return TC.TyUndefined
-        WithProof _ e -> exprType e
         Let _ e -> exprType e
         LetStrict _ _ e -> exprType e
         Case _ _ (Just e) _ -> exprType e
