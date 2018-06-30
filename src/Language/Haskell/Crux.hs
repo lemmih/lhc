@@ -58,22 +58,22 @@ data Expr
     | Convert Expr Type
     | Id
     | Cast
-    deriving ( Show )
+    deriving ( Show, Eq )
 
 data LetBind
     = NonRec Variable Expr
     | Rec [(Variable, Expr)]
-    deriving ( Show )
+    deriving ( Show, Eq )
 
 data Alt = Alt Pattern Expr
-    deriving ( Show )
+    deriving ( Show, Eq )
 
 data Pattern
     = ConPat Variable [Variable]
     | LitPat Literal
     | UnboxedPat [Variable]
     -- VarPat Variable
-    deriving ( Show )
+    deriving ( Show, Eq )
 
 -- All unlifted.
 data Literal
@@ -84,7 +84,7 @@ data Literal
     | LitFloat Rational
     | LitDouble Rational
     | LitVoid
-    deriving ( Show )
+    deriving ( Show, Eq )
 
 
 --------------------------------------------------------------

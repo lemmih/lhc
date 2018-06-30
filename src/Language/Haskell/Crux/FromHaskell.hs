@@ -92,15 +92,15 @@ newName ident = do
     u <- newUnique
     return $ Name [] ident u
 
-newNameFrom :: Name -> M Name
-newNameFrom (Name ms ident _) = do
-  u <- newUnique
-  return $ Name ms ident u
-
-newVariableFrom :: Variable -> M Variable
-newVariableFrom v = do
-  name' <- newNameFrom (varName v)
-  return $ v{varName = name'}
+-- newNameFrom :: Name -> M Name
+-- newNameFrom (Name ms ident _) = do
+--   u <- newUnique
+--   return $ Name ms ident u
+--
+-- newVariableFrom :: Variable -> M Variable
+-- newVariableFrom v = do
+--   name' <- newNameFrom (varName v)
+--   return $ v{varName = name'}
 
 nameInfo :: HS.Annotated ast => ast Typed -> Scope.NameInfo
 nameInfo ast =
@@ -359,12 +359,12 @@ convertAltPats conds failBranch successBranch =
         [] -> pure successBranch
         ((scrut,pat) : more)
             | isSimplePat pat ->
-                convertAltPat scrut failBranch pat =<<
+                convertAltPat (Var scrut) failBranch pat =<<
                     convertAltPats more failBranch successBranch
             | otherwise -> do
                 rest <- convertAltPats more failBranch successBranch
                 restBranch <- Variable <$> newName "branch" <*> exprType rest
-                e <- convertAltPat scrut failBranch pat (Var restBranch)
+                e <- convertAltPat (Var scrut) failBranch pat (Var restBranch)
                 return $ Let (NonRec restBranch rest) e
 
 
@@ -597,10 +597,13 @@ convertExp expr =
       Lam
         <$> sequence [ bindVariable name | HS.PVar _ name <- pats ]
         <*> convertExp sub
+    HS.Case _ scrut@HS.Var{} alts -> do
+      scrut' <- convertExp scrut
+      convertAlts scrut' alts
     HS.Case _ scrut alts -> do
       scrut' <- convertExp scrut
       scrutVar <- Variable <$> newName "scrut" <*> exprType scrut'
-      def <- convertAlts scrutVar alts
+      def <- convertAlts (Var scrutVar) alts
       return $ Case scrut' scrutVar (Just def) []
     HS.Lit _ (HS.Char _ c _) ->
       pure $ Con charCon `App` Lit (LitChar c)
@@ -621,8 +624,8 @@ convertExp expr =
       convertStmts stmts
     _ -> error $ "H->C convertExp: " ++ show expr
 
-convertAlts :: Variable -> [HS.Alt Typed] -> M Expr
-convertAlts scrut [] = pure $ Case (Var scrut) scrut Nothing []
+convertAlts :: Expr -> [HS.Alt Typed] -> M Expr
+convertAlts _scrut [] = error "" -- pure $ Case (Var scrut) scrut Nothing []
 convertAlts scrut [HS.Alt _ pat rhs Nothing] =
   convertAltPat scrut Nothing pat =<< convertRhs rhs
 convertAlts scrut (HS.Alt _ pat rhs Nothing:alts) = do
@@ -650,50 +653,53 @@ isSimplePat pat =
     isPVar HS.PVar{} = True
     isPVar _         = False
 
-convertAltPat :: Variable -> Maybe Expr -> HS.Pat Typed -> Expr -> M Expr
+convertAltPat :: Expr -> Maybe Expr -> HS.Pat Typed -> Expr -> M Expr
 convertAltPat scrut failBranch pat successBranch =
   case pat of
     HS.PApp _ name pats -> do
-      scrut' <- newVariableFrom scrut
+      scrut' <- Variable <$> newName "scrut" <*> exprType scrut
       args <- sequence [ Variable (bindName var) <$> lookupType var
                        | HS.PVar _ var <- pats ]
       alt <- Alt <$> (ConPat <$> resolveQName name <*> pure args)
           <*> pure successBranch
-      return $ Case (Var scrut) scrut' failBranch [alt]
+      return $ Case scrut scrut' failBranch [alt]
     HS.PInfixApp src a con b -> convertAltPat scrut failBranch (HS.PApp src con [a,b]) successBranch
     HS.PTuple _ HS.Unboxed pats -> do
+      scrut' <- Variable <$> newName "scrut" <*> exprType scrut
       args <- sequence [ Variable (bindName var) <$> lookupType var
                        | HS.PVar _ var <- pats ]
       alt <- Alt (UnboxedPat args)
           <$> pure successBranch
-      return $ Case (Var scrut) scrut failBranch [alt]
+      return $ Case scrut scrut' failBranch [alt]
     HS.PWildCard _ ->
       return successBranch
     HS.PVar _ var -> do
       var' <- Variable (bindName var) <$> lookupType var
-      -- XXX: Very hacky. We cannot compare on types yet.
-      if varName var' == varName scrut
+      if Var var' == scrut
         then return successBranch
-        else return $ Let (NonRec var' (Var scrut)) successBranch
+        else return $ Let (NonRec var' scrut) successBranch
     -- 0 -> ...
     -- I# i -> case i of
     --            0# -> ...
     HS.PLit _ _sign (HS.Int _ int _) -> do
+      scrut' <- Variable <$> newName "scrut" <*> exprType scrut
       intVar <- Variable <$> newName "i" <*> pure i32
       intVar64 <- Variable <$> newName "i64" <*> pure i64
       let alt = Alt (ConPat intCon [intVar]) $
                 Case (Var i32toi64 `App` Var intVar) intVar64 failBranch
                 [Alt (LitPat (LitInt int)) successBranch]
-      return $ Case (Var scrut) scrut Nothing [alt]
+      return $ Case scrut scrut' Nothing [alt]
     HS.PLit _ _sign lit -> do
+      scrut' <- Variable <$> newName "scrut" <*> exprType scrut
       alt <- Alt (LitPat $ convertLiteral lit)
           <$> pure successBranch
-      return $ Case (Var scrut) scrut failBranch [alt]
+      return $ Case scrut scrut' failBranch [alt]
     HS.PParen _ pat' ->
       convertAltPat scrut failBranch pat' successBranch
     HS.PList _ [] -> do
+      scrut' <- Variable <$> newName "scrut" <*> exprType scrut
       let alt = Alt (ConPat nilCon []) successBranch
-      return $ Case (Var scrut) scrut failBranch [alt]
+      return $ Case scrut scrut' failBranch [alt]
     _ -> error $ "Compiler.HaskellToCore.convertAltPat: " ++ show pat
 
 _convertAlt :: HS.Alt Typed -> M Alt
