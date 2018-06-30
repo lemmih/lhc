@@ -64,7 +64,6 @@ uniqueExpr expr =
             <*> mapM uniqueAlt alts
     Convert e ty ->
       Convert <$> uniqueExpr e <*> pure ty
-    Id -> pure Id
 
 uniqueAlt :: Alt -> M Alt
 uniqueAlt (Alt pattern e) =

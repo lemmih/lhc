@@ -27,7 +27,6 @@ lowerNewTypes m = m
         Case scrut var defaultBranch alts ->
             Case (expr scrut) var (fmap expr defaultBranch) (map alt alts)
         Convert rest ty -> Convert (expr rest) ty
-        Id -> e
         Cast -> Cast
     alt (Alt p branch) = Alt p (expr branch)
     letBind (NonRec bind rhs) = NonRec bind (expr rhs)

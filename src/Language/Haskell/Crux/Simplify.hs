@@ -18,7 +18,6 @@ simplify m = m
           WithExternal out outS external (map expr args) (expr st) $ expr rest
         ExternalPure out external args rest ->
           ExternalPure out external (map expr args) $ expr rest
-        App Id b -> expr b
         App (Lam (v:vs) body) b ->
           expr (Let (NonRec v b) (Lam vs body))
         App (Let bind rest) b ->
@@ -56,7 +55,6 @@ simplify m = m
         Case scrut var defaultBranch alts ->
             Case (expr scrut) var (fmap expr defaultBranch) (map alt alts)
         Convert rest ty -> Convert (expr rest) ty
-        Id -> e
     alt (Alt p branch) = Alt p (expr branch)
     letBind (NonRec bind rhs) = NonRec bind (expr rhs)
     letBind (Rec binds) = Rec [ (bind, expr rhs) | (bind, rhs) <- binds ]

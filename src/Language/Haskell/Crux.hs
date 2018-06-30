@@ -56,7 +56,6 @@ data Expr
     | LetStrict Variable Expr Expr
     | Case Expr Variable (Maybe Expr) [Alt]
     | Convert Expr Type
-    | Id
     | Cast
     deriving ( Show, Eq )
 
@@ -182,14 +181,6 @@ instance Pretty Expr where
         parens (pretty scrut <+> text ":::" <+> pretty ty)
       Cast ->
         text "cast"
-      Id -> text "id"
-      -- WithCoercion CoerceId e -> pretty e
-      -- WithCoercion (CoerceAp tys) e -> parensIf (p > 0) $
-      --   pretty e <+> fillSep (map (prettyPrec appPrecedence) tys)
-      -- WithCoercion c e -> parensIf (p > 0) $
-      --   pretty c <+> pretty e
-      -- WithProof proof e -> parensIf (p > 0) $
-      --   pretty proof <+> pretty e
       WithExternal outV outS cName args _st cont ->
         ppTypedVariable outV <> comma <+> pretty outS <+> text "←" <+>
           text "external" <+> text cName <+> ppVars args <$$>
