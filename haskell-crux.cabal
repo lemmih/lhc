@@ -22,7 +22,8 @@ library
                        Language.Haskell.Crux.DCE,
                        Language.Haskell.Crux.Simplify,
                        Language.Haskell.Crux.SimpleInline,
-                       Language.Haskell.Crux.Unique
+                       Language.Haskell.Crux.Unique,
+                       Language.Haskell.Crux.NewTypes
   -- other-modules:
   other-extensions:    GeneralizedNewtypeDeriving,
                        LambdaCase

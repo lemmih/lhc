@@ -36,7 +36,7 @@ data Declaration = Declaration
 data NodeDefinition = NodeDefinition Variable
     deriving (Show)
 
-newtype NewType = IsNewType Variable deriving (Show)
+newtype NewType = IsNewType Variable deriving (Show, Eq)
 
 data Variable = Variable
     { varName :: Name

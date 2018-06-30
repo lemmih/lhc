@@ -255,11 +255,12 @@ reifyTypeVariables _                   = id
 convertNewTypes :: HS.Decl Typed -> M (Maybe Variable)
 convertNewTypes decl =
   case decl of
-    HS.DataDecl _ HS.NewType{} _ctx _dhead [HS.QualConDecl _ _tyvars _ (HS.ConDecl _ name _)] _deriving -> do
-        ty <- lookupType name
-        let nt = Variable (bindConstructor name) ty
-        pushNewType $ IsNewType nt
-        return $ Just nt
+    HS.DataDecl _ HS.NewType{} _ctx dhead [HS.QualConDecl _ _tyvars _ (HS.ConDecl _ name _)] _deriving -> do
+      dheadToNode dhead
+      ty <- lookupType name
+      let nt = Variable (bindConstructor name) ty
+      pushNewType $ IsNewType nt
+      return $ Just nt
     _ -> return Nothing
 
 convertDecl' :: HS.Decl Typed -> M [Declaration]
@@ -599,20 +600,8 @@ convertExp expr =
     HS.Case _ scrut alts -> do
       scrut' <- convertExp scrut
       scrutVar <- Variable <$> newName "scrut" <*> exprType scrut'
-      nts <- asks scopeNewTypes
-      case alts of
-        [HS.Alt _ (HS.PApp _ name [rest]) rhs Nothing] -> do
-          var <- resolveQName name
-          if var `elem` nts
-            then do
-              branch <- convertAltPat scrutVar Nothing rest =<< convertRhs rhs
-              return $ Case (App Cast scrut') scrutVar (Just branch) []
-            else do
-              def <- convertAlts scrutVar alts
-              return $ Case scrut' scrutVar (Just def) []
-        _ -> do
-          def <- convertAlts scrutVar alts
-          return $ Case scrut' scrutVar (Just def) []
+      def <- convertAlts scrutVar alts
+      return $ Case scrut' scrutVar (Just def) []
     HS.Lit _ (HS.Char _ c _) ->
       pure $ Con charCon `App` Lit (LitChar c)
     HS.Lit _ (HS.Int _ i _) ->

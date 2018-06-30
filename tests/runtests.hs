@@ -3,6 +3,7 @@ module Main (main) where
 
 import           Control.Monad                     (fmap, mplus, unless, when)
 import           Language.Haskell.Crux.FromHaskell as Haskell
+import           Language.Haskell.Crux.NewTypes as Haskell
 import           Language.Haskell.Exts             (ImportDecl (..),
                                                     Module (..),
                                                     ModuleHead (..),
@@ -84,7 +85,7 @@ desugar files = handleErrors $ do
         Right (typedModule, tiEnv') -> do
           writeIORef resolveEnvRef resolveEnv'
           writeIORef tiEnvRef tiEnv'
-          let core = Haskell.convert tiEnv' typedModule
+          let core = Haskell.lowerNewTypes $ Haskell.convert tiEnv' typedModule
           return $ show (pretty core) ++ "\n"
     CyclicSCC{} -> error "Recursive modules not handled yet.")
 
