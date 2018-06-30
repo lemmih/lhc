@@ -9,7 +9,7 @@ import           Data.Array
 import           Data.Graph
 import           Data.Map                            (Map)
 import qualified Data.Map                            as Map
-import           Data.Semigroup
+import           Data.Semigroup                      (Semigroup (..))
 import           Data.Set                            (Set)
 import qualified Data.Set                            as Set
 
@@ -145,6 +145,7 @@ uniqueExpr expr = do
           <*> mapM uniqueAlt alts
     Convert e ty ->
       Convert <$> uniqueExpr e <*> pure ty
+    Cast -> pure Cast
 
 uniqueAlt :: Alt -> M Alt
 uniqueAlt (Alt pattern e) =

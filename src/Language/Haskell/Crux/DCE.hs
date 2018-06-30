@@ -39,6 +39,7 @@ moduleGraph m =
           maybe [] exprDependencies defaultBranch ++
           concatMap alternativeDependencies alts
         Convert e _ty -> exprDependencies e
+        Cast -> []
     alternativeDependencies (Alt _pattern branch) = exprDependencies branch
     letBindDependencies (NonRec _var e) = exprDependencies e
     letBindDependencies (Rec binds) = concatMap (exprDependencies . snd) binds

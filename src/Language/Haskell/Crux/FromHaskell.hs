@@ -12,7 +12,7 @@ import           Data.List                  (transpose)
 import           Data.Map                   (Map)
 import qualified Data.Map                   as Map
 import           Data.Maybe
-import           Data.Semigroup
+import           Data.Semigroup             (Semigroup(..))
 import qualified Language.Haskell.Exts      as HS
 
 import           Language.Haskell.Crux
@@ -333,6 +333,8 @@ dheadToNode dhead = do
   where
     split (HS.DHead _ name) acc = (name, reverse acc)
     split (HS.DHApp _ dh _ty) acc = split dh (TC.TyStar : acc)
+    split (HS.DHInfix _ _ty name) acc = (name, reverse (TC.TyStar : acc))
+    split (HS.DHParen _ dh) acc = split dh acc
 
 convertMatches :: [Variable] -> [HS.Match Typed] -> M Expr
 convertMatches _args [] = error "Compiler.HaskellToCore.convertMatches"

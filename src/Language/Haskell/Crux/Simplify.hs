@@ -55,6 +55,7 @@ simplify m = m
         Case scrut var defaultBranch alts ->
             Case (expr scrut) var (fmap expr defaultBranch) (map alt alts)
         Convert rest ty -> Convert (expr rest) ty
+        Cast -> Cast
     alt (Alt p branch) = Alt p (expr branch)
     letBind (NonRec bind rhs) = NonRec bind (expr rhs)
     letBind (Rec binds) = Rec [ (bind, expr rhs) | (bind, rhs) <- binds ]
