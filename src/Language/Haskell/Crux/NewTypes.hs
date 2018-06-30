@@ -23,7 +23,7 @@ lowerNewTypes m = m
         LetStrict bind e1 e2 -> LetStrict bind (expr e1) (expr e2)
         Case scrut _var Nothing [Alt (ConPat con [unpacked]) branch]
           | IsNewType con `elem` cruxNewTypes m ->
-          LetStrict unpacked (App Cast scrut) branch
+          Let (NonRec unpacked (App Cast scrut)) branch
         Case scrut var defaultBranch alts ->
             Case (expr scrut) var (fmap expr defaultBranch) (map alt alts)
         Convert rest ty -> Convert (expr rest) ty
