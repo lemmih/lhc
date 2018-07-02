@@ -125,8 +125,9 @@ putStr lst =
     [] -> return ()
     head : tail ->
       case head of
-        C# char ->
-          c_putchar char `thenIO` putStr tail
+        C# char -> do
+          c_putchar char
+          putStr tail
 
 putStrLn :: [Char] -> IO ()
 putStrLn msg = putStr msg `thenIO` putStr (unpackString# "\n"#)

@@ -18,6 +18,9 @@ simplify m = m
           WithExternal out outS external (map expr args) (expr st) $ expr rest
         ExternalPure out external args rest ->
           ExternalPure out external (map expr args) $ expr rest
+        -- _ | (Cast, x:xs) <- collectApps e ->
+        --   App Cast (expr $ foldl App x xs)
+        App Cast a -> expr a
         App (Lam (v:vs) body) b ->
           expr (Let (NonRec v b) (Lam vs body))
         App (Let bind rest) b ->
@@ -26,6 +29,8 @@ simplify m = m
           expr $ ExternalPure out external args $
                  App a rest
         App a b -> App (expr a) (expr b)
+        -- Lam a rest | (Cast, x:xs) <- collectApps rest ->
+        --   expr (App Cast (Lam a (foldl App x xs)))
         Lam [] rest -> expr rest
         Lam a (Lam b rest) -> expr (Lam (a++b) rest)
         Lam vars rest -> Lam vars (expr rest)
@@ -33,7 +38,7 @@ simplify m = m
             expr $ Lam a (Let bind b)
         Let (NonRec bind rhs) e' | (Var bind', apps) <- collectApps e'
                                  , varName bind == varName bind' ->
-            foldl App (expr rhs) apps
+            expr (foldl App rhs apps)
         Let bind rest -> Let (letBind bind) (expr rest)
         LetStrict bind e1 e2 -> LetStrict bind (expr e1) (expr e2)
         Case (LetStrict bind e1 e2) var mbDef alts ->
@@ -50,6 +55,8 @@ simplify m = m
                  Case rest var mbDef alts
         Case (UnboxedTuple es) _var Nothing [Alt (UnboxedPat vs) branch] ->
           expr $ foldr (\(v,e') -> Let (NonRec v e')) branch (zip vs es)
+        Case (Var scrut) var (Just (Case (Var scrut') _var' mbDef alts')) alts | varName scrut == varName scrut' ->
+            expr $ Case (Var scrut) var mbDef (alts ++ alts')
         Case scrut var (Just (Case (Var scrut') _var' mbDef alts')) alts | varName var == varName scrut' ->
             expr $ Case scrut var mbDef (alts ++ alts')
         Case scrut var defaultBranch alts ->

@@ -495,15 +495,15 @@ convertStmts [end] =
         _                   -> error $ "convertStmts: " ++ show end
 convertStmts (x:xs) =
   case x of
-    HS.Generator _ (HS.PVar _ name) expr -> do
+    HS.Generator (TC.Coerced _ _ proof) (HS.PVar _ name) expr -> do
       var <- bindVariable name
       expr' <- convertExp expr
       rest <- convertStmts xs
-      return $ primBindIO `App` expr' `App` Lam [var] rest
-    HS.Qualifier _ expr -> do
+      return $ convertProof proof primBindIO `App` expr' `App` Lam [var] rest
+    HS.Qualifier (TC.Coerced _ _ proof) expr -> do
       expr' <- convertExp expr
       rest <- convertStmts xs
-      return $ primThenIO `App` expr' `App` rest
+      return $ convertProof proof primThenIO `App` expr' `App` rest
     _ -> error "Urk: statement"
 
 primThenIO :: Expr
@@ -563,7 +563,7 @@ convertProof p = error $ "Weird proof: " ++ show p
 tyToExpr :: TC.Type -> Expr
 tyToExpr (TC.TyRef ref) = Var (tcVarToVariable ref)
 tyToExpr (TC.TyList elt) = App (Con listCon) (tyToExpr elt)
-tyToExpr (TC.TyCon (QualifiedName m ident)) = Con (Variable (Name [m] ident 0) TC.TyStar)
+tyToExpr (TC.TyCon (QualifiedName m ident)) = Con (Variable (Name ["@",m] ident 0) TC.TyStar)
 tyToExpr (TC.TyTuple []) = Con unitTCon
 tyToExpr ty             = error $ "Weird type: " ++ show ty
 
@@ -579,7 +579,7 @@ convertExp expr =
       nts <- asks scopeNewTypes
       if var `elem` nts
         then return Cast
-        else return $ findProof name (Con var)
+        else return $ Con var
     HS.App _ a b ->
       App
         <$> convertExp a
@@ -588,7 +588,8 @@ convertExp expr =
       ae <- convertExp a
       be <- convertExp b
       var <- resolveQName con
-      pure $ App (App (findProof con (Con var)) ae) be
+      -- pure $ App (App (findProof con (Con var)) ae) be
+      pure $ App (App (Con var) ae) be
     HS.InfixApp _ a (HS.QVarOp _ name) b -> do
       ae <- convertExp a
       be <- convertExp b
@@ -620,8 +621,9 @@ convertExp expr =
       Let (Rec [ (Variable name ty, body)
                | Declaration ty name body <- concat decls ])
           <$> convertExp inExpr
-    HS.List (TC.Coerced _ _ proof) [] ->
-      return $ convertProof proof (Con nilCon)
+    HS.List (TC.Coerced _ _ _proof) [] ->
+      -- return $ convertProof proof (Con nilCon)
+      return $ Con nilCon
     HS.Do _ stmts ->
       convertStmts stmts
     _ -> error $ "H->C convertExp: " ++ show expr
@@ -632,11 +634,11 @@ convertAlts scrut [HS.Alt _ pat rhs Nothing] =
   convertAltPat scrut Nothing pat =<< convertRhs rhs
 convertAlts scrut (HS.Alt _ pat rhs Nothing:alts) = do
   rest <- convertAlts scrut alts
-  restBranch <- Variable <$> newName "branch" <*> exprType rest
   if isSimplePat pat
     then
       convertAltPat scrut (Just rest) pat =<< convertRhs rhs
     else do
+      restBranch <- Variable <$> newName "branch" <*> exprType rest
       e <- convertAltPat scrut (Just $ Var restBranch) pat =<< convertRhs rhs
       return $ Let (NonRec restBranch rest) e
 convertAlts _ _ = error "Urk: alt"
