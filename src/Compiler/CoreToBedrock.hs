@@ -51,8 +51,8 @@ convertName :: Core.Name -> Name
 convertName (Core.Name prefix ident uniq) = Name prefix ident uniq
 
 convertNodeDefinition :: Core.NodeDefinition -> NodeDefinition
-convertNodeDefinition (Core.NodeDefinition name tys) =
-    NodeDefinition (convertName name) (map convertTcType tys)
+convertNodeDefinition (Core.NodeDefinition (Core.Variable name ty)) =
+    NodeDefinition (convertName name) (convertTcTypes ty)
 
 convertModule :: Core.Module -> M ()
 convertModule m = setArities arities $ do
@@ -65,8 +65,8 @@ convertModule m = setArities arities $ do
                       Lam vars _ -> length vars
                       -- WithCoercion _ (Lam vars _) -> length vars
                       _          -> 0 ] ++
-      [ (convertName name, length args)
-      | Core.NodeDefinition name args <- cruxNodes m ] ++
+      [ (convertName name, length $ convertTcTypes ty)
+      | Core.NodeDefinition (Core.Variable name ty) <- cruxNodes m ] ++
       [ (convertName $ Core.varName con, 1)
       | Core.IsNewType con <- cruxNewTypes m ]
 
@@ -102,6 +102,13 @@ setArities arities = local $ \env -> env
 
 lookupArity :: Name -> M (Maybe Int)
 lookupArity fn = asks $ Map.lookup fn . envArity
+
+requireArity :: Name -> M Int
+requireArity name = do
+  mbArity <- lookupArity name
+  case mbArity of
+    Nothing -> error $ "No arity for: " ++ show name
+    Just arity -> pure arity
 
 newName :: [String] -> String -> M Name
 newName orig ident = do
@@ -154,6 +161,16 @@ blockType block =
 convertVariable :: Core.Variable -> M Variable
 convertVariable var = return $
     Variable (convertName $ Core.varName var) (convertTcType (Core.varType var))
+
+convertTcTypes :: TC.Type -> [Type]
+convertTcTypes tcTy =
+  case tcTy of
+    TC.TyFun a b -> convertTcType a : convertTcTypes b
+    TC.TyApp{} -> []
+    TC.TyCon{} -> []
+    TC.TyStar{} -> []
+    TC.TyForall _tvs (_ TC.:=> ty) -> convertTcTypes ty
+    _ -> error $ "convertTcTypes: " ++ show tcTy
 
 convertTcType :: TC.Type -> Type
 convertTcType tcTy =
@@ -365,9 +382,6 @@ collectApps = worker []
     worker acc expr =
         case expr of
             App a b            -> worker (b:acc) a
-            WithProof _proof e -> worker acc e
-            -- WithProof proof e -> (e, Just proof, acc)
-            -- WithCoercion c e -> (e, c, acc)
             _                  -> (expr, Nothing, acc)
 
 convertExpr :: Bool -> Core.Expr -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
@@ -378,7 +392,7 @@ convertExpr lazy expr rest =
       convertExprs args $ \args' -> do
         tmp <- newVariable [] "con" NodePtr
         let name = convertName $ Core.varName con
-        Just arity <- lookupArity name
+        arity <- requireArity name
         Bind [tmp] (Store (ConstructorName name (arity-length args)) args')
             <$> rest [tmp]
     _ | (Var v, _coercion, args) <- collectApps expr, lazy ->
@@ -495,7 +509,7 @@ convertExpr lazy expr rest =
                   Bind [tmp] (Bedrock.Fetch val) <$>
                     Bedrock.Case tmp (Just defExpr) <$>
                         mapM convertAlt alts
-    Cast e ty ->
+    Convert e ty ->
       convertExpr False e $ \[val] -> do
         var <- deriveVariable val "val" (convertTcType ty)
         Bind [var] (Bedrock.TypeCast val) <$> rest [var]
@@ -522,14 +536,14 @@ convertExpr lazy expr rest =
           name' <- convertVariable name
           Bind [name'] (TypeCast val) <$> convertExpr lazy e2 rest
 
-    WithProof _proof e -> convertExpr lazy e rest
-
     Core.Case{} | lazy -> do
       body <- convertExpr False expr (pure . Return)
       (node, nodeArgs) <- pushFunction [] (Left "thunk") body
       tmp <- newVariable [] "thunk" NodePtr
       Bind [tmp] (Store (FunctionName node 0) nodeArgs)
         <$> rest [tmp]
+    Core.Cast ->
+      rest []
     _ | lazy -> error $ "C->B convertExpr: " ++ show (lazy, expr)
     _ -> -- not lazy
       convertExpr True expr $ \[val] -> do

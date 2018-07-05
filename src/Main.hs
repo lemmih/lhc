@@ -26,7 +26,7 @@ import qualified Language.Haskell.Crux              as Core
 import qualified Language.Haskell.Crux.DCE          as Core
 import qualified Language.Haskell.Crux.FromHaskell  as Haskell
 import           Language.Haskell.Crux.Interface
-import qualified Language.Haskell.Crux.NewType      as NewType
+import qualified Language.Haskell.Crux.NewTypes      as NewType
 import qualified Language.Haskell.Crux.SimpleEta    as Core
 import qualified Language.Haskell.Crux.SimpleInline as Core
 import qualified Language.Haskell.Crux.Simplify     as Core
@@ -139,7 +139,7 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
             putStrLn "Converting to core..."
             let core = Haskell.convert tiEnv' typedModule
                 coreFile = buildDir </> moduleFile m' <.> "core"
-                complete = Core.simplify $ Core.simplify $ NewType.lower $ Core.simplify $ Core.simplify core
+                complete = Core.simplify $ Core.simplify $ NewType.lowerNewTypes $ Core.simplify $ Core.simplify core
                 (_,etaAbs) = Core.simpleEta Core.emptySimpleEtaAnnotation complete
             writeCompact coreFile =<< compact etaAbs
             writeFile (coreFile <.> "pretty") (show $ pretty etaAbs)
@@ -197,7 +197,7 @@ compileExecutable verbose keepIntermediateFiles gcStrategy file = do
       libraryCore = mconcat (map (snd . snd) ifaces)
       entrypoint = Core.Name ["Main"] "entrypoint" 0
       base = Core.deadCodeElimination entrypoint $
-             NewType.lower $ mappend libraryCore core
+             NewType.lowerNewTypes $ mappend libraryCore core
       complete =
           Core.deadCodeElimination entrypoint $
           Core.unique $
@@ -209,7 +209,8 @@ compileExecutable verbose keepIntermediateFiles gcStrategy file = do
           snd $ Core.simpleEta Core.emptySimpleEtaAnnotation
           base
   -- print (pretty complete)
-  when verbose $
+  when verbose $ do
+    displayIO stdout (renderPretty 1 100 (pretty base))
     displayIO stdout (renderPretty 1 100 (pretty complete))
 
   let bedrock = Core.convert complete

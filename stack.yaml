@@ -5,20 +5,21 @@ allow-newer: true
 packages:
 - '.'
 - bedrock
+# - ../haskell-crux
 
 - location:
     git: https://github.com/haskell-suite/haskell-tc.git
-    commit: 050021d82c5ada766afd31d2a92886fe8a1864ba
+    commit: 3a893cb3fc844eea6e203d17e18f1f59cd14e5bf
   extra-dep: true
 
 - location:
     git: https://github.com/Lemmih/haskell-crux
-    commit: 113ab24b10315e83e3f183e15100092683c6f4f4
+    commit: 592ca5391b79e864534b5494de0dc4059310e1d0
   extra-dep: true
 
 - location:
     git: https://github.com/haskell-suite/haskell-scope.git
-    commit: 5d77593110a0455745da4f376a5bcdb9e511784c
+    commit: e552d0ec70d473e4b4e2ac283cb21c4d8116766c
   extra-dep: true
 
 - location:
