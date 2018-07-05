@@ -801,7 +801,7 @@ charCon = Variable (Name ["LHC.Prim"] "C#" 0)
   (i32 `TC.TyFun` charTy)
 
 listCon :: Variable
-listCon = Variable (Name ["@","LHC","Prim"] "List" 0)
+listCon = Variable (Name ["@","LHC.Prim"] "List" 0)
   (TC.TyFun TC.TyStar TC.TyStar)
 
 -- data List a = Nil | Cons a (List a)
