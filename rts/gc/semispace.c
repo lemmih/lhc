@@ -19,6 +19,7 @@ void scavenge_records();
 void scavenge();
 
 #define MIN_HEAP (1024*128)
+#define MAX_HEAP (1024*1024*128)
 static int size=MIN_HEAP;
 static int live;
 static int factor=2;
@@ -26,7 +27,7 @@ static int factor=2;
 static word *hp_limit;
 
 static word *from_space;
-static word *to_space, *free_space;
+static word *to_space, *free_space, *prev_heap;
 static word *scavenged;
 
 word _lhc_semi_allocate(word *hp, word space) {
@@ -42,6 +43,7 @@ word* _lhc_semi_init() {
   from_space = hp;
   hp_limit = hp+size;
   to_space = NULL;
+  prev_heap = NULL;
   free_space = NULL;
   // printf("SemiSpace init: hp: %p, size: %d\n", hp, size);
   return hp;
@@ -68,8 +70,16 @@ word *_lhc_semi_end() {
   assert(free_space==scavenged);
   assert(from_space!=NULL);
   free(from_space);
+  if(prev_heap) {
+    free(prev_heap);
+  }
   assert(to_space!=NULL);
   size = MAX(MIN_HEAP,live*factor);
+  if(size >= MAX_HEAP) {
+    printf("Out of heap\n");
+    abort();
+  }
+  prev_heap = to_space;
   to_space = NULL;
   free_space = NULL;
   scavenged = NULL;
