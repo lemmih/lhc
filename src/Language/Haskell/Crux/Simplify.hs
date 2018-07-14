@@ -28,6 +28,13 @@ simplify m = m
         App a (ExternalPure out external args rest) ->
           expr $ ExternalPure out external args $
                  App a rest
+        App (ExternalPure out external args rest) b ->
+          expr $ ExternalPure out external args (App rest b)
+        App (Case scrut var mbDef alts) b@Var{} ->
+          expr $ Case scrut var (fmap (\def -> App def b) mbDef)
+                          [ Alt pat (App branch b) | Alt pat branch <- alts ]
+        App (Case scrut var Nothing [Alt pat branch]) b ->
+          expr $ Case scrut var Nothing [Alt pat (App branch b)]
         App a b -> App (expr a) (expr b)
         -- Lam a rest | (Cast, x:xs) <- collectApps rest ->
         --   expr (App Cast (Lam a (foldl App x xs)))

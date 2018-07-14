@@ -209,7 +209,7 @@ convert _ _ = error "HaskellToCore.convert"
 -- Return function name.
 matchInfo :: [HS.Match Typed] -> HS.Name Typed
 matchInfo [] =
-    error "Compiler.HaskellToCore.matchInfo"
+    error "Language.Haskell.Crux.FromHaskell.matchInfo"
 matchInfo (HS.Match _ name _pats _ _:_) = name
 matchInfo (HS.InfixMatch _ _ name _pats _rhs _:_) = name
 
@@ -312,7 +312,7 @@ convertDecl' decl =
     HS.DataDecl _ HS.NewType{} _ctx _dhead _qualCons _deriving -> return []
     HS.TypeSig{} -> return []
     HS.InlineSig{} -> return []
-    _ -> error $ "Compiler.HaskellToCore.convertDecl: " ++ show decl
+    _ -> error $ "Language.Haskell.Crux.FromHaskell.convertDecl: " ++ show decl
 
 isPrimitive :: String -> Bool
 isPrimitive "realworld#" = True
@@ -337,7 +337,7 @@ dheadToNode dhead = do
     split (HS.DHParen _ dh) acc = split dh acc
 
 convertMatches :: [Variable] -> [HS.Match Typed] -> M Expr
-convertMatches _args [] = error "Compiler.HaskellToCore.convertMatches"
+convertMatches _args [] = error "Language.Haskell.Crux.FromHaskell.convertMatches"
 convertMatches args [HS.InfixMatch _ pat _ pats rhs _mbBinds] =
     convertAltPats (zip args (pat:pats)) Nothing =<< convertRhs rhs
 convertMatches args [HS.Match _ _ pats rhs _mbBinds] =
@@ -400,6 +400,8 @@ toCType ty =
         TC.TyApp (TC.TyCon qname) ty'
             | qname == QualifiedName "LHC.Prim" "Addr" ->
                 LLVM.PointerType (toCType ty') (LLVM.AddrSpace 0)
+            | qname == QualifiedName "LHC.Prim" "Ptr" ->
+                LLVM.PointerType (toCType ty') (LLVM.AddrSpace 0)
         TC.TyCon qname
             | qname == QualifiedName "LHC.Prim" "I8" ->
                 LLVM.IntegerType 8
@@ -443,7 +445,7 @@ convertExternal "cast" ty = do
 convertExternal cName ty
     | isIO = do
         args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
-        primOut <- Variable <$> newName "primOut" <*> pure i32
+        primOut <- Variable <$> newName "primOut" <*> pure primRetType
         s <- Variable
                 <$> newName "s"
                 <*> pure realWorld
@@ -456,7 +458,7 @@ convertExternal cName ty
             Lam args $
             let action = Lam [s] $
                     WithExternal primOut s' cName (map Var args) (Var s) $
-                    UnboxedTuple [Var s', App (Con int32Con) (Var primOut)]
+                    UnboxedTuple [Var s', boxRetType (Var primOut)]
             in action
     | otherwise = do -- not isIO
         args <- forM argTypes $ \t -> Variable <$> newName "arg" <*> pure t
@@ -467,6 +469,17 @@ convertExternal cName ty
             Var primOut
   where
     (argTypes, isIO, retType) = ffiTypes ty
+    (primRetType, boxRetType) = marshalType retType
+
+marshalType :: TC.Type -> (TC.Type, Expr -> Expr)
+marshalType ty =
+  case ty of
+    TC.TyCon (QualifiedName "LHC.Prim" "Int32") ->
+      (i32, App (Con int32Con))
+    TC.TyApp (TC.TyCon (QualifiedName "LHC.Prim" "Ptr"))
+             (TC.TyCon (QualifiedName "LHC.Prim" "I8"))->
+      (TC.TyApp addrTy i8, App (Con ptrCon))
+    _ -> error $ "Can't marshal: " ++ show ty
 
 ffiTypes :: TC.Type -> ([TC.Type], Bool, TC.Type)
 ffiTypes = worker []
@@ -565,6 +578,7 @@ tyToExpr (TC.TyRef ref) = Var (tcVarToVariable ref)
 tyToExpr (TC.TyList elt) = App (Con listCon) (tyToExpr elt)
 tyToExpr (TC.TyCon (QualifiedName m ident)) = Con (Variable (Name ["@",m] ident 0) TC.TyStar)
 tyToExpr (TC.TyTuple []) = Con unitTCon
+tyToExpr (TC.TyApp a b) = App (tyToExpr a) (tyToExpr b)
 tyToExpr ty             = error $ "Weird type: " ++ show ty
 
 
@@ -704,7 +718,7 @@ convertAltPat scrut failBranch pat successBranch =
       scrut' <- Variable <$> newName "scrut" <*> exprType scrut
       let alt = Alt (ConPat nilCon []) successBranch
       return $ Case scrut scrut' failBranch [alt]
-    _ -> error $ "Compiler.HaskellToCore.convertAltPat: " ++ show pat
+    _ -> error $ "Language.Haskell.Crux.FromHaskell.convertAltPat: " ++ show pat
 
 _convertAlt :: HS.Alt Typed -> M Alt
 _convertAlt alt =
@@ -781,7 +795,8 @@ getNameIdentifier (HS.Symbol _ symbol) = symbol
 
 
 -- LHC.Prim builtins
-i32, i64, realWorld, io, int32, charTy, intTy :: TC.Type
+i8, i32, i64, realWorld, io, int32, charTy, intTy, addrTy, ptrTy :: TC.Type
+i8 = TC.TyCon $ QualifiedName "LHC.Prim" "I8"
 i32 = TC.TyCon $ QualifiedName "LHC.Prim" "I32"
 i64 = TC.TyCon $ QualifiedName "LHC.Prim" "I64"
 realWorld = TC.TyCon $ QualifiedName "LHC.Prim" "RealWorld#"
@@ -789,6 +804,8 @@ io = TC.TyCon $ QualifiedName "LHC.Prim" "IO"
 int32 = TC.TyCon $ QualifiedName "LHC.Prim" "Int32"
 charTy = TC.TyCon $ QualifiedName "LHC.Prim" "Char"
 intTy = TC.TyCon $ QualifiedName "LHC.Prim" "Int"
+addrTy = TC.TyCon $ QualifiedName "LHC.Prim" "Addr"
+ptrTy = TC.TyCon $ QualifiedName "LHC.Prim" "Ptr"
 
 -- data Int = I# I32
 intCon :: Variable
@@ -842,3 +859,10 @@ int32Con = Variable (Name ["LHC.Prim"] "Int32" 0)
 
 i32toi64 = Variable (Name ["LHC.Prim"] "i32toi64" 0) (TC.TyFun i32 i64)
 i64toi32 = Variable (Name ["LHC.Prim"] "i64toi32" 0) (TC.TyFun i64 i32)
+
+ptrCon :: Variable
+ptrCon = Variable (Name ["LHC.Prim"] "Ptr" 0) $
+    TC.TyForall [a] ([] :=> (TC.TyApp addrTy aTy `TC.TyFun` TC.TyApp ptrTy aTy))
+  where
+    a = TcVar "a" []
+    aTy = TC.TyRef a
