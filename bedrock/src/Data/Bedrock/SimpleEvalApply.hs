@@ -115,7 +115,7 @@ applyPairs = do
     | fn <- fs
     , n <- [1..length (fnArguments fn)]
     , let nodeName = FunctionName (fnName fn) n
-    , nodeName `Set.member` activeNodes
+    , fnName fn `Set.member` activeNodes
     , let retTys = if n == 1 then fnResults fn else [NodePtr]
     , let appliedArgs = reverse (drop n (reverse (fnArguments fn)))
     , let argTy = variableType (reverse (fnArguments fn) !! (n-1)) ] ++
@@ -123,15 +123,15 @@ applyPairs = do
     | NodeDefinition name args <- ns
     , n <- [1..length args]
     , let nodeName = ConstructorName name n
-    , nodeName `Set.member` activeNodes
+    , name `Set.member` activeNodes
     , let appliedArgs = reverse (drop n (reverse args))
     , let retTys = [NodePtr]
     , let argTy = reverse args !! (n-1) ]
 
-functionNodes :: Function -> Set NodeName
+functionNodes :: Function -> Set Name
 functionNodes = blockNodes . fnBody
 
-blockNodes :: Block -> Set NodeName
+blockNodes :: Block -> Set Name
 blockNodes block =
   case block of
     Case _scrut mbBlock alts ->
@@ -140,11 +140,16 @@ blockNodes block =
         [ blockNodes branch
         | Alternative _pattern branch <- alts ]
     Bind _vars (Store node _args) rest ->
-      Set.insert node (blockNodes rest)
+      setNodeName node (blockNodes rest)
     Bind _vars (MkNode node _args) rest ->
-      Set.insert node (blockNodes rest)
+      setNodeName node (blockNodes rest)
     Bind _vars _ rest -> blockNodes rest
     _ -> Set.empty
+
+setNodeName :: NodeName -> Set Name -> Set Name
+setNodeName UnboxedTupleName        = id
+setNodeName (ConstructorName con _) = Set.insert con
+setNodeName (FunctionName con _)    = Set.insert con
 
 mkEvalAlternative :: Variable -> Function -> Gen Alternative
 mkEvalAlternative ptr fn = do
@@ -178,6 +183,6 @@ replaceEvalApply applys eval = fix $ \loop block ->
         Eval arg -> Application eval [arg]
         Apply fn arg ->
           case Map.lookup (expectedRetTypes, variableType arg) applys of
-            Nothing -> Undefined -- error $ "Missing apply function: " ++ show (fn,arg)
+            Nothing -> error $ "Missing apply function: " ++ show (expectedRetTypes, variableType arg)
             Just apply -> Application apply [fn, arg]
         _        -> expr

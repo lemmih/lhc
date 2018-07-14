@@ -179,7 +179,8 @@ convertTcType tcTy =
         | qname == QualifiedName "LHC.Prim" "Addr"
             -> case convertTcType sub of
                  Primitive prim -> Primitive (LLVM.ptr prim)
-                 _ -> error $ "CoreToBedrock: Addr must be primitive: " ++ show sub
+                 _ -> Primitive (LLVM.ptr LLVM.i8) -- FIXME: Ugly hack because types aren't right
+                 -- _ -> error $ "CoreToBedrock: Addr must be primitive: " ++ show sub
     TC.TyCon qname
         | qname == QualifiedName "LHC.Prim" "I8"
              -> Primitive LLVM.i8

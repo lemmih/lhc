@@ -137,7 +137,7 @@ toLLVM bedrock = LLVM.Module
               , functionAttributes = [Right NoUnwind, Right NoReturn]
               , metadata = [] }
       newDefinition $ GlobalDefinition functionDefaults
-        { name = LLVM.Name "main"
+        { name = LLVM.Name "_lhc_main"
         , returnType = i32
         , basicBlocks = [BasicBlock (UnName 0) [Do entryCall] (Do $ Unreachable [])] }
     getLayoutDef = do

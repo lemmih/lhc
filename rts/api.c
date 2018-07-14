@@ -33,3 +33,18 @@ word _lhc_mkIndirection(word *hp) {
 word _lhc_mkTag(word tag) {
   return tag<<1;
 }
+
+
+int _lhc_getargc(void) {
+  return _lhc_argc;
+}
+
+char* _lhc_getargv(int n) {
+  return _lhc_argv[n];
+}
+
+int main(int argc, char *argv[]) {
+  _lhc_argc = argc;
+  _lhc_argv = argv;
+  _lhc_main();
+}

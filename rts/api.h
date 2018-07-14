@@ -26,6 +26,9 @@ extern InfoTable _lhc_info_tables[];
 
 typedef uint64_t word;
 
+int _lhc_argc;
+char **_lhc_argv;
+
 // typedef union {
 //   struct Node {
 //     int type:2;
@@ -53,6 +56,7 @@ typedef uint64_t word;
 //   trunk: 32 bits // only on 64 bit systems.
 #define OBJECT_HEADER(hp) (*hp)
 
+extern int _lhc_main(void);
 
 word _lhc_isIndirection(word);
 word _lhc_isIndirectionP(word*);
@@ -62,5 +66,8 @@ void _lhc_setIndirection(word*, word*);
 word _lhc_getTag(word);
 word _lhc_mkIndirection(word*);
 word _lhc_mkTag(word);
+
+int _lhc_getargc(void);
+char* _lhc_getargv(int n);
 
 #endif // __LHC_API__

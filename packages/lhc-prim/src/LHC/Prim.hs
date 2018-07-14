@@ -12,6 +12,7 @@ module LHC.Prim
     , unsafePerformIO
     , List(Nil,Cons)
     -- , sequence_
+    , getArgs
     , unpackString#
     , putStr
     , putStrLn
@@ -40,6 +41,7 @@ data I8
 data I32
 data I64
 data Addr a
+data Ptr a = Ptr (Addr a)
 
 data Int32 = Int32 I32
 
@@ -101,6 +103,22 @@ unpackString# ptr =
   case i8toi64 (indexI8# ptr) of
     0#   -> []
     char -> (:) (C# (i64toi32 char)) (unpackString# (addrAdd# ptr 1#))
+
+foreign import ccall unsafe "_lhc_getargc" c_getargc :: IO Int32
+foreign import ccall unsafe "_lhc_getargv" c_getargv :: I32 -> IO (Ptr I8)
+
+getArgs :: IO [[Char]]
+getArgs = do
+  argc <- c_getargc
+  case argc of
+    Int32 n -> getArgs_worker [] n
+
+getArgs_worker :: [[Char]] -> I32 -> IO [[Char]]
+getArgs_worker acc '\0'# = return acc
+getArgs_worker acc n = do
+  ptr <- c_getargv (n -# '\1'#)
+  case ptr of
+    Ptr str -> getArgs_worker (unpackString# str : acc) (n -# '\1'#)
 
 foreign import ccall "getchar" c_getchar :: IO Int32
 
