@@ -24,6 +24,7 @@ module LHC.Prim
     , not
     , otherwise
     , (+), (-), (*)
+    , shiftL
     -- , udiv, urem
     , sdiv, srem
     , mapM_
@@ -178,6 +179,11 @@ foreign import ccall unsafe sdiv# :: I32 -> I32 -> I32
 
 foreign import ccall unsafe urem# :: I32 -> I32 -> I32
 foreign import ccall unsafe srem# :: I32 -> I32 -> I32
+
+foreign import ccall unsafe shl# :: I32 -> I32 -> I32
+
+shiftL :: Int -> Int -> Int
+shiftL (I# a#) (I# b#) = I# (shl# a# b#)
 
 -- udiv :: Int -> Int -> Int
 -- udiv (I# a#) (I# b#) = I# (udiv# a# b#)
