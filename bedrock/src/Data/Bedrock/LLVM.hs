@@ -457,6 +457,14 @@ blockToLLVM = worker
             , operand1 = toLocalReference b
             , metadata = []
             }
+    mkInst _retTy (CCall "*#" [a, b]) =
+        return $ Mul
+            { nsw = False
+            , nuw = False
+            , operand0 = toLocalReference a
+            , operand1 = toLocalReference b
+            , metadata = []
+            }
     mkInst _retTy (CCall "shl#" [a, b]) =
         return $ Shl
             { nsw = False

@@ -5,7 +5,11 @@ module LHC.Prelude
   , showInt
   , digits
   , last
-  , replicate ) where
+  , replicate
+  , take
+  , iterate
+  , print
+  ) where
 
 import LHC.Prim
 
@@ -60,3 +64,13 @@ last_go x (y:ys) = last_go y ys
 replicate :: Int -> a -> [a]
 replicate 0 elt = []
 replicate n elt = elt : replicate (n-1) elt
+
+take :: Int -> [a] -> [a]
+take 0 _ = []
+take n (x:xs) = x : take (n-1) xs
+
+iterate :: (a -> a) -> a -> [a]
+iterate fn a = a : iterate fn (fn a)
+
+print :: Int -> IO ()
+print n = putStrLn (showInt n)
