@@ -47,6 +47,7 @@ unitTests :: [Test]
 unitTests =
   [ sugarTest "Prim"
   , sugarTest "Basic1"
+  , sugarTest "Where"
   , testGroup "Haskell2010"
     [
     ]

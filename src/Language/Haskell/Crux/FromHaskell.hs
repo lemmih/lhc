@@ -282,29 +282,33 @@ convertDecl' decl =
           <*> (reifyTypeVariables ty <$> Lam args
                   <$> convertMatches args matches)
       return [decl']
-    HS.PatBind _ (HS.PVar _ name) rhs _binds -> do
-        decl' <- Declaration
-            <$> lookupType name
-            <*> pure (bindName name)
-            <*> convertRhs rhs
-        return [decl']
+    HS.PatBind tyDecl (HS.PVar _ name) rhs binds -> do
+      let proof =
+            case tyDecl of
+              TC.Coerced _ _ p -> p
+              TC.Scoped{}      -> error "missing proof"
+      let ty = TC.reifyProof proof
+      decl' <- Declaration
+          <$> lookupType name
+          <*> pure (bindName name)
+          <*> (reifyTypeVariables ty <$> (convertBinds binds =<< convertRhs rhs))
+      return [decl']
     HS.ForImp _ _conv _safety mbExternal name _ty -> do
-        let external = fromMaybe (getNameIdentifier name) mbExternal
-        foreignTy <- lookupType name
-        decl' <- Declaration
-            <$> lookupType name
-            <*> pure (bindName name)
-            <*> convertExternal external foreignTy
+      let external = fromMaybe (getNameIdentifier name) mbExternal
+      foreignTy <- lookupType name
+      decl' <- Declaration
+          <$> lookupType name
+          <*> pure (bindName name)
+          <*> convertExternal external foreignTy
 
-        unless (isPrimitive external) $ do
-            let (argTypes, _isIO, retType) = ffiTypes foreignTy
-            pushForeign Foreign
-                { foreignName = external
-                , foreignReturn = toCType retType
-                , foreignArguments = map toCType argTypes }
+      unless (isPrimitive external) $ do
+          let (argTypes, _isIO, retType) = ffiTypes foreignTy
+          pushForeign Foreign
+              { foreignName = external
+              , foreignReturn = toCType retType
+              , foreignArguments = map toCType argTypes }
 
-        return [decl']
-
+      return [decl']
     HS.DataDecl _ HS.DataType{} _ctx dhead qualCons _deriving -> do
       dheadToNode dhead
       mapM_ (convertQualCon False) qualCons
@@ -338,22 +342,32 @@ dheadToNode dhead = do
 
 convertMatches :: [Variable] -> [HS.Match Typed] -> M Expr
 convertMatches _args [] = error "Language.Haskell.Crux.FromHaskell.convertMatches"
-convertMatches args [HS.InfixMatch _ pat _ pats rhs _mbBinds] =
-    convertAltPats (zip args (pat:pats)) Nothing =<< convertRhs rhs
-convertMatches args [HS.Match _ _ pats rhs _mbBinds] =
-    convertAltPats (zip args pats) Nothing =<< convertRhs rhs
-convertMatches args (HS.Match _ _ pats rhs _mbBinds:xs)
+convertMatches args [HS.InfixMatch _ pat _ pats rhs mbBinds] =
+    convertBinds mbBinds =<< convertAltPats (zip args (pat:pats)) Nothing =<< convertRhs rhs
+convertMatches args [HS.Match _ _ pats rhs mbBinds] =
+    convertBinds mbBinds =<< convertAltPats (zip args pats) Nothing =<< convertRhs rhs
+convertMatches args (HS.Match _ _ pats rhs mbBinds:xs)
     | all isSimplePat pats = do
         rest <- convertMatches args xs
-        convertAltPats (zip args pats) (Just rest) =<<
+        convertBinds mbBinds =<<
+          convertAltPats (zip args pats) (Just rest) =<<
                 convertRhs rhs
     | otherwise = do
         rest <- convertMatches args xs
         restBranch <- Variable <$> newName "branch" <*> exprType rest
         e <- convertAltPats (zip args pats) (Just $ Var restBranch) =<<
                 convertRhs rhs
-        return $ Let (NonRec restBranch rest) e
+        convertBinds mbBinds $ Let (NonRec restBranch rest) e
 convertMatches _args _ = error "Urk"
+
+convertBinds :: Maybe (HS.Binds Typed) -> Expr -> M Expr
+convertBinds Nothing e = pure e
+convertBinds (Just (HS.BDecls _ binds)) e = do
+  decls <- mapM convertDecl' binds
+  pure $ Let (Rec [ (Variable name ty, body)
+           | Declaration ty name body <- concat decls ])
+         e
+convertBinds _ _ = error "Invalid bind"
 
 convertAltPats :: [(Variable, HS.Pat Typed)] -> Maybe Expr -> Expr -> M Expr
 convertAltPats conds failBranch successBranch =
