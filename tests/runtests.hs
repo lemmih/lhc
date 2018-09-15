@@ -46,6 +46,7 @@ main = do
 unitTests :: [Test]
 unitTests =
   [ sugarTest "Prim"
+  , sugarTest "Basic1"
   , testGroup "Haskell2010"
     [
     ]

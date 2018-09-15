@@ -1,0 +1,12 @@
+Basic1.dot : ∀ v14 v16 v13. (v14 →  v13) →  (v16 →  v14) →  v16 →  v13
+Basic1.dot =
+  λ @.v14:* @.v16:* @.v13:* Basic1.f:(v14 →  v13) Basic1.g:(v16 →  v14) Basic1.x:v16 → 
+  Basic1.f (Basic1.g Basic1.x)
+Basic1.id : ∀ v8. v8 →  v8
+Basic1.id =
+  λ @.v8:* Basic1.x:v8 → 
+  Basic1.x
+Basic1.apply : ∀ v4 v3. (v4 →  v3) →  v4 →  v3
+Basic1.apply =
+  λ @.v4:* @.v3:* Basic1.f:(v4 →  v3) Basic1.a:v4 → 
+  Basic1.f Basic1.a
