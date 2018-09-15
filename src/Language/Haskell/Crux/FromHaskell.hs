@@ -12,7 +12,8 @@ import           Data.List                  (transpose)
 import           Data.Map                   (Map)
 import qualified Data.Map                   as Map
 import           Data.Maybe
-import           Data.Semigroup             (Semigroup(..))
+import           Data.Semigroup             (Semigroup (..))
+import           Data.Typeable
 import qualified Language.Haskell.Exts      as HS
 
 import           Language.Haskell.Crux
@@ -26,8 +27,8 @@ import qualified LLVM.AST                   as LLVM
 import qualified LLVM.AST.AddrSpace         as LLVM
 
 data Scope = Scope
-    { scopeTcEnv        :: TcEnv
-    , scopeNewTypes     :: [Variable]
+    { scopeTcEnv    :: TcEnv
+    , scopeNewTypes :: [Variable]
     }
 
 data Env = Env
@@ -117,9 +118,9 @@ expectEntity :: HS.Name Typed -> Entity
 expectEntity hsName =
   case nameInfo hsName of
     Scope.Resolved entity -> entity
-    Scope.Binding entity -> entity
-    Scope.None -> error "expectEntity: None"
-    Scope.ScopeError err -> error $ "expectEntity: ScopeError " ++ show err
+    Scope.Binding entity  -> entity
+    Scope.None            -> error "expectEntity: None"
+    Scope.ScopeError err  -> error $ "expectEntity: ScopeError " ++ show err
 
 bindName :: HS.Name Typed -> Name
 bindName = nameFromEntity . expectEntity
@@ -191,7 +192,7 @@ resolveQName qname =
         HS.Special _ HS.UnitCon{} -> return unitCon
         HS.Special _ HS.Cons{}    -> return consCon
         -- HS.Special _ HS.ListCon{} -> return nilCon
-        _ -> error $ "HaskellToCore.resolveQName: " ++ show qname
+        _ -> unhandledSyntax qname
 
 convert :: TcEnv -> HS.Module Typed -> Module
 convert tcEnv (HS.Module _ _ _ _ decls) = Module
@@ -204,7 +205,7 @@ convert tcEnv (HS.Module _ _ _ _ decls) = Module
         nts <- catMaybes <$> mapM convertNewTypes decls
         local (\s -> s{scopeNewTypes = nts}) $
           mapM_ convertDecl decls
-convert _ _ = error "HaskellToCore.convert"
+convert _ m = unhandledSyntax m
 
 -- Return function name.
 matchInfo :: [HS.Match Typed] -> HS.Name Typed
@@ -316,7 +317,7 @@ convertDecl' decl =
     HS.DataDecl _ HS.NewType{} _ctx _dhead _qualCons _deriving -> return []
     HS.TypeSig{} -> return []
     HS.InlineSig{} -> return []
-    _ -> error $ "Language.Haskell.Crux.FromHaskell.convertDecl: " ++ show decl
+    _ -> unhandledSyntax decl
 
 isPrimitive :: String -> Bool
 isPrimitive "realworld#" = True
@@ -335,10 +336,10 @@ dheadToNode dhead = do
     let name = annotateName "@" $ nameFromEntity $ expectEntity hsName
     pushNode $ NodeDefinition (Variable name (foldr TC.TyFun TC.TyStar args))
   where
-    split (HS.DHead _ name) acc = (name, reverse acc)
-    split (HS.DHApp _ dh _ty) acc = split dh (TC.TyStar : acc)
+    split (HS.DHead _ name) acc       = (name, reverse acc)
+    split (HS.DHApp _ dh _ty) acc     = split dh (TC.TyStar : acc)
     split (HS.DHInfix _ _ty name) acc = (name, reverse (TC.TyStar : acc))
-    split (HS.DHParen _ dh) acc = split dh acc
+    split (HS.DHParen _ dh) acc       = split dh acc
 
 convertMatches :: [Variable] -> [HS.Match Typed] -> M Expr
 convertMatches _args [] = error "Language.Haskell.Crux.FromHaskell.convertMatches"
@@ -358,7 +359,7 @@ convertMatches args (HS.Match _ _ pats rhs mbBinds:xs)
         e <- convertAltPats (zip args pats) (Just $ Var restBranch) =<<
                 convertRhs rhs
         convertBinds mbBinds $ Let (NonRec restBranch rest) e
-convertMatches _args _ = error "Urk"
+convertMatches _args (match:_) = unhandledSyntax match
 
 convertBinds :: Maybe (HS.Binds Typed) -> Expr -> M Expr
 convertBinds Nothing e = pure e
@@ -400,7 +401,7 @@ convertConDecl isNewtype con =
         then pushNewType $ IsNewType $ Variable conName ty
         else pushNode $ NodeDefinition (Variable conName ty) -- (init $ splitTy ty)
     --HS.RecDecl _ name fieldDecls -> do
-    _ -> error "convertCon"
+    _ -> unhandledSyntax con
 
 -- XXX: Temporary measure. 2014-07-11
 splitTy :: TC.Type -> [TC.Type]
@@ -511,7 +512,7 @@ convertRhs :: HS.Rhs Typed -> M Expr
 convertRhs rhs =
     case rhs of
         HS.UnGuardedRhs _ expr -> convertExp expr
-        _                      -> error "convertRhs"
+        _                      -> unhandledSyntax rhs
 
 convertStmts :: [HS.Stmt Typed] -> M Expr
 convertStmts [] = error "convertStmts: Empty list"
@@ -519,7 +520,7 @@ convertStmts [end] =
     case end of
         -- HS.Generator _ pat expr
         HS.Qualifier _ expr -> convertExp expr
-        _                   -> error $ "convertStmts: " ++ show end
+        _                   -> unhandledSyntax end
 convertStmts (x:xs) =
   case x of
     HS.Generator (TC.Coerced _ _ proof) (HS.PVar _ name) expr -> do
@@ -531,7 +532,7 @@ convertStmts (x:xs) =
       expr' <- convertExp expr
       rest <- convertStmts xs
       return $ convertProof proof primThenIO `App` expr' `App` rest
-    _ -> error "Urk: statement"
+    _ -> unhandledSyntax x
 
 primThenIO :: Expr
 primThenIO = Var (Variable name ty)
@@ -654,7 +655,7 @@ convertExp expr =
       return $ Con nilCon
     HS.Do _ stmts ->
       convertStmts stmts
-    _ -> error $ "H->C convertExp: " ++ show expr
+    _ -> unhandledSyntax expr
 
 convertAlts :: Expr -> [HS.Alt Typed] -> M Expr
 convertAlts _scrut [] = error "" -- pure $ Case (Var scrut) scrut Nothing []
@@ -669,7 +670,7 @@ convertAlts scrut (HS.Alt _ pat rhs Nothing:alts) = do
       restBranch <- Variable <$> newName "branch" <*> exprType rest
       e <- convertAltPat scrut (Just $ Var restBranch) pat =<< convertRhs rhs
       return $ Let (NonRec restBranch rest) e
-convertAlts _ _ = error "Urk: alt"
+convertAlts _ (alt:_) = unhandledSyntax alt
 
 isSimplePat :: HS.Pat Typed -> Bool
 isSimplePat pat =
@@ -732,7 +733,7 @@ convertAltPat scrut failBranch pat successBranch =
       scrut' <- Variable <$> newName "scrut" <*> exprType scrut
       let alt = Alt (ConPat nilCon []) successBranch
       return $ Case scrut scrut' failBranch [alt]
-    _ -> error $ "Language.Haskell.Crux.FromHaskell.convertAltPat: " ++ show pat
+    _ -> unhandledSyntax pat
 
 _convertAlt :: HS.Alt Typed -> M Alt
 _convertAlt alt =
@@ -753,7 +754,7 @@ _convertAlt alt =
         -- HS.Alt _ (HS.PVar _ var) rhs Nothing ->
         --     Alt <$> (VarPat <$> (Variable <$> bindName var <*> lookupType var))
         --         <*> convertRhs rhs
-        _ -> error $ "convertAlt: " ++ show alt
+        _ -> unhandledSyntax alt
 
 convertLiteralToExpr :: HS.Literal Typed -> Expr
 convertLiteralToExpr lit =
@@ -762,7 +763,7 @@ convertLiteralToExpr lit =
         HS.PrimInt _ int _    -> Lit $ LitInt int
         HS.PrimChar _ char _  -> Lit $ LitChar char
         HS.String _ str _     -> App unpackString (Lit $ LitString str)
-        _                     -> error $ "convertLiteral: " ++ show lit
+        _                     -> unhandledSyntax lit
 
 convertLiteral :: HS.Literal Typed -> Literal
 convertLiteral lit =
@@ -770,13 +771,7 @@ convertLiteral lit =
         HS.PrimString _ str _ -> LitString str
         HS.PrimInt _ int _    -> LitInt int
         HS.PrimChar _ char _  -> LitChar char
-        _                     -> error $ "convertLiteral: " ++ show lit
-
-_toEntity :: HS.QName Typed -> Entity
-_toEntity qname =
-    case nameInfo qname of
-        Resolved entity -> entity
-        _               -> error $ "toGlobalName: " ++ show qname
+        _                     -> unhandledSyntax lit
 
 exprType :: Expr -> M TC.Type
 exprType expr =
@@ -880,3 +875,9 @@ ptrCon = Variable (Name ["LHC.Prim"] "Ptr" 0) $
   where
     a = TcVar "a" []
     aTy = TC.TyRef a
+
+
+unhandledSyntax :: (Typeable a, HS.Pretty a) => a -> b
+unhandledSyntax val = error $
+  "Unhandled syntax: (type: "++ show (typeOf val) ++ ")\n" ++
+  HS.prettyPrint val

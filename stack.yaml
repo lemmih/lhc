@@ -7,7 +7,7 @@ packages:
 
 - location:
     git: https://github.com/haskell-suite/haskell-tc.git
-    commit: 24c4626668240d8ac0a586380a369be77e8b250c
+    commit: 3a893cb3fc844eea6e203d17e18f1f59cd14e5bf
   extra-dep: true
 
 - location:
