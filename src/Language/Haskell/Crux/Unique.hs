@@ -51,8 +51,9 @@ uniqueExpr expr =
     Let (NonRec v e) body -> bind v $ \v' ->
       Let <$> (NonRec v' <$> uniqueExpr e)
           <*> uniqueExpr body
-    Let{} ->
-      error "Compiler.Core.Unique.uniqueExpr.Let: undefined"
+    Let (Rec binds) body -> bindMany (map fst binds) $ \vars -> do
+      defs <- mapM uniqueExpr (map snd binds)
+      Let (Rec $ zip vars defs) <$> uniqueExpr body
     LetStrict v e rest ->
       bind v $ \v' ->
         LetStrict v' <$> uniqueExpr e <*> uniqueExpr rest
