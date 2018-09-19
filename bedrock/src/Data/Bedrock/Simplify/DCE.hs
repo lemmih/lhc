@@ -39,6 +39,7 @@ moduleGraph m =
         Case _ mbDefault alts ->
           maybe [] blockDependencies mbDefault ++ concatMap altDependencies alts
         Bind _ expr block -> exprDependencies expr ++ blockDependencies block
+        Recursive _ block -> blockDependencies block
         TailCall fn _ -> [fn]
         _ -> []
     altDependencies (Alternative _ block) = blockDependencies block

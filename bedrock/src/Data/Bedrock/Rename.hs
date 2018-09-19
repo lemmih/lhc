@@ -42,8 +42,12 @@ newUnique _mbTy = do
 
 newName :: Maybe Type -> Name -> Uniq Name
 newName mbTy name = do
-    u <- newUnique mbTy
-    return name{ nameUnique = u }
+  -- m <- ask
+  -- case Map.lookup name m of
+  --   _Nothing -> do
+      u <- newUnique mbTy
+      return name{ nameUnique = u }
+    -- _Just new -> pure new
 
 rename :: Maybe Type -> Name -> Uniq a -> Uniq a
 rename mbTy old action = do
@@ -148,6 +152,10 @@ uniqBlock block =
                 <$> mapM resolve binds
                 <*> uniqSimple simple
                 <*> uniqBlock rest
+        Recursive binds rest -> renameVariables binds $
+          Recursive
+            <$> mapM resolve binds
+            <*> uniqBlock rest
         Return vars ->
             Return <$> mapM resolve vars
         Raise var ->
@@ -335,6 +343,10 @@ locallyBlock block =
       Bind
         <$> mapM locallyBindVariable binds
         <*> locallyExpression expr
+        <*> locallyBlock rest
+    Recursive binds rest ->
+      Recursive
+        <$> mapM locallyBindVariable binds
         <*> locallyBlock rest
     Return args ->
       Return <$> mapM locallyResolveVariable args

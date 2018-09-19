@@ -78,6 +78,8 @@ dceBlock root block =
       unless (isSimple expr) $
         useMany [root] vars
       (ifUsed vars $ Bind vars expr) <*> dceBlock root rest
+    Recursive binds rest ->
+      Recursive binds <$> dceBlock root rest
     Return vars -> do
       useMany [root] vars
       return block

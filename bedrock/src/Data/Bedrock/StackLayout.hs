@@ -53,7 +53,8 @@ lowerBlock block =
           lowerBlock rest)
       Bind binds expr rest ->
         Bind binds expr <$> lowerBlock rest
-
+      Recursive binds rest ->
+        Recursive binds <$> lowerBlock rest
       Case scrut defaultBranch alts ->
         Case scrut
           <$> maybe (return Nothing) (fmap Just . lowerBlock) defaultBranch

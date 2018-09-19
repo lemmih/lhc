@@ -170,6 +170,10 @@ uniqBlock block =
                 <$> resolveMany binds
                 <*> uniqExpression simple
                 <*> uniqBlock rest
+        Recursive binds rest -> lowerMany binds $
+          Recursive
+            <$> resolveMany binds
+            <*> uniqBlock rest
         Return vars ->
             Return <$> resolveMany vars
         Raise var ->

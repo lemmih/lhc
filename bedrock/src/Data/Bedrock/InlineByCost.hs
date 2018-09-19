@@ -39,6 +39,7 @@ blockCost block =
     Case _scrut _defaultBranch _alts -> return Nothing
     Bind vars expr rest ->
       fmap (step (exprCost expr) (Bind vars expr)) <$> (blockCost rest)
+    Recursive _binds _rest -> return Nothing
     Return rets -> return $ Just (0, \mk -> mk rets)
     Raise{} -> return $ Just (0, \_ -> block)
     TailCall{} -> return Nothing
@@ -98,6 +99,8 @@ inlineBlock block =
             typeCastMany (zip inlinedArgs args) $
             inliner (\vals -> typeCastMany (zip vars vals) rest')
         _ProhibitlyExpensive -> Bind vars expr <$> inlineBlock rest
+    Recursive vars rest ->
+      Recursive vars <$> inlineBlock rest
     Bind vars expr rest ->
       Bind vars expr <$> inlineBlock rest
     Return{} -> return block

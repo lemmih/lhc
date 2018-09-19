@@ -2,28 +2,31 @@
 module Compiler.CoreToBedrock where
 
 
-import           Data.Bedrock               as Bedrock
-import           Data.Bedrock.Transform     (freeVariables)
-import           Language.Haskell.Crux      hiding (Foreign (..), Name (..),
-                                             NodeDefinition (..), UnboxedPat,
-                                             Variable (..))
-import qualified Language.Haskell.Crux      as Core
+import           Data.Bedrock                      as Bedrock
+import           Data.Bedrock.Transform            (freeVariables)
+import           Language.Haskell.Crux             hiding (Foreign (..),
+                                                    Name (..),
+                                                    NodeDefinition (..),
+                                                    UnboxedPat, Variable (..))
+import qualified Language.Haskell.Crux             as Core
+import           Language.Haskell.TypeCheck.Pretty (pretty)
 
 import           Control.Monad.Reader
-import           Control.Monad.RWS          (MonadState (..), RWS, execRWS)
-import           Control.Monad.Writer       (MonadWriter (..))
-import           Data.Char                  (ord)
-import           Data.Map                   (Map)
-import qualified Data.Map                   as Map
+import           Control.Monad.RWS                 (MonadState (..), RWS,
+                                                    execRWS)
+import           Control.Monad.Writer              (MonadWriter (..))
+import           Data.Char                         (ord)
+import           Data.Map                          (Map)
+import qualified Data.Map                          as Map
 import           Data.Maybe
-import qualified Data.Set                   as Set
-import qualified LLVM.AST                   as LLVM (Type (..))
+import qualified Data.Set                          as Set
+import qualified LLVM.AST                          as LLVM (Type (..))
 import           LLVM.AST.AddrSpace
-import qualified LLVM.AST.Type              as LLVM
+import qualified LLVM.AST.Type                     as LLVM
 
-import           Language.Haskell.Scope     (QualifiedName (..))
-import qualified Language.Haskell.TypeCheck as TC (Proof, Qualified (..),
-                                                   Type (..))
+import           Language.Haskell.Scope            (QualifiedName (..))
+import qualified Language.Haskell.TypeCheck        as TC (Proof, Qualified (..),
+                                                          Type (..))
 
 -- import Debug.Trace
 
@@ -107,7 +110,7 @@ requireArity :: Name -> M Int
 requireArity name = do
   mbArity <- lookupArity name
   case mbArity of
-    Nothing -> error $ "No arity for: " ++ show name
+    Nothing    -> error $ "No arity for: " ++ show name
     Just arity -> pure arity
 
 newName :: [String] -> String -> M Name
@@ -165,12 +168,12 @@ convertVariable var = return $
 convertTcTypes :: TC.Type -> [Type]
 convertTcTypes tcTy =
   case tcTy of
-    TC.TyFun a b -> convertTcType a : convertTcTypes b
-    TC.TyApp{} -> []
-    TC.TyCon{} -> []
-    TC.TyStar{} -> []
+    TC.TyFun a b                   -> convertTcType a : convertTcTypes b
+    TC.TyApp{}                     -> []
+    TC.TyCon{}                     -> []
+    TC.TyStar{}                    -> []
     TC.TyForall _tvs (_ TC.:=> ty) -> convertTcTypes ty
-    _ -> error $ "convertTcTypes: " ++ show tcTy
+    _                              -> error $ "convertTcTypes: " ++ show tcTy
 
 convertTcType :: TC.Type -> Type
 convertTcType tcTy =
@@ -179,7 +182,7 @@ convertTcType tcTy =
         | qname == QualifiedName "LHC.Prim" "Addr"
             -> case convertTcType sub of
                  Primitive prim -> Primitive (LLVM.ptr prim)
-                 _ -> Primitive (LLVM.ptr LLVM.i8) -- FIXME: Ugly hack because types aren't right
+                 _              -> Primitive (LLVM.ptr LLVM.i8) -- FIXME: Ugly hack because types aren't right
                  -- _ -> error $ "CoreToBedrock: Addr must be primitive: " ++ show sub
     TC.TyCon qname
         | qname == QualifiedName "LHC.Prim" "I8"
@@ -209,6 +212,7 @@ setProgramExit block =
         [ Alternative pattern (setProgramExit branch)
         | Alternative pattern branch <- alts ]
     Bind binds expr rest -> Bind binds expr (setProgramExit rest)
+    Recursive binds rest -> Recursive binds (setProgramExit rest)
     Return{} -> Exit
     Raise{} -> error "setProgramExit"
     TailCall{} -> error "setProgramExit"
@@ -382,8 +386,8 @@ collectApps = worker []
   where
     worker acc expr =
         case expr of
-            App a b            -> worker (b:acc) a
-            _                  -> (expr, Nothing, acc)
+            App a b -> worker (b:acc) a
+            _       -> (expr, Nothing, acc)
 
 convertExpr :: Bool -> Core.Expr -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
 convertExpr lazy expr rest =
@@ -532,6 +536,13 @@ convertExpr lazy expr rest =
           name' <- convertVariable name
           Bind [name'] (TypeCast val) <$> convertExpr lazy e2 rest
 
+    Let (Rec []) e2 -> convertExpr lazy e2 rest
+    Let (Rec ((name,e1):binds)) e2 -> do
+      name' <- convertVariable name
+      Recursive [name'] <$>
+        (convertExpr True e1 $ \[val] ->
+          Bind [name'] (TypeCast val) <$> convertExpr lazy (Let (Rec binds) e2) rest)
+
     LetStrict name e1 e2 ->
       convertExpr False e1 $ \[val] -> do
           name' <- convertVariable name
@@ -545,7 +556,7 @@ convertExpr lazy expr rest =
         <$> rest [tmp]
     Core.Cast ->
       rest []
-    _ | lazy -> error $ "C->B convertExpr: " ++ show (lazy, expr)
+    _ | lazy -> error $ "C->B convertExpr: (lazy: "++ show lazy ++ ")\n" ++ show (pretty expr)
     _ -> -- not lazy
       convertExpr True expr $ \[val] -> do
       tmp <- deriveVariable val "eval" NodePtr

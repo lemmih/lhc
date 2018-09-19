@@ -241,6 +241,7 @@ pattern GCMarkFrame var = Builtin "gc_mark_frame" [PVariable var]
 data Block
   = Case Variable (Maybe Block) [Alternative]
   | Bind [Variable] Expression Block
+  | Recursive [Variable] Block
   | Return [Variable]
   | Raise Variable
   | TailCall Name [Variable]

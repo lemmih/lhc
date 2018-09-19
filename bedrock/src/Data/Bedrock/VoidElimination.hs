@@ -35,6 +35,8 @@ voidBlock block =
         (voidVariables binds)
         (voidExpression expr)
         (voidBlock rest)
+    Recursive binds rest ->
+      Recursive (voidVariables binds) (voidBlock rest)
     Return vars -> Return (voidVariables vars)
     Raise{} -> block
     TailCall fn vars -> TailCall fn (voidVariables vars)

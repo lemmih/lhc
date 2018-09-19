@@ -171,6 +171,7 @@ frameSize block =
         Bind _ Application{} rest -> max 2 (frameSize rest)
         Bind _ (Restore n) rest -> max (n+1) (frameSize rest)
         Bind _ _ rest -> frameSize rest
+        Recursive _ rest -> frameSize rest
         Return{} -> 0
         Case _scrut defaultBranch alts -> maximum
             ((case defaultBranch of

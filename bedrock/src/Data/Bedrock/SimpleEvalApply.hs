@@ -144,6 +144,7 @@ blockNodes block =
     Bind _vars (MkNode node _args) rest ->
       setNodeName node (blockNodes rest)
     Bind _vars _ rest -> blockNodes rest
+    Recursive _ rest -> blockNodes rest
     _ -> Set.empty
 
 setNodeName :: NodeName -> Set Name -> Set Name
@@ -171,6 +172,8 @@ replaceEvalApply applys eval = fix $ \loop block ->
         [ Alternative pat (loop branch)
         | Alternative pat branch <- alts ]
     Bind vars expr rest -> Bind vars (worker (map variableType vars) expr) (loop rest)
+    Recursive binds rest ->
+      Recursive binds (loop rest)
     Return vars -> Return vars
     Raise var -> Raise var
     TailCall fn args -> TailCall fn args

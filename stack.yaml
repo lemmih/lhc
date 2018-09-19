@@ -9,12 +9,12 @@ packages:
 
 - location:
     git: https://github.com/haskell-suite/haskell-tc.git
-    commit: 3a893cb3fc844eea6e203d17e18f1f59cd14e5bf
+    commit: a411e72a2dcabc7cf23cfb79f8801c4d2b102674
   extra-dep: true
 
 - location:
     git: https://github.com/Lemmih/haskell-crux
-    commit: bb075858755780f0c51a5f1b5c3030d3aea61c6c
+    commit: b9366eec7860977a14c412bf6f0b3e4abbf66ebe
   extra-dep: true
 
 - location:

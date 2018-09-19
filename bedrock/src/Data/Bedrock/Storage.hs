@@ -44,6 +44,8 @@ transformBlock origin block =
     Bind binds simple rest ->
       transformExpresion origin binds simple =<<
           transformBlock origin rest
+    Recursive binds rest ->
+      Recursive binds <$> transformBlock origin rest
     Return{} ->
       return block
     Raise{} ->

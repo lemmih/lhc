@@ -40,6 +40,9 @@ finBlock block =
       Bind binds
         <$> finExpression expr
         <*> finBlock rest
+    Recursive binds rest ->
+      Recursive binds
+        <$> finBlock rest
     Return{} -> pure block
     Raise{} -> pure block
     TailCall{} -> pure block

@@ -97,6 +97,8 @@ simplifyBlock block =
             Bind binds
                 <$> simplifyExpression simple
                 <*> simplifyBlock rest
+        Recursive binds rest ->
+          Recursive binds <$> simplifyBlock rest
         -- FIXME: Sanity check: con == node
         Case scrut Nothing alts@[Alternative (NodePat _con args) branch] -> do
           mbNode <- lookupConstant scrut

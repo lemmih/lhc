@@ -119,6 +119,9 @@ instance Pretty Parameter where
       PString str -> Doc.text (show str)
       PName name -> pretty name
       PNodeName node -> Doc.text "node" <+> ppNode node []
+      -- PNodes nodes -> Doc.sep
+      --   [ Doc.parens $ ppList $ map pretty [PName name, PVariables vars]
+      --   | (name, vars) <- nodes ]
       PVariable var -> pretty var
       PVariables var -> Doc.brackets (ppList $ map pretty var)
 
@@ -158,6 +161,9 @@ ppBlock block =
       ppList (map pretty names) <+>
       text "=" <+>
       pretty simple Doc.<$$>
+      ppBlock rest
+    Recursive vars rest ->
+      ppSyntax "@rec" <+> ppList (map pretty vars) Doc.<$$>
       ppBlock rest
     Case scrut Nothing [(Alternative pattern expression)] ->
       ppPattern pattern <+> text "← " <+> pretty scrut Doc.<$$>

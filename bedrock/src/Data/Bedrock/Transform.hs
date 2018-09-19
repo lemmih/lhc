@@ -135,6 +135,7 @@ freeVariables' block =
       freeVariablesSimple simple .
       flip Set.difference (Set.fromList binds) .
       freeVariables' rest
+    Recursive _binds rest -> freeVariables' rest
     Return args ->
       Set.union (Set.fromList args)
     Raise name ->
