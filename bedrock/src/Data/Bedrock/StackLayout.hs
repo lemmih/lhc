@@ -7,7 +7,6 @@ import           Control.Applicative    (Applicative, pure, (<$>), (<*>))
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.List
-import           Data.Ord
 import qualified Data.Set               as Set
 
 import           Data.Bedrock
@@ -49,8 +48,7 @@ lowerBlock block =
           allotStackPositions free $ \mapped ->
           saveVariables mapped $
           Bind binds expr <$>
-          (asks envStackLayout >>= \slots -> restoreVariables slots $
-          lowerBlock rest)
+          (restoreVariables mapped $ lowerBlock rest)
       Bind binds expr rest ->
         Bind binds expr <$> lowerBlock rest
       Recursive binds rest ->
@@ -81,14 +79,34 @@ trimStackMap free = local $ \env -> env
 
 allotStackPositions :: [Variable] -> ([(Variable, Int)] -> M a) -> M a
 allotStackPositions free action = do
-    layout <- asks envStackLayout
-    let alreadyAllotted = map fst layout
-        -- The two first stack slots are reserved for the return address
-        -- and the previous stack frame
-        freeSpots = [2..] \\ map snd layout
-        newAllotted = zip (free \\ alreadyAllotted) freeSpots
-    local (\env -> env{ envStackLayout = sortBy (comparing snd) $ newAllotted ++ envStackLayout env }) $
-      action newAllotted
+    action (zip (prims ++ pointers) freeSpots)
+  where
+    (prims, pointers) = partition isPrimitive free
+    freeSpots = [2..]
+    -- Sigh, this should be moved or refactored
+    isPrimitive :: Variable -> Bool
+    isPrimitive var =
+      case variableType var of
+        NodePtr{}    -> False
+        Node{}       -> False
+        StaticNode{} -> False
+        IWord{}      -> True
+        Primitive{}  -> True
+        FramePtr     -> False
+
+
+-- This implementation doesn't keep the invariant that primitives should come
+-- before heap pointers.
+-- allotStackPositions :: [Variable] -> ([(Variable, Int)] -> M a) -> M a
+-- allotStackPositions free action = do
+--     layout <- asks envStackLayout
+--     let alreadyAllotted = map fst layout
+--         -- The two first stack slots are reserved for the return address
+--         -- and the previous stack frame
+--         freeSpots = [2..] \\ map snd layout
+--         newAllotted = zip (free \\ alreadyAllotted) freeSpots
+--     local (\env -> env{ envStackLayout = sortBy (comparing snd) $ newAllotted ++ envStackLayout env }) $
+--       action newAllotted
 
 saveVariables :: [(Variable, Int)] -> M Block -> M Block
 saveVariables [] fn           = fn
