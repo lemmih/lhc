@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
 #include "api.h"
@@ -44,6 +45,7 @@ char* _lhc_getargv(int n) {
 }
 
 int main(int argc, char *argv[]) {
+  setvbuf(stdout, NULL, _IONBF, 0);
   _lhc_argc = argc;
   _lhc_argv = argv;
   _lhc_main();
