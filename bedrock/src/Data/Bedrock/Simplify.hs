@@ -15,6 +15,7 @@ data Env = Env
     , envAddresses :: Map Variable (Variable, Int)
     , envConstant  :: Map Variable (NodeName, [Variable])
     , envStores    :: Map Variable (NodeName, [Variable])
+    , envLoads     :: Map Variable (Variable, Int)
     }
 newtype M a = M { unM :: ReaderT Env (State AvailableNamespace) a }
     deriving
@@ -30,7 +31,8 @@ simplify m = runM (simplifyModule m)
         { envRenaming  = Map.empty
         , envAddresses = Map.empty
         , envConstant  = Map.empty
-        , envStores    = Map.empty }
+        , envStores    = Map.empty
+        , envLoads     = Map.empty }
 
 simplifyModule :: Module -> M Module
 simplifyModule m = do
@@ -54,6 +56,11 @@ simplifyBlock block =
             bindVariable scrut clone $
                 Bind [clone] (Unit (NodeArg node [])) <$>
                     simplifyBlock branch-}
+        Bind [val] expr@(Load ptr n) rest ->
+            bindLoad val ptr n $
+            Bind [val]
+                <$> simplifyExpression expr
+                <*> simplifyBlock rest
         Bind [ptr] expr@(Store name vars) rest ->
             bindStore ptr name vars $
             Bind [ptr]
@@ -85,6 +92,16 @@ simplifyBlock block =
         Bind [dst] (TypeCast src) rest | variableType dst == variableType src -> do
             src' <- resolve src
             bindVariable dst src' (simplifyBlock rest)
+        Bind [dst] (TypeCast src) rest | variableType dst /= variableType src -> do
+            src' <- resolve src
+            mbLoad <- lookupLoad src'
+            case mbLoad of
+              Nothing -> Bind [dst]
+                  <$> simplifyExpression (TypeCast src)
+                  <*> simplifyBlock rest
+              Just (ptr, idx) -> do
+                ptr' <- resolve ptr
+                Bind [dst] (Load ptr' idx) <$> simplifyBlock rest
         Bind [dst] (Address src idx) rest -> do
           src' <- resolve src
           bindAddress dst src' idx $
@@ -291,6 +308,16 @@ lookupStore var = do
     m <- asks envStores
     return $ Map.lookup var' m
 
+lookupLoad :: Variable -> M (Maybe (Variable, Int))
+lookupLoad var = do
+    var' <- resolve var
+    m <- asks envLoads
+    return $ Map.lookup var' m
+
 bindStore :: Variable -> NodeName -> [Variable] -> M a -> M a
 bindStore var node vars = local $ \env ->
     env{ envStores = Map.insert var (node, vars) (envStores env) }
+
+bindLoad :: Variable -> Variable -> Int -> M a -> M a
+bindLoad var ptr n = local $ \env ->
+    env{ envLoads = Map.insert var (ptr, n) (envLoads env) }

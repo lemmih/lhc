@@ -149,11 +149,7 @@ word *_lhc_semi_mark(word *object) {
   assert(object >= to_space && object < free_space);
   return object;
 }
-// void *p1 = deadbeef;
-// void *p2 = deadbeef;
-// evacuate(&p1);
-// evacuate(&p2);
-//
+
 void evacuate(word **object_address) {
   InfoTable *table;
   size_t size;

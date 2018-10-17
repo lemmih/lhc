@@ -57,7 +57,8 @@ lowerEvalApply = do
     pure $ Bind [ind] (Builtin "isIndirection" [PVariable arg]) $
       Case ind (Just nonIndirection) [Alternative (LitPat (LiteralInt 1)) $
         Bind [target] (Builtin "getIndirection" [PVariable arg]) $
-        Return [target]
+        -- Return [target]
+        TailCall evalName [target]
       ]
 
   pushFunction Function

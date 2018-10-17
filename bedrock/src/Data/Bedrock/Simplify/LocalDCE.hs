@@ -102,4 +102,5 @@ isSimple Literal{} = True
 isSimple TypeCast{} = True
 isSimple Undefined{} = True
 isSimple Address{} = True
+isSimple Load{} = True
 isSimple _ = False
