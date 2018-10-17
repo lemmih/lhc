@@ -1,4 +1,5 @@
 #include "api.h"
+#include "stats.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -22,7 +23,7 @@ void scavenge();
 #define MAX_HEAP (1024*1024*128)
 static int size=MIN_HEAP;
 static int live;
-static int factor=2;
+static int factor=3;
 
 static word *hp_limit;
 
@@ -32,6 +33,7 @@ static word *scavenged;
 
 word _lhc_semi_allocate(word *hp, word space) {
   // printf("SemiSpace alloc: %p %ld\n", hp, space);
+  _lhc_stats_allocate(space*sizeof(word));
   return hp+space<hp_limit;
 }
 
@@ -46,15 +48,17 @@ word* _lhc_semi_init() {
   prev_heap = NULL;
   free_space = NULL;
   // printf("SemiSpace init: hp: %p, size: %d\n", hp, size);
+  _lhc_stats_heap(MIN_HEAP*sizeof(word));
   return hp;
 }
 
 void _lhc_semi_begin() {
+  _lhc_stats_collect();
   assert(to_space==NULL);
   assert(free_space==NULL);
   assert(size>0);
   to_space = calloc(size,sizeof(word));
-  // printf("SemiSpace begin, to_space: %p\n", to_space);
+  //printf("SemiSpace begin, to_space: %p\n", to_space);
   free_space = to_space;
   scavenged = to_space;
   live = 0;
@@ -87,7 +91,9 @@ word *_lhc_semi_end() {
   assert(hp!=NULL);
   from_space = hp;
   hp_limit = hp+size;
-  // printf("SemiSpace done. Live: %d, size: %d, hp: %p\n", live, size, hp);
+  // printf("SemiSpace done. Live: %d, size: %d\n", live, size);
+  _lhc_stats_live(live*sizeof(word));
+  _lhc_stats_heap(size*sizeof(word));
   return hp;
 }
 
@@ -143,19 +149,30 @@ word *_lhc_semi_mark(word *object) {
   assert(object >= to_space && object < free_space);
   return object;
 }
+// void *p1 = deadbeef;
+// void *p2 = deadbeef;
+// evacuate(&p1);
+// evacuate(&p2);
+//
 void evacuate(word **object_address) {
   InfoTable *table;
   size_t size;
   word *object = *object_address;
   // if(!IN_FROM_SPACE(object)) return;
-  if(_lhc_isIndirectionP(object)) {
+  while(_lhc_isIndirectionP(object)) {
     *object_address = _lhc_getIndirectionP(object);
     object = *object_address;
   }
+  if(object >= to_space && object < free_space) {
+    // printf("Already evacuated object.\n");
+    return;
+  }
   table = &_lhc_info_tables[_lhc_getTag(*object)];
   size = (1+table->nPrimitives+table->nHeapPointers);
+  _lhc_stats_copy(size*sizeof(word));
 
   memcpy(free_space, object, size*sizeof(word));
+  _lhc_setIndirection(object, free_space);
   *object_address = free_space;
   live += size;
   free_space+=size;
@@ -163,6 +180,7 @@ void evacuate(word **object_address) {
 void scavenge() {
   InfoTable *table;
   while(scavenged < free_space) {
+    word* obj = scavenged;
     table = &_lhc_info_tables[_lhc_getTag(*scavenged)];
     // printf("SemiSpace: Scavenge: %ld = %ld", scavenged-to_space, *scavenged);
     for(int i=0;i<table->nPrimitives;i++) {
@@ -177,5 +195,6 @@ void scavenge() {
       scavenged++;
     }
     // printf("\n");
+    _lhc_stats_scavenged(obj);
   }
 }
