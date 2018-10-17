@@ -14,14 +14,17 @@ linkRTS target = do
   rtsDir <- getDataFileName "rts"
   semispace <- getDataFileName "rts/gc/semispace.c"
   api <- getDataFileName "rts/api.c"
+  stats <- getDataFileName "rts/stats.c"
   clang <- findLLVMExecutable "clang"
   link <- findLLVMExecutable "llvm-link"
   tmpDir <- getTemporaryDirectory
   let semi_dst = tmpDir </> "semispace.ll"
       api_dst = tmpDir </> "api.ll"
-  assertProcess clang ["-O2", "-I"++rtsDir, semispace, "-emit-llvm", "-S", "-o",semi_dst]
-  assertProcess clang ["-O2", "-I"++rtsDir, api, "-emit-llvm", "-S", "-o",api_dst]
-  assertProcess link [target, semi_dst, api_dst, "-S", "-o", target]
+      stats_dst = tmpDir </> "stats.ll"
+  assertProcess clang ["-O2", "-I"++rtsDir, semispace, "-emit-llvm", "-Werror", "-S", "-o",semi_dst]
+  assertProcess clang ["-O2", "-I"++rtsDir, api, "-emit-llvm", "-Werror", "-S", "-o",api_dst]
+  assertProcess clang ["-O2", "-I"++rtsDir, stats, "-emit-llvm", "-Werror", "-S", "-o",stats_dst]
+  assertProcess link [target, semi_dst, api_dst, stats_dst, "-S", "-o", target]
 
 
 

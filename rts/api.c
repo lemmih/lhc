@@ -1,7 +1,10 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <string.h>
 #include "api.h"
+#include "stats.h"
 
 word _lhc_isIndirection(word header) {
   return (header&1) == 1;
@@ -44,9 +47,29 @@ char* _lhc_getargv(int n) {
   return _lhc_argv[n];
 }
 
+void processArgs(int argc, char *argv[]) {
+  int rtsMode = 0;
+  _lhc_argv = calloc(argc, sizeof(char*));
+  _lhc_argc = 0;
+  for(int i=0; i < argc; i++) {
+    if(strcmp(argv[i], "+RTS")==0 && !rtsMode) {
+      rtsMode = 1;
+    } else if(strcmp(argv[i], "-RTS")==0 && rtsMode) {
+      rtsMode = 0;
+    } else if(strcmp(argv[i], "--gc-stats")==0 && rtsMode) {
+      _lhc_enable_gc_stats = 1;
+    } else if (rtsMode) {
+      fprintf(stderr, "Invalid option: %s\n", argv[i]);
+      exit(EXIT_FAILURE);
+    } else {
+      _lhc_argv[_lhc_argc++] = argv[i];
+    }
+  }
+}
+
 int main(int argc, char *argv[]) {
+  _lhc_stats_init();
   setvbuf(stdout, NULL, _IONBF, 0);
-  _lhc_argc = argc;
-  _lhc_argv = argv;
+  processArgs(argc, argv);
   _lhc_main();
 }
