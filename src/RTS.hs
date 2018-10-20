@@ -35,15 +35,14 @@ linkRTS target = do
 
 findLLVMExecutable :: FilePath -> IO FilePath
 findLLVMExecutable exec = do
-  mbRet <- findExecutable exec
-  case mbRet of
+  mbV6 <- findExecutable (exec++"-6.0")
+  case mbV6 of
     Just path -> pure path
     Nothing -> do
-      mbV6 <- findExecutable (exec++"-6.0")
-      case mbV6 of
+      mbRet <- findExecutable exec
+      case mbRet of
         Just path -> pure path
         Nothing   -> error $ "Required program could not be found: " ++ exec
-
 
 assertProcess :: String -> [String] -> IO ()
 assertProcess prog args = do
