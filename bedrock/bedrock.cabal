@@ -44,6 +44,7 @@ library
                        Data.Bedrock.Storage.Pluggable
                        Data.Bedrock.Storage.Fixed
                        Data.Bedrock.Storage.SemiSpace
+                       Data.Bedrock.Storage.Cached
                        Data.Bedrock.RegisterIntroduction
                        Data.Bedrock.Rename
                        Data.Bedrock.InlineByCost

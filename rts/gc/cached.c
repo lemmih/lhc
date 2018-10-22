@@ -8,12 +8,12 @@
 #include <assert.h>
 #include <sys/param.h>
 
-word *_lhc_semi_init();
-void _lhc_semi_begin();
-word *_lhc_semi_end();
-word *_lhc_semi_mark(word *object);
-word *_lhc_semi_mark_frame(word *object);
-word _lhc_semi_allocate(word*, word);
+word *_lhc_cached_init();
+void _lhc_cached_begin();
+word *_lhc_cached_end();
+word *_lhc_cached_mark(word *object);
+word *_lhc_cached_mark_frame(word *object);
+word _lhc_cached_allocate(word*, word);
 static void evacuate_frame(word **object_address);
 static void evacuate(word **object_address);
 static void scavenge_records();
@@ -31,13 +31,13 @@ static word *from_space;
 static word *to_space, *free_space, *prev_heap;
 static word *scavenged;
 
-word _lhc_semi_allocate(word *hp, word space) {
+word _lhc_cached_allocate(word *hp, word space) {
   // printf("SemiSpace alloc: %p %ld\n", hp, space);
   _lhc_stats_allocate(space*sizeof(word));
   return hp+space<hp_limit;
 }
 
-word* _lhc_semi_init() {
+word* _lhc_cached_init() {
   void *hp;
   assert  (sizeof(word)==8); // 64bit only for now
 
@@ -52,7 +52,7 @@ word* _lhc_semi_init() {
   return hp;
 }
 
-void _lhc_semi_begin() {
+void _lhc_cached_begin() {
   _lhc_stats_collect();
   assert(to_space==NULL);
   assert(free_space==NULL);
@@ -63,7 +63,7 @@ void _lhc_semi_begin() {
   scavenged = to_space;
   live = 0;
 }
-word *_lhc_semi_end() {
+word *_lhc_cached_end() {
   void *hp;
   // All roots have been marked.
   // Start by scavenging the frame stack.
@@ -97,7 +97,7 @@ word *_lhc_semi_end() {
   return hp;
 }
 
-word *_lhc_semi_mark_frame(word *object) {
+word *_lhc_cached_mark_frame(word *object) {
   word *orig_object = object;
   if(object==NULL) return NULL;
   evacuate_frame(&object);
@@ -143,7 +143,7 @@ static void scavenge_records() {
   }
 }
 
-word *_lhc_semi_mark(word *object) {
+word *_lhc_cached_mark(word *object) {
   assert(object!=NULL);
   evacuate(&object);
   assert(object >= to_space && object < free_space);
@@ -172,6 +172,11 @@ static void evacuate(word **object_address) {
   *object_address = free_space;
   live += size;
   free_space+=size;
+
+  if(table->nHeapPointers > 0) {
+    word **tail_pointer = (word**)(free_space-1);
+    evacuate(tail_pointer);
+  }
 }
 static void scavenge() {
   InfoTable *table;

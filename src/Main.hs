@@ -18,6 +18,7 @@ import           Control.Monad
 import qualified Data.Bedrock.Compile               as Bedrock
 import           Data.Bedrock.Storage.Fixed
 import           Data.Bedrock.Storage.SemiSpace
+import           Data.Bedrock.Storage.Cached
 import           Data.IORef
 import           Data.List                          (intercalate)
 import           Data.Monoid                        (mconcat, (<>))
@@ -219,7 +220,8 @@ compileExecutable verbose keepIntermediateFiles gcStrategy file = do
              ""      -> fixedGC
              "fixed" -> fixedGC
              "semi"  -> semiSpaceGC
-             _       -> error "Unknown strategy. Options are: fixed, semi"
+             "cached"-> cachedSpaceGC
+             _       -> error "Unknown strategy. Options are: fixed, semi, cached"
   let target = replaceExtension file "ll"
   Bedrock.compileModule keepIntermediateFiles verbose gc bedrock target
   linkRTS target

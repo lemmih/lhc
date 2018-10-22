@@ -75,7 +75,8 @@ void _lhc_stats_scavenged(word *scavenged) {
   table = &_lhc_info_tables[_lhc_getTag(*scavenged)];
   for(int i=0;i<table->nHeapPointers;i++) {
     word *new_addr = ((word**)scavenged)[1+table->nPrimitives+i];
-    int distance = (new_addr-scavenged)*sizeof(word);
+    size_t size = (1+table->nPrimitives+table->nHeapPointers);
+    int distance = labs((new_addr-size-scavenged))*sizeof(word);
     int j;
     for(j=0; j<_LHC_N_BUCKETS; j++)
       if( distance < _lhc_buckets[j] )
