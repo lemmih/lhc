@@ -71,7 +71,8 @@ void _lhc_stats_live(int live) {
     _lhc_stats_max_copied = live;
 }
 void _lhc_stats_scavenged(word *scavenged) {
-  InfoTable *table;
+  const InfoTable *table;
+  if(!_lhc_enable_gc_stats) return;
   table = &_lhc_info_tables[_lhc_getTag(*scavenged)];
   for(int i=0;i<table->nHeapPointers;i++) {
     word *new_addr = ((word**)scavenged)[1+table->nPrimitives+i];

@@ -25,7 +25,7 @@ typedef struct {
   unsigned int nHeapPointers;
 } InfoTable;
 
-extern InfoTable _lhc_info_tables[];
+extern const InfoTable _lhc_info_tables[];
 
 typedef uint64_t word;
 
