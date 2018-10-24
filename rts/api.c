@@ -58,6 +58,8 @@ void processArgs(int argc, char *argv[]) {
       rtsMode = 0;
     } else if(strcmp(argv[i], "--gc-stats")==0 && rtsMode) {
       _lhc_enable_gc_stats = 1;
+    } else if(strcmp(argv[i], "--tail-copy")==0 && rtsMode) {
+      _lhc_enable_tail_copying = 1;
     } else if (rtsMode) {
       fprintf(stderr, "Invalid option: %s\n", argv[i]);
       exit(EXIT_FAILURE);

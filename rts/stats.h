@@ -3,8 +3,6 @@
 
 #include "api.h"
 
-extern int _lhc_enable_gc_stats;
-
 void _lhc_stats_init(void);
 void _lhc_stats_collect(void);
 void _lhc_stats_copy(int size);

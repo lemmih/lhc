@@ -8,6 +8,8 @@
 #include <assert.h>
 #include <sys/param.h>
 
+int _lhc_enable_tail_copying = 0;
+
 word *_lhc_semi_init();
 void _lhc_semi_begin();
 word *_lhc_semi_end();
@@ -172,6 +174,11 @@ static void evacuate(word **object_address) {
   *object_address = free_space;
   live += size;
   free_space+=size;
+
+  if(_lhc_enable_tail_copying && table->nHeapPointers > 0) {
+    word **tail_pointer = (word**)(free_space-1);
+    return evacuate(tail_pointer);
+  }
 }
 static void scavenge() {
   InfoTable *table;
@@ -184,10 +191,11 @@ static void scavenge() {
     }
     scavenged += 1+table->nPrimitives;
     for(int i=0;i<table->nHeapPointers;i++) {
-      word *new_addr;
+      if(_lhc_enable_tail_copying && i == table->nHeapPointers-1) {
+        scavenged++;
+        break;
+      }
       evacuate((word**)scavenged);
-      new_addr = *(word**)scavenged;
-      // printf(" %lu", new_addr-to_space);
       scavenged++;
     }
     // printf("\n");

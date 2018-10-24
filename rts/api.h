@@ -4,6 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+extern int _lhc_enable_gc_stats;
+extern int _lhc_enable_tail_copying;
+
 /*
 Activation records:
 1: ptr to return function. This function has a prefix
