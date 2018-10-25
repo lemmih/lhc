@@ -386,6 +386,8 @@ Libraries to make life easier:
     wrappers.
   libdivide
     Would this be worth it or is it just silly.
+  libicu
+    Unicode support.
 
 GRIN optimizations:
   Copy propagation:
