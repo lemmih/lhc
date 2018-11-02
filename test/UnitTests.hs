@@ -10,7 +10,7 @@ import           Test.HUnit       (Assertion, Test (..), assertEqual,
                                    assertFailure, assertString)
 
 gcStrategies :: [String]
-gcStrategies = ["fixed", "semi"]
+gcStrategies = ["semi"]
 
 unitTestFolder :: FilePath -> IO Test
 unitTestFolder path =
