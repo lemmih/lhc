@@ -7,6 +7,7 @@
 extern int _lhc_enable_gc_stats;
 extern int _lhc_enable_time_stats;
 extern int _lhc_enable_tail_copying;
+extern int _lhc_enable_tail_compacting;
 extern int _lhc_enable_padding;
 
 /*
@@ -77,6 +78,7 @@ word _lhc_setSize(word header, word size);
 word _lhc_incSize(word header, word size);
 word _lhc_getTail(word header);
 word _lhc_setTail(word header, word tail);
+word* _lhc_loadLast(word *ptr, word header, word idx);
 
 int _lhc_getargc(void);
 char* _lhc_getargv(int n);

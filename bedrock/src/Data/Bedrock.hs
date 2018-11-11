@@ -222,6 +222,7 @@ pattern FunctionPointer name = Builtin "fn_ptr" [PName name]
 
 pattern Fetch ptr = Builtin "fetch" [PVariable ptr]
 pattern Load ptr idx = Builtin "load" [PVariable ptr, PInt idx]
+pattern LoadLastPtr ptr tag idx = Builtin "load_last" [PVariable ptr, PVariable tag, PInt idx]
 pattern Undefined = Builtin "undefined" []
 pattern Save var slot = Builtin "save" [PVariable var, PInt slot]
 pattern Restore slot = Builtin "restore" [PInt slot]

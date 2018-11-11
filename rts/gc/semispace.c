@@ -9,6 +9,7 @@
 #include <sys/param.h>
 
 int _lhc_enable_tail_copying = 0;
+int _lhc_enable_tail_compacting = 0;
 int _lhc_enable_padding = 0;
 
 word *_lhc_semi_init();

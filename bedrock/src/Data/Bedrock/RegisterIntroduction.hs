@@ -130,9 +130,8 @@ uniqBlock block =
             case scruts of
                 [] -> pure Exit
                 (tag:args) ->
-                    Case
-                        <$> pure tag
-                        <*> uniqMaybe uniqBlock mbBranch
+                    Case tag
+                        <$> uniqMaybe uniqBlock mbBranch
                         <*> mapM (uniqAlternative args) alts
         Bind [bind] (TypeCast var) rest -> lower bind $ do
             nodeBinds <- resolve bind
@@ -155,10 +154,17 @@ uniqBlock block =
             return $
                 Bind [tagBind] (MkNode nodeName []) $
                 bindMany (zip nodeBinds nodeArgs) rest'
-        Bind binds (Fetch ptr) rest -> lowerMany binds $ do
-            binds' <- resolveMany binds
-            rest' <- uniqBlock rest
-            return $ foldr (\(n,b) -> Bind [b] (Load ptr n)) rest' (zip [0..] binds')
+        Bind [obj] (Fetch ptr) (Case scrut mbBranch alts) | scrut == obj ->
+          lower obj $ do
+            (tag:_) <- resolve obj
+            Bind [tag] (Load ptr 0)
+              <$> (Case tag
+                    <$> uniqMaybe uniqBlock mbBranch
+                    <*> mapM (uniqAlternative' ptr tag) alts)
+        -- Bind binds (Fetch ptr) rest -> lowerMany binds $ do
+        --     binds' <- resolveMany binds
+        --     rest' <- uniqBlock rest
+        --     return $ foldr (\(n,b) -> Bind [b] (Load ptr n)) rest' (zip [0..] binds')
         Bind [bind] (Store nodeName args) rest -> do
             args' <- resolveMany args
             rest' <- uniqBlock rest
@@ -199,6 +205,23 @@ uniqAlternative args (Alternative pattern branch) =
         --     Alternative
         --         <$> pure (VarPat var)
         --         <*> uniqBlock branch
+
+uniqAlternative' :: Variable -> Variable -> Alternative -> Uniq Alternative
+uniqAlternative' ptr tag (Alternative pattern branch) =
+  case pattern of
+    LitPat{} -> Alternative pattern <$> uniqBlock branch
+    NodePat nodeName vars -> lowerMany vars $ do
+      flatVars <- resolveMany vars
+      let load idx | idx == length flatVars &&
+                     variableType (last flatVars) == NodePtr =
+                       LoadLastPtr ptr tag idx
+                   | otherwise = Load ptr idx
+          bind rest =
+            foldr (\(bind, idx) -> Bind [bind] (load idx)) rest
+              (zip flatVars [1..])
+      Alternative
+        <$> pure (NodePat nodeName [])
+        <*> (bind <$> uniqBlock branch)
 
 
 uniqMaybe :: (a -> Uniq a) -> Maybe a -> Uniq (Maybe a)

@@ -68,6 +68,16 @@ word _lhc_setTail(word header, word tail) {
   return (header&~(1<<(1+SIZE_BITS+1))) | (tail<<(1+SIZE_BITS+1));
 }
 
+word* _lhc_loadLast(word *ptr, word header, word idx) {
+  header = *ptr;
+  assert(!_lhc_getTail(header));
+  if(_lhc_getTail(header)) {
+    return ptr+idx;
+  } else {
+    return ((word**)ptr)[idx];
+  }
+}
+
 
 int _lhc_getargc(void) {
   return _lhc_argc;
@@ -90,6 +100,8 @@ void processArgs(int argc, char *argv[]) {
       _lhc_enable_gc_stats = 1;
     } else if(strcmp(argv[i], "--tail-copy")==0 && rtsMode) {
       _lhc_enable_tail_copying = 1;
+    } else if(strcmp(argv[i], "--tail-compact")==0 && rtsMode) {
+      _lhc_enable_tail_compacting = 1;
     } else if(strcmp(argv[i], "--padding")==0 && rtsMode) {
       _lhc_enable_padding = 1;
     } else if(strcmp(argv[i], "-s")==0 && rtsMode) {

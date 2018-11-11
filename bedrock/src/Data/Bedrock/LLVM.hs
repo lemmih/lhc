@@ -101,6 +101,13 @@ toLLVM bedrock = LLVM.Module
               , parameters = ([ Parameter (LLVM.ptr wordTy) (UnName 0) []
                               , Parameter (LLVM.ptr wordTy) (UnName 1) []], False)
               }
+      newDefinition $ GlobalDefinition functionDefaults
+              { name = LLVM.Name "_lhc_loadLast"
+              , returnType = LLVM.ptr wordTy
+              , parameters = ([ Parameter (LLVM.ptr wordTy) (UnName 0) []
+                              , Parameter wordTy (UnName 1) []
+                              , Parameter wordTy (UnName 2) []], False)
+              }
       getLayoutDef
 
       mainDef
@@ -496,8 +503,8 @@ blockToLLVM = worker
                                     (FunctionType retTy [] False)
                                     (LLVM.Name $ fromString fName))
             , arguments =
-                [ (LocalReference (typeToLLVM variableType) (nameToLLVM variableName), [])
-                | Variable{..} <- args ]
+                [ (toLocalReference arg, [])
+                | arg <- args ]
             , functionAttributes = []
             , metadata = [] }
     mkInst retTy (Application fName args) = do
@@ -509,8 +516,8 @@ blockToLLVM = worker
                                     (FunctionType retTy [] False)
                                     (nameToLLVM fName))
             , arguments =
-                [ (LocalReference (typeToLLVM variableType) (nameToLLVM variableName), [])
-                | Variable{..} <- args ]
+                [ (toLocalReference arg, [])
+                | arg <- args ]
             , functionAttributes = []
             , metadata = [] }
     mkInst retTy (InvokeReturn var args) = do
@@ -612,6 +619,20 @@ blockToLLVM = worker
               , functionAttributes = []
               , metadata = [] }
           else return $ castReference wordTy word retTy
+    mkInst retTy (Bedrock.LoadLastPtr ptr tag offset) = do
+      return Call
+          { tailCallKind = Nothing
+          , callingConvention = C
+          , returnAttributes = []
+          , function = Right (ConstantOperand $ Constant.GlobalReference
+                                  (FunctionType (LLVM.ptr wordTy) [LLVM.ptr wordTy, wordTy, wordTy] False)
+                                  (LLVM.Name "_lhc_loadLast"))
+          , arguments =
+              [ (toLocalReference ptr, [])
+              , (toLocalReference tag, [])
+              , (ConstantOperand $ Constant.Int 64 (fromIntegral offset), []) ]
+          , functionAttributes = []
+          , metadata = [] }
     mkInst _retTy (Write dst offset var) = do
         casted <- anonInst $ castReference
                     (typeToLLVM $ variableType var)
