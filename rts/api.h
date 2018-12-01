@@ -6,9 +6,11 @@
 
 extern int _lhc_enable_gc_stats;
 extern int _lhc_enable_time_stats;
+extern int _lhc_enable_machine_readable;
 extern int _lhc_enable_tail_copying;
 extern int _lhc_enable_tail_compacting;
 extern int _lhc_enable_padding;
+extern int _lhc_rts_verbose;
 
 /*
 Activation records:
@@ -26,9 +28,11 @@ typedef struct {
 typedef struct {
   unsigned int nPrimitives;
   unsigned int nHeapPointers;
+  char node[128];
 } InfoTable;
 
 extern const InfoTable _lhc_info_tables[];
+extern const int _lhc_info_table_size;
 
 typedef uint64_t word;
 
@@ -72,6 +76,9 @@ void _lhc_setIndirection(word*, word*);
 word _lhc_getTag(word);
 word _lhc_mkIndirection(word*);
 word _lhc_mkTag(word);
+
+void _lhc_checkNode(word *ptr);
+void _lhc_pprintNode(word *ptr);
 
 word _lhc_getSize(word header);
 word _lhc_setSize(word header, word size);

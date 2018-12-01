@@ -74,6 +74,9 @@ instance Pretty Literal where
       LiteralInt i      -> Doc.integer i
       LiteralString str -> Doc.text (show str)
 
+instance Pretty NodeName where
+  pretty node = ppNode node []
+
 ppNode :: NodeName -> [Doc] -> Doc
 ppNode (ConstructorName constructor blanks) args =
   Doc.hsep (Doc.blue (pretty constructor) : args ++ replicate blanks (Doc.char '_'))

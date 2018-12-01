@@ -36,6 +36,7 @@ static int _lhc_total_evacuations = 0;
 
 int _lhc_enable_gc_stats = 0;
 int _lhc_enable_time_stats = 0;
+int _lhc_enable_machine_readable = 0;
 
 static uint64_t realtime_start;
 static uint64_t gc_realtime_start;
@@ -138,7 +139,9 @@ void _lhc_stats_evacuation() {
 char* format(int precision, uint64_t number) {
   static char buffer[1024];
   double n = (double)number;
-  if(number < 1024) {
+  if(_lhc_enable_machine_readable) {
+    sprintf(buffer, "%lu b", number);
+  } else if(number < 1024) {
     sprintf(buffer, "%.*f b", precision, n);
   } else if(number < 1024*1024) {
     sprintf(buffer, "%.*f kb", precision, n/1024);

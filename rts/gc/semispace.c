@@ -19,7 +19,7 @@ word *_lhc_semi_mark(word *object);
 word *_lhc_semi_mark_frame(word *object);
 word _lhc_semi_allocate(word*, word);
 static void evacuate_frame(word **object_address);
-static void evacuate(word*, word **);
+static void evacuate(word*, word, word **);
 static void scavenge_records();
 static void scavenge();
 
@@ -28,6 +28,7 @@ static void scavenge();
 static int size=MIN_HEAP;
 static int live;
 static int factor=3;
+static int compacted;
 
 static word *hp_limit;
 
@@ -49,7 +50,8 @@ word* _lhc_semi_init() {
   to_space = NULL;
   prev_heap = NULL;
   free_space = NULL;
-  // printf("SemiSpace init: hp: %p, size: %d\n", hp, size);
+  if(_lhc_rts_verbose)
+    fprintf(stderr, "SemiSpace init: hp: %p, size: %d\n", hp, size);
   _lhc_stats_heap(MIN_HEAP*sizeof(word));
   return hp;
 }
@@ -61,11 +63,13 @@ void _lhc_semi_begin() {
   assert(free_space==NULL);
   assert(size>0);
   _lhc_stats_allocate(size*sizeof(word));
-  to_space = malloc(size * sizeof(word));
-  //printf("SemiSpace begin, to_space: %p\n", to_space);
+  to_space = calloc(size, sizeof(word));
+  if(_lhc_rts_verbose)
+    fprintf(stderr, "SemiSpace begin, to_space: %p\n", to_space);
   free_space = to_space;
   scavenged = to_space;
   live = 0;
+  compacted=0;
 }
 word *_lhc_semi_end() {
   word *hp;
@@ -73,8 +77,14 @@ word *_lhc_semi_end() {
   // Start by scavenging the frame stack.
   // Then scavenge the rest of the objects.
   // Then free from_space and swap.
+  if(_lhc_rts_verbose)
+    fprintf(stderr, "SemiSpace end\n");
   scavenge_records();
+  if(_lhc_rts_verbose)
+    fprintf(stderr, "SemiSpace end - finished scav records\n");
   scavenge();
+  if(_lhc_rts_verbose)
+    fprintf(stderr, "SemiSpace end - finished scav heap\n");
   assert(free_space==scavenged);
   assert(from_space!=NULL);
   free(from_space);
@@ -84,20 +94,21 @@ word *_lhc_semi_end() {
   assert(to_space!=NULL);
   size = MAX(MIN_HEAP,live*factor);
   if(size >= MAX_HEAP) {
-    printf("Out of heap\n");
+    fprintf(stderr, "Out of heap\n");
     abort();
   }
   prev_heap = to_space;
   to_space = NULL;
   free_space = NULL;
   scavenged = NULL;
-  hp = malloc(size * sizeof(word));
+  hp = calloc(size, sizeof(word));
   assert(hp!=NULL);
   from_space = hp;
   hp_limit = hp+size;
-  // printf("SemiSpace done. Live: %d, size: %d, allocated: %lu\n", live, size, _lhc_stats_allocated);
+  if(_lhc_rts_verbose)
+    fprintf(stderr, "SemiSpace done. Live: %d, size: %d, allocated: %lu\n", live, size, _lhc_stats_allocated);
   _lhc_stats_live(live*sizeof(word));
-  _lhc_stats_copy(live*sizeof(word));
+  _lhc_stats_copy((live-compacted)*sizeof(word));
   _lhc_stats_heap(size*sizeof(word));
   _lhc_stats_end_gc();
   return hp;
@@ -139,7 +150,7 @@ static void scavenge_records() {
     }
     for(int i=0;i<info->nHeapPointers;i++) {
       word *new_addr;
-      evacuate(NULL, (word**)&scavenged[2+info->nPrimitives+i]);
+      evacuate(NULL, 0, (word**)&scavenged[2+info->nPrimitives+i]);
       new_addr = *(word**)&scavenged[2+info->nPrimitives+i];
       // printf(" %lu", new_addr-to_space);
     }
@@ -151,215 +162,80 @@ static void scavenge_records() {
 
 word *_lhc_semi_mark(word *object) {
   assert(object!=NULL);
-  evacuate(NULL, &object);
+  evacuate(NULL, 0, &object);
   assert(object >= to_space && object < free_space);
   return object;
 }
 
-// // evacuate an object with at least 1 tail object.
-// static void evacuate1(word *parent, word **object_address) {
-//   const InfoTable *table;
-//   size_t size;
-//   word *object = *object_address;
-//   word header=*object;
-//   while(_lhc_isIndirection(header)) {
-//     object = _lhc_getIndirection(header);
-//     *object_address = object;
-//     header=*object;
-//   }
-//   if(object >= to_space && object < free_space) {
-//     return;
-//   }
-//   table = &_lhc_info_tables[_lhc_getTag(header)];
-//   size = (1+table->nPrimitives+table->nHeapPointers);
-//
-//   *parent = _lhc_incSize(*parent, 1);
-//   free_space[0] = header;
-//   #pragma clang loop unroll_count(3)
-//   for(int i=1; i<size; i++)
-//     free_space[i] = object[i];
-//   _lhc_setIndirection(object, free_space);
-//   *object_address = free_space;
-//   live += size;
-//   free_space+=size;
-//
-//   word **tail_pointer = (word**)(free_space-1);
-//   return evacuate(parent, tail_pointer);
-// }
-//
-// // evacuate an object with at least 2 tail objects.
-// static void evacuate2(word *parent, word **object_address) {
-//   const InfoTable *table;
-//   size_t size;
-//   word *object = *object_address;
-//   word header=*object;
-//   while(_lhc_isIndirection(header)) {
-//     object = _lhc_getIndirection(header);
-//     *object_address = object;
-//     header=*object;
-//   }
-//   if(object >= to_space && object < free_space) {
-//     return;
-//   }
-//   table = &_lhc_info_tables[_lhc_getTag(header)];
-//   size = (1+table->nPrimitives+table->nHeapPointers);
-//
-//   *parent = _lhc_incSize(*parent, 1);
-//   free_space[0] = header;
-//   #pragma clang loop unroll_count(3)
-//   for(int i=1; i<size; i++)
-//     free_space[i] = object[i];
-//   _lhc_setIndirection(object, free_space);
-//   *object_address = free_space;
-//   live += size;
-//   free_space+=size;
-//
-//   word **tail_pointer = (word**)(free_space-1);
-//   return evacuate1(parent, tail_pointer);
-// }
-//
-// // evacuate an object with at least 3 tail objects.
-// static void evacuate3(word *parent, word **object_address) {
-//   const InfoTable *table;
-//   size_t size;
-//   word *object = *object_address;
-//   word header=*object;
-//   while(_lhc_isIndirection(header)) {
-//     object = _lhc_getIndirection(header);
-//     *object_address = object;
-//     header=*object;
-//   }
-//   if(object >= to_space && object < free_space) {
-//     return;
-//   }
-//   table = &_lhc_info_tables[_lhc_getTag(header)];
-//   size = (1+table->nPrimitives+table->nHeapPointers);
-//
-//   *parent = _lhc_incSize(*parent, 1);
-//   free_space[0] = header;
-//   #pragma clang loop unroll_count(3)
-//   for(int i=1; i<size; i++)
-//     free_space[i] = object[i];
-//   _lhc_setIndirection(object, free_space);
-//   *object_address = free_space;
-//   live += size;
-//   free_space+=size;
-//
-//   word **tail_pointer = (word**)(free_space-1);
-//   return evacuate2(parent, tail_pointer);
-// }
-//
-// // evacuate an object with at least 4 tail objects.
-// static void evacuate4(word *parent, word **object_address) {
-//   const InfoTable *table;
-//   size_t size;
-//   word *object = *object_address;
-//   word header=*object;
-//   while(_lhc_isIndirection(header)) {
-//     object = _lhc_getIndirection(header);
-//     *object_address = object;
-//     header=*object;
-//   }
-//   if(object >= to_space && object < free_space) {
-//     return;
-//   }
-//   table = &_lhc_info_tables[_lhc_getTag(header)];
-//   size = (1+table->nPrimitives+table->nHeapPointers);
-//
-//   *parent = _lhc_incSize(*parent, 1);
-//   free_space[0] = header;
-//   #pragma clang loop unroll_count(3)
-//   for(int i=1; i<size; i++)
-//     free_space[i] = object[i];
-//   _lhc_setIndirection(object, free_space);
-//   *object_address = free_space;
-//   live += size;
-//   free_space+=size;
-//
-//   word **tail_pointer = (word**)(free_space-1);
-//   return evacuate3(parent, tail_pointer);
-// }
-//
-// // evacuate an object with at least 5 tail objects.
-// static void evacuate5(word *parent, word **object_address) {
-//   const InfoTable *table;
-//   size_t size;
-//   word *object = *object_address;
-//   word header=*object;
-//   while(_lhc_isIndirection(header)) {
-//     object = _lhc_getIndirection(header);
-//     *object_address = object;
-//     header=*object;
-//   }
-//   if(object >= to_space && object < free_space) {
-//     return;
-//   }
-//   table = &_lhc_info_tables[_lhc_getTag(header)];
-//   size = (1+table->nPrimitives+table->nHeapPointers);
-//
-//   *parent = _lhc_incSize(*parent, 1);
-//   free_space[0] = header;
-//   #pragma clang loop unroll_count(3)
-//   for(int i=1; i<size; i++)
-//     free_space[i] = object[i];
-//   _lhc_setIndirection(object, free_space);
-//   *object_address = free_space;
-//   live += size;
-//   free_space+=size;
-//
-//   word **tail_pointer = (word**)(free_space-1);
-//   return evacuate4(parent, tail_pointer);
-// }
+static word *silly_tail_pointer;
 
-static void evacuate(word *parent, word **object_address) {
+static void evacuate(word *parent, word prevTail, word **object_address) {
   const InfoTable *table;
   size_t size;
   word *object = *object_address;
   word header=*object;
   word nTailObjs = 0;
+  if(_lhc_rts_verbose) {
+    fprintf(stderr, "Evacuate: %lu ", free_space-to_space);
+    _lhc_pprintNode(object);
+  }
   while(_lhc_isIndirection(header)) {
+    // if(prevTail) {
+    //   fprintf(stderr, "Tail to indirection\n");
+    //   abort();
+    // }
     object = _lhc_getIndirection(header);
-    *object_address = object;
+    // if( !prevTail ) {
+      *object_address = object;
+    // }
     header=*object;
   }
   if(object >= to_space && object < free_space) {
-    // printf("Already evacuated object.\n");
+    if(_lhc_rts_verbose)
+      fprintf(stderr, "Already evacuated object: %lu\n", object-to_space);
+    if(prevTail) {
+      if(_lhc_rts_verbose)
+        fprintf(stderr, "Tail to evacuated\n");
+      // free_space--;
+      free_space[-1] = (word)object;
+      // abort();
+    }
     return;
   }
   table = &_lhc_info_tables[_lhc_getTag(header)];
   size = (1+table->nPrimitives+table->nHeapPointers);
-  if(_lhc_enable_padding && table->nHeapPointers)
-    size++;
-  // if(!_lhc_enable_padding && table->nHeapPointers)
-  //   live++;
 
-  // if(_lhc_enable_tail_copying && table->nHeapPointers) {
-  //   if(parent) {
-  //     *parent = _lhc_incSize(*parent, 1);
-  //     nTailObjs = _lhc_getSize(header);
-  //     nTailObjs = nTailObjs ? nTailObjs : 1;
-  //     header = _lhc_setSize(header, 0);
-  //   } else {
-  //     parent = free_space;
-  //     nTailObjs = _lhc_getSize(header);
-  //     nTailObjs = nTailObjs ? nTailObjs : 1;
-  //     header = _lhc_setSize(header, 0);
-  //   }
-  // }
+  if( _lhc_enable_tail_compacting && parent) {
+    free_space--;
+    *parent = _lhc_setTail(*parent, 1);
+    compacted++;
+    // if(_lhc_rts_verbose)
+    //   fprintf(stderr, "Set parent tail.\n");
+  } else {
+    *object_address = free_space;
+  }
   _lhc_setIndirection(object, free_space);
-  *object_address = free_space;
   live += size;
-  free_space[0] = header;
+  free_space[0] = _lhc_setTail(header,0);
+
   #pragma clang loop unroll_count(2)
   for(int i=1; i<size; i++)
     free_space[i] = object[i];
   free_space+=size;
 
   if(_lhc_enable_tail_copying && table->nHeapPointers) {
-    word **tail_pointer = (word**)(free_space-1);
-    // if(_lhc_enable_padding)
-    //   tail_pointer--;
-    return evacuate(parent, tail_pointer);
+    if(_lhc_getTail(header)) {
+      // word *tail_pointer = object+size-1;
+      silly_tail_pointer = object+size-1;
+      // if(_lhc_rts_verbose)
+      //   fprintf(stderr, "Tail compact\n");
+      return evacuate(free_space-size, 1, &silly_tail_pointer);
+    } else {
+      word **tail_pointer = (word**)(free_space-1);
+      // if(_lhc_rts_verbose)
+      //   fprintf(stderr, "Tail copy\n");
+      return evacuate(free_space-size, 0, tail_pointer);
+    }
   }
   // _lhc_stats_evacuation();
   // if(table->nHeapPointers) {
@@ -400,16 +276,19 @@ static void scavenge() {
   if(_lhc_enable_tail_copying) {
     while(s < free_space) {
       word* obj = s;
-      table = &_lhc_info_tables[_lhc_getTag(*s)];
+      word header = *s;
+      if(_lhc_rts_verbose) {
+        // fprintf(stderr, "Scavenge: %lu ", s-to_space);
+        // _lhc_pprintNode(s);
+      }
+      table = &_lhc_info_tables[_lhc_getTag(header)];
       s += 1+table->nPrimitives;
       // #pragma clang loop unroll_count(8)
       for(int i=1;i<table->nHeapPointers;i++) {
-        evacuate(NULL, (word**)s);
+        evacuate(NULL, 0, (word**)s);
         s++;
       }
-      if(table->nHeapPointers) s++;
-      if(_lhc_enable_padding && table->nHeapPointers)
-        s++;
+      if(table->nHeapPointers && !_lhc_getTail(header)) s++;
       // _lhc_stats_scavenged(obj);
     }
     scavenged = s;
@@ -420,11 +299,9 @@ static void scavenge() {
       scavenged += 1+table->nPrimitives;
       // #pragma clang loop unroll_count(8)
       for(int i=0;i<table->nHeapPointers;i++) {
-        evacuate(NULL, (word**)scavenged);
+        evacuate(NULL, 0, (word**)scavenged);
         scavenged++;
       }
-      if(_lhc_enable_padding && table->nHeapPointers)
-        scavenged++;
 
       // _lhc_stats_scavenged(obj);
     }

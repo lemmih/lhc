@@ -9,6 +9,8 @@ import qualified Data.Set                     as Set
 import           Data.Bedrock                 as Bedrock
 import           Data.Bedrock.GlobalVariables (allRegisters)
 import           Data.Bedrock.LLVMGen
+import Data.Bedrock.PrettyPrint (pretty)
+import           Data.Char
 import           Data.List
 import qualified Data.Text.Lazy.IO            as T
 import           Data.Word
@@ -149,8 +151,11 @@ toLLVM bedrock = LLVM.Module
         , basicBlocks = [BasicBlock (UnName 0) [Do entryCall] (Do $ Unreachable [])] }
     getLayoutDef = do
       layouts <- asks envNodeLayout
-      let nLayouts = fromIntegral (length layouts)
-          infoTableType = StructureType False [i32, i32]
+      let nChars :: Num a => a
+          nChars = 128
+          nLayouts :: Num a => a
+          nLayouts = fromIntegral (length layouts)
+          infoTableType = StructureType False [i32, i32, LLVM.ArrayType nChars i8]
           infoTablesType = ArrayType nLayouts infoTableType
       newDefinition $ GlobalDefinition globalVariableDefaults
         { name = LLVM.Name "_lhc_info_tables"
@@ -158,8 +163,18 @@ toLLVM bedrock = LLVM.Module
         , Global.type' = infoTablesType
         , initializer = Just $ Constant.Array infoTableType
             [ Constant.Struct Nothing False
-                [Constant.Int 32 (fromIntegral prim), Constant.Int 32 (fromIntegral ptrs)]
-            | (prim, ptrs) <- map snd layouts ]
+                [ Constant.Int 32 (fromIntegral prim)
+                , Constant.Int 32 (fromIntegral ptrs)
+                , Constant.Array i8 [Constant.Int 8 (fromIntegral $ ord c) | c <- str]
+                ]
+            | (node, (prim, ptrs)) <- layouts
+            , let str = take nChars (show (pretty node) ++ repeat '\0') ]
+        }
+      newDefinition $ GlobalDefinition globalVariableDefaults
+        { name = LLVM.Name "_lhc_info_table_size"
+        , isConstant = True
+        , Global.type' = i32
+        , initializer = Just $ Constant.Int 32 nLayouts
         }
 
 attributesToPrefix :: [Bedrock.Attribute] -> GenModule (Maybe Constant.Constant)
