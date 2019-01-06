@@ -270,18 +270,21 @@ static void evacuate(word *parent, word prevTail, word **object_address) {
 //     _lhc_stats_scavenged(obj);
 //   }
 // }
-static void scavenge() {
+static void scavenge(void) {
   const InfoTable *table;
-  // make a local copy of the global 'scavenged' pointer for better
-  // optimization opportunities.
+  // make a local copy of the global 'scavenged' pointer for
+  // better optimization opportunities.
   word* s = scavenged;
-  // branch on _lhc_enable_tail_copying out side the loop to avoid
-  // unnecessary branches later.
+  // branch on _lhc_enable_tail_copying out side the loop to
+  // avoid unnecessary branches later.
   if(_lhc_enable_tail_copying) {
     while(s < free_space) {
       word header = *s;
       table = &_lhc_info_tables[_lhc_getTag(header)];
       s += 1+table->nPrimitives;
+      // i=1 because we want to skip the last pointer. The
+      // pointer may not exist and if it does, it'll already
+      // have been evacuated.
       for(int i=1;i<table->nHeapPointers;i++) {
         evacuate(NULL, 0, (word**)s);
         s++;
