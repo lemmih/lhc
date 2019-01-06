@@ -107,8 +107,7 @@ toLLVM bedrock = LLVM.Module
               { name = LLVM.Name "_lhc_loadLast"
               , returnType = LLVM.ptr wordTy
               , parameters = ([ Parameter (LLVM.ptr wordTy) (UnName 0) []
-                              , Parameter wordTy (UnName 1) []
-                              , Parameter wordTy (UnName 2) []], False)
+                              , Parameter wordTy (UnName 1) []], False)
               }
       getLayoutDef
 
@@ -640,11 +639,10 @@ blockToLLVM = worker
           , callingConvention = C
           , returnAttributes = []
           , function = Right (ConstantOperand $ Constant.GlobalReference
-                                  (FunctionType (LLVM.ptr wordTy) [LLVM.ptr wordTy, wordTy, wordTy] False)
+                                  (FunctionType (LLVM.ptr wordTy) [LLVM.ptr wordTy, wordTy] False)
                                   (LLVM.Name "_lhc_loadLast"))
           , arguments =
               [ (toLocalReference ptr, [])
-              , (toLocalReference tag, [])
               , (ConstantOperand $ Constant.Int 64 (fromIntegral offset), []) ]
           , functionAttributes = []
           , metadata = [] }

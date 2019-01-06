@@ -71,12 +71,8 @@ word _lhc_setTail(word header, word tail) {
   return (header&(~(1<<(1+SIZE_BITS)))) | (tail<<(1+SIZE_BITS));
 }
 
-word* _lhc_loadLast(word *ptr, word header, word idx) {
-  header = *ptr;
-  if(_lhc_getTail(header)) {
-    // if(_lhc_rts_verbose)
-    //   printf("Loading last of tail.\n");
-    _lhc_checkNode(ptr+idx);
+word* _lhc_loadLast(word *ptr, word idx) {
+  if(_lhc_getTail(*ptr)) {
     return ptr+idx;
   } else {
     return ((word**)ptr)[idx];

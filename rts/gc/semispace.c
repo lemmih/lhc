@@ -272,38 +272,31 @@ static void evacuate(word *parent, word prevTail, word **object_address) {
 // }
 static void scavenge() {
   const InfoTable *table;
+  // make a local copy of the global 'scavenged' pointer for better
+  // optimization opportunities.
   word* s = scavenged;
+  // branch on _lhc_enable_tail_copying out side the loop to avoid
+  // unnecessary branches later.
   if(_lhc_enable_tail_copying) {
     while(s < free_space) {
-      word* obj = s;
       word header = *s;
-      if(_lhc_rts_verbose) {
-        // fprintf(stderr, "Scavenge: %lu ", s-to_space);
-        // _lhc_pprintNode(s);
-      }
       table = &_lhc_info_tables[_lhc_getTag(header)];
       s += 1+table->nPrimitives;
-      // #pragma clang loop unroll_count(8)
       for(int i=1;i<table->nHeapPointers;i++) {
         evacuate(NULL, 0, (word**)s);
         s++;
       }
       if(table->nHeapPointers && !_lhc_getTail(header)) s++;
-      // _lhc_stats_scavenged(obj);
     }
-    scavenged = s;
   } else {
-    while(scavenged < free_space) {
-      word* obj = scavenged;
-      table = &_lhc_info_tables[_lhc_getTag(*scavenged)];
-      scavenged += 1+table->nPrimitives;
-      // #pragma clang loop unroll_count(8)
+    while(s < free_space) {
+      table = &_lhc_info_tables[_lhc_getTag(*s)];
+      s += 1+table->nPrimitives;
       for(int i=0;i<table->nHeapPointers;i++) {
-        evacuate(NULL, 0, (word**)scavenged);
-        scavenged++;
+        evacuate(NULL, 0, (word**)s);
+        s++;
       }
-
-      // _lhc_stats_scavenged(obj);
     }
   }
+  scavenged = s;
 }
