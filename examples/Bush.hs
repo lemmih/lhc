@@ -14,7 +14,7 @@ check Leaf = 1
 check (Branch a b c d) = 1 + check a + check b + check c + check d
 
 main :: IO ()
-main = dup (make 11)
+main = dup (make 12)
 
 dup a = act a a
 

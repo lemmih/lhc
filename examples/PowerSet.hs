@@ -14,7 +14,7 @@ power n i acc = power n (i-1) (i:acc)
 main :: IO ()
 main = do
   putStrLn "Allocating a bunch of data"
-  putStrLn (showInt (last (last (reverse (run 8000)))))
+  putStrLn (showInt (last (last (reverse (run 20000)))))
 
 entrypoint :: ()
 entrypoint = unsafePerformIO main

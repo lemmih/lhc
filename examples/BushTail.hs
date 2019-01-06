@@ -17,6 +17,8 @@ make 7 = Branch (make 6) (make 6) (make 6) (make 6)
 make 8 = Branch (make 7) (make 7) (make 7) (make 7)
 make 9 = Branch (make 8) (make 8) (make 8) (make 8)
 make 10 = Branch (make 9) (make 9) (make 9) (make 9)
+make 11 = Branch (make 10) (make 10) (make 10) (make 10)
+make 12 = Branch (make 11) (make 11) (make 11) (make 11)
 make n = Branch (make (n-1)) (make (n-1)) (make (n-1)) (make (n-1))
 
 check :: Tree -> [Tree] -> Int -> Int
@@ -28,7 +30,7 @@ check (Branch a b c d) lst n =
   check a (b:c:d:lst) (1+n)
 
 main :: IO ()
-main = dup (make 10)
+main = dup (make 12)
 
 dup a = act a a
 

@@ -4,6 +4,7 @@ module LHC.Prim
     ( IO
     , Unit(Unit)
     , I8
+    , I32
     , I64
     , Addr
     , bindIO
@@ -24,11 +25,13 @@ module LHC.Prim
     , not
     , otherwise
     , (+), (-), (*)
+    , (-#)
+    , sum
     , shiftL
     -- , udiv, urem
     , sdiv, srem
     , mapM_
-    , (<=)
+    , (<=), le#
     , max
     , i32toi64
     , i64toi32
@@ -227,7 +230,18 @@ max a b =
 
 
 length :: [a] -> Int
-length lst = length lst
+length lst = length_go '\0'# lst
+
+length_go :: I32 -> [a] -> Int
+length_go n [] = I# n
+length_go n (x:xs) = length_go (n +# '\1'#) xs
+
+sum :: [Int] -> Int
+sum lst = sum_go '\0'# lst
+
+sum_go :: I32 -> [Int] -> Int
+sum_go n [] = I# n
+sum_go n (I# x:xs) = sum_go (n +# x) xs
 
 emptyString :: [Char]
 emptyString = []

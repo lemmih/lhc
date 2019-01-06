@@ -7,7 +7,7 @@ main :: IO ()
 main = putStrLn (showInt (last longList))
 
 longList :: [Int]
-longList = replicate 20000000 0
+longList = replicate 100000000 0
 
 entrypoint :: ()
 entrypoint = unsafePerformIO main

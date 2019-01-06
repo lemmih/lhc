@@ -5,6 +5,7 @@ module LHC.Prelude
   , showInt
   , digits
   , last
+  , head
   , replicate
   , take
   , iterate
@@ -54,6 +55,10 @@ digits_go n = intToDigit (srem n 10) : digits_go (sdiv n 10)
 --     0# -> []
 --     _  -> intToDigit (srem (I# i) 10) : digits (sdiv (I# i) 10)
 
+head :: [a] -> a
+head [] = head []
+head (x:xs) = x
+
 last :: [a] -> a
 last [] = last []
 last (x:xs) = last_go x xs
@@ -61,9 +66,15 @@ last (x:xs) = last_go x xs
 last_go x [] = x
 last_go x (y:ys) = last_go y ys
 
+-- replicate :: Int -> a -> [a]
+-- replicate 0 elt = []
+-- replicate n elt = elt : replicate (n-1) elt
+
 replicate :: Int -> a -> [a]
-replicate 0 elt = []
-replicate n elt = elt : replicate (n-1) elt
+replicate (I# n) elt = replicate_go n elt
+
+replicate_go '\0'# elt = []
+replicate_go n elt = elt : replicate_go (n -# '\1'#) elt
 
 take :: Int -> [a] -> [a]
 take 0 _ = []
