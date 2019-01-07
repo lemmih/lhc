@@ -73,6 +73,7 @@ finExpression expr =
     InvokeReturn{}  -> pure expr
     Literal{}       -> pure expr
     Store node args -> Store node <$> touch node args
+    MkNode node args -> MkNode node <$> touch node args
     Builtin{}       -> pure expr
 
 touch :: NodeName -> [Variable] -> M [Variable]

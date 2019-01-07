@@ -9,6 +9,9 @@ import qualified Data.Set               as Set
 import           Data.Bedrock
 import           Data.Bedrock.Transform
 
+blackholeName :: Name
+blackholeName = Name ["internal"] "BlackHole" 0
+
 {-
 Create eval function.
 Create apply function for each argument/result pair.
@@ -41,6 +44,8 @@ lowerEvalApply = do
   evalName <- newName "eval"
   arg <- newVariable "arg" NodePtr
   let defaultEval = Return [arg]
+
+  pushNode $ NodeDefinition blackholeName []
 
   evalBody <- do
     obj <- newVariable "obj" Node
@@ -155,9 +160,12 @@ setNodeName (FunctionName con _)    = Set.insert con
 
 mkEvalAlternative :: Variable -> Function -> Gen Alternative
 mkEvalAlternative ptr fn = do
+    tmp <- newVariable "tmp" (StaticNode 1)
     newVal <- newVariable "new" NodePtr
     args <- mapM (newVariable "arg" .variableType) (fnArguments fn)
     return $ Alternative (NodePat nodeName args) $
+      Bind [tmp] (MkNode (ConstructorName blackholeName 0) []) $
+      Bind [] (Write ptr 0 tmp) $
       Bind [newVal] (Application (fnName fn) args) $
       Bind [] (Builtin "setIndirection" [PVariable ptr, PVariable newVal]) $
       -- XXX: Should be an 'Update arg (Indirection new)' here.

@@ -235,6 +235,11 @@ uniqExpression expr =
     case expr of
         Application fn vars ->
             Application fn <$> resolveArgs fn vars
+        Write dst idx ptr -> do
+            ret <- resolve ptr
+            case ret of
+              -- [] -> pure (Write dst idx ptr)
+              (tag:_) -> pure (Write dst idx tag)
         CCall fn vars ->
             CCall fn <$> resolveMany vars
         Catch exh exhArgs fn fnArgs ->
