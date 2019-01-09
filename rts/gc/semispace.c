@@ -106,10 +106,10 @@ word *_lhc_semi_end() {
   from_space = hp;
   hp_limit = hp+size;
   if(_lhc_rts_verbose)
-    fprintf(stderr, "SemiSpace done. Live: %d, size: %d, allocated: %lu\n", live, size, _lhc_stats_allocated);
+    fprintf(stderr, "SemiSpace done. Live: %d (%d), size: %d, allocated: %lu\n", live, compacted, size, _lhc_stats_allocated);
   _lhc_stats_live(live*sizeof(word));
   _lhc_stats_copy((live-compacted)*sizeof(word));
-  _lhc_stats_heap(size*sizeof(word));
+  _lhc_stats_heap((live-compacted+size)*sizeof(word));
   _lhc_stats_end_gc();
   return hp;
 }
@@ -279,6 +279,7 @@ static void scavenge(void) {
   // avoid unnecessary branches later.
   if(_lhc_enable_tail_copying) {
     while(s < free_space) {
+      word* obj = s;
       word header = *s;
       table = &_lhc_info_tables[_lhc_getTag(header)];
       s += 1+table->nPrimitives;
@@ -290,15 +291,18 @@ static void scavenge(void) {
         s++;
       }
       if(table->nHeapPointers && !_lhc_getTail(header)) s++;
+      // _lhc_stats_scavenged(obj);
     }
   } else {
     while(s < free_space) {
+      word* obj = s;
       table = &_lhc_info_tables[_lhc_getTag(*s)];
       s += 1+table->nPrimitives;
       for(int i=0;i<table->nHeapPointers;i++) {
         evacuate(NULL, 0, (word**)s);
         s++;
       }
+      // _lhc_stats_scavenged(obj);
     }
   }
   scavenged = s;

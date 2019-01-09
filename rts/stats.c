@@ -17,8 +17,8 @@ Bytes copied.
 static uint64_t _lhc_stats_copied = 0;
 uint64_t _lhc_stats_allocated = 0;
 static int _lhc_stats_collections = 0;
-static int _lhc_stats_max_heap = 0;
-static int _lhc_stats_max_copied = 0;
+static uint64_t _lhc_stats_max_heap = 0;
+static uint64_t _lhc_stats_max_copied = 0;
 
 #define _LHC_HISTOGRAM_SIZE 64
 static int _lhc_distance_histogram[_LHC_HISTOGRAM_SIZE];
@@ -99,11 +99,11 @@ void _lhc_stats_copy(uint64_t size) {
 void _lhc_stats_allocate(uint64_t size) {
   _lhc_stats_allocated += size;
 }
-void _lhc_stats_heap(int heap) {
+void _lhc_stats_heap(uint64_t heap) {
   if(_lhc_stats_max_heap < heap)
     _lhc_stats_max_heap = heap;
 }
-void _lhc_stats_live(int live) {
+void _lhc_stats_live(uint64_t live) {
   if(_lhc_stats_max_copied < live)
     _lhc_stats_max_copied = live;
 }
