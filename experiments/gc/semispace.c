@@ -2,10 +2,13 @@
 #include "header.h"
 #include "objects.h"
 #include "nursery.h"
+#include "utils.h"
+#include "stats.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <sys/mman.h>
 #include <assert.h>
 
 void semi_init(SemiSpace *semi) {
@@ -18,9 +21,11 @@ void semi_init(SemiSpace *semi) {
   semi->grey_space.free = NULL;
   semi->grey_space.scavenged = NULL;
   semi->grey_space.size = 0;
-  semi->black_space.ptr = calloc(sizeof(word), MIN_AREA);
+  semi->black_space.ptr = malloc(sizeof(word) * MIN_AREA);
   semi->black_space.free = semi->black_space.ptr;
   semi->black_space.size = MIN_AREA;
+
+  touchSpace(semi->black_space.ptr, semi->black_space.size);
 }
 
 void semi_close(SemiSpace *semi) {
@@ -45,32 +50,9 @@ void semi_close(SemiSpace *semi) {
 // black space. These objects may point to white objects. The white objects
 // must be evacuated (copied to the grey space).
 
-hp semi_bump_grey(SemiSpace *semi, word size) {
-  hp ret;
-  assert(semi->grey_space.free+size <= area_limit(semi->grey_space));
-  ret = semi->grey_space.free;
-  semi->grey_space.free += size;
-  return ret;
-}
-
-hp semi_bump_black(SemiSpace *semi, word size) {
-  hp ret;
-  assert(semi->black_space.free+size <= area_limit(semi->black_space));
-  ret = semi->black_space.free;
-  semi->black_space.free += size;
-  return ret;
-}
-
 bool semi_check(SemiSpace *semi, word size) {
   // printf("Semi check: %lu %lu %d\n", area_used(semi->black_space), size, semi->black_space.size);
   return semi->black_space.free+size <= area_limit(semi->black_space);
-}
-
-static void writeIndirection(hp from, hp to) {
-  Header ind;
-  ind.forwardPtr = to;
-  ind.data.isForwardPtr = 1;
-  *from = ind.raw;
 }
 
 void semi_evacuate(SemiSpace *semi, hp* objAddr) {
@@ -92,12 +74,7 @@ void semi_evacuate(SemiSpace *semi, hp* objAddr) {
 
   assert( header.data.gen == 1 );
 
-  if( header.data.black == semi->black_bit ) {
-    return;
-  }
-  if( header.data.grey ) {
-    return;
-  }
+  if( !IS_WHITE(semi, header) ) return;
 
   dst = semi_bump_grey(semi, obj_size);
   header.data.grey = true;
@@ -112,9 +89,10 @@ void semi_evacuate(SemiSpace *semi, hp* objAddr) {
   }
 }
 
-void semi_scavenge(SemiSpace *semi) {
+void semi_scavenge(SemiSpace *semi, Stats *s) {
   Header header;
   const ObjectInfo *info;
+  stats_gen1_begin(s);
   while(semi->grey_space.scavenged<semi->grey_space.free) {
     header = readHeader(semi->grey_space.scavenged);
     assert(header.data.grey == true);
@@ -140,16 +118,25 @@ void semi_scavenge(SemiSpace *semi) {
   semi->white_space.size = area_used(semi->grey_space) + area_used(semi->black_space);
 
   semi->grey_space.size = semi->white_space.size;
-  semi->grey_space.ptr = calloc(sizeof(word), semi->grey_space.size);
+  // semi->grey_space.ptr = calloc(sizeof(word), semi->grey_space.size);
+  semi->grey_space.ptr = malloc(sizeof(word) * semi->grey_space.size);
   semi->grey_space.free = semi->grey_space.ptr;
   semi->grey_space.scavenged = semi->grey_space.ptr;
 
   semi->black_space.size = MAX(MIN_AREA,semi->white_space.size * semi->factor);
-  semi->black_space.ptr = calloc(sizeof(word), semi->black_space.size);
+  // semi->black_space.ptr = calloc(sizeof(word), semi->black_space.size);
+  semi->black_space.ptr = malloc(sizeof(word) * semi->black_space.size);
+
+  touchSpace(semi->black_space.ptr, semi->black_space.size);
+  touchSpace(semi->grey_space.ptr, semi->grey_space.size);
+
   semi->black_space.free = semi->black_space.ptr;
 
   assert(area_used(semi->grey_space)==0);
   assert(area_used(semi->black_space)==0);
+
+  stats_gen1_end(s);
+  s->gen1_collections++;
 }
 
 word semi_size(SemiSpace *semi) {

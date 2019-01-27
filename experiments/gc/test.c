@@ -3,6 +3,7 @@
 #include "nursery.h"
 #include "semispace.h"
 #include "header.h"
+#include "stats.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -12,10 +13,11 @@
 
 
 int main(void) {
+  Stats s;
   Nursery ns;
   SemiSpace semi;
 
-
+  stats_init(&s);
   { // Header must be exactly one word.
     Header h;
     assert(sizeof(h)==sizeof(word));
@@ -35,7 +37,7 @@ int main(void) {
     hp leaf;
     nursery_init(&ns);
 
-    leaf = allocate(&ns, Leaf, (MkLeaf){10});
+    leaf = allocate(&ns, NULL, Leaf, (MkLeaf){10});
     assert(readHeader(leaf).data.tag == Leaf);
     assert(((MkLeaf*)readObject(leaf))->n == 10);
   }
@@ -45,7 +47,7 @@ int main(void) {
     nursery_init(&ns);
 
     for(i=0;i<NURSERY_SIZE*2;i++) {
-      hp leaf = allocate(&ns, Unit, (MkUnit){});
+      hp leaf = allocate(&ns, NULL, Unit, (MkUnit){});
       if(!leaf)
         break;
     }
@@ -56,7 +58,7 @@ int main(void) {
     nursery_init(&ns);
 
     for(int i=0;i<NURSERY_SIZE/2;i++) {
-      hp leaf = allocate(&ns, Unit, (MkUnit){});
+      hp leaf = allocate(&ns, NULL, Unit, (MkUnit){});
       assert(leaf);
     }
   }
@@ -66,12 +68,12 @@ int main(void) {
     nursery_init(&ns);
     semi_init(&semi);
 
-    leaf = allocate(&ns, Leaf, (MkLeaf){10});
+    leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
     assert(leaf != NULL);
     assert(readHeader(leaf).data.gen == 0); // 0 => nursery
 
     nursery_evacuate(&ns, &semi, &leaf);
-    nursery_reset(&ns);
+    nursery_reset(&ns, &s);
     assert(readHeader(leaf).data.gen == 1);
     assert(!nursery_member(&ns, leaf));
     semi_close(&semi);
@@ -82,8 +84,8 @@ int main(void) {
     nursery_init(&ns);
     semi_init(&semi);
 
-    leaf = allocate(&ns, Leaf, (MkLeaf){10});
-    branch = allocate(&ns, Branch, (MkBranch){leaf,leaf});
+    leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
+    branch = allocate(&ns, &semi, Branch, (MkBranch){leaf,leaf});
 
     nursery_evacuate(&ns, &semi, &branch);
     // Check that the leaf object in nursery points forward.
@@ -104,7 +106,7 @@ int main(void) {
     nursery_init(&ns);
     semi_init(&semi);
 
-    leaf = allocate(&ns, Leaf, (MkLeaf){10});
+    leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
     assert(readHeader(leaf).data.gen == 0);
 
     nursery_evacuate(&ns, &semi, &leaf);
@@ -113,7 +115,7 @@ int main(void) {
     assert(readHeader(leaf).data.black == semi.black_bit);
     assert(semi_size(&semi) == 2);
 
-    semi_scavenge(&semi);
+    semi_scavenge(&semi, &s);
     assert(readHeader(leaf).data.gen == 1);
     assert(readHeader(leaf).data.grey == 0);
     assert(readHeader(leaf).data.black == !semi.black_bit);
@@ -125,11 +127,30 @@ int main(void) {
     assert(readHeader(leaf).data.black == !semi.black_bit);
     assert(semi_size(&semi) == 4);
 
-    semi_scavenge(&semi);
+    semi_scavenge(&semi, &s);
     assert(readHeader(leaf).data.gen == 1);
     assert(readHeader(leaf).data.grey == 0);
     assert(readHeader(leaf).data.black == !semi.black_bit);
     assert(semi_size(&semi) == 2);
+
+    semi_close(&semi);
+  }
+  {
+    hp leaf, prevAddr;
+    nursery_init(&ns);
+    semi_init(&semi);
+
+    nursery_bypass(&ns, &semi);
+
+    leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
+    prevAddr = leaf;
+    assert(readHeader(leaf).data.gen == 0);
+
+    nursery_evacuate(&ns, &semi, &leaf);
+    assert(readHeader(leaf).data.gen == 1);
+    assert(readHeader(leaf).data.grey == 0);
+    assert(readHeader(leaf).data.black == semi.black_bit);
+    assert(leaf == prevAddr);
 
     semi_close(&semi);
   }
