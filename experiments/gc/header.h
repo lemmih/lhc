@@ -12,6 +12,8 @@ typedef union {
     bool grey:1;
     unsigned int black:1;
     unsigned int tag:10;
+    unsigned int prims:5;
+    unsigned int ptrs:5;
   } data;
   word raw;
 } Header;

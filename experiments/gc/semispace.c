@@ -14,6 +14,7 @@
 void semi_init(SemiSpace *semi) {
   semi->black_bit=0;
   semi->factor = 1;
+  semi->has_roots = false;
   semi->white_space.ptr1 = NULL;
   semi->white_space.ptr2 = NULL;
   semi->white_space.size = 0;
@@ -28,7 +29,24 @@ void semi_init(SemiSpace *semi) {
   touchSpace(semi->black_space.ptr, semi->black_space.size);
 }
 
-void semi_close(SemiSpace *semi) {
+void semi_close(SemiSpace *semi, Stats *s) {
+  // stats_misc_begin(s);
+  semi_scavenge(semi, s);
+  // stats_misc_end(s);
+
+  s->gen1_copied += area_used(semi->grey_space);
+  const uint64_t heap_size = area_used(semi->grey_space) + area_used(semi->black_space) + semi->white_space.size;
+  // printf("Heap: %lu %lu %lu\n", heap_size*8/1024/1024
+  //                             , area_used(semi->grey_space)*8/1024/1024
+  //                             , area_used(semi->black_space)*8/1024/1024);
+  if(s->max_heap < heap_size)
+    s->max_heap = heap_size;
+  const uint64_t residency = area_used(semi->grey_space) + area_used(semi->black_space);
+
+  // printf("Residency: %lu\n", residency*8/1024/1024);
+  if(s->max_residency < residency)
+    s->max_residency = residency;
+
   free(semi->white_space.ptr1);
   free(semi->white_space.ptr2);
   free(semi->grey_space.ptr);
@@ -56,10 +74,8 @@ bool semi_check(SemiSpace *semi, word size) {
 }
 
 void semi_evacuate(SemiSpace *semi, hp* objAddr) {
-  hp obj = *objAddr, dst;
+  hp obj = *objAddr;
   Header header;
-  const ObjectInfo *info;
-  word obj_size;
 
   header = readHeader(obj);
   while( header.data.isForwardPtr ) {
@@ -69,14 +85,16 @@ void semi_evacuate(SemiSpace *semi, hp* objAddr) {
   }
   assert( header.data.isForwardPtr == 0 );
 
-  info = &InfoTable[header.data.tag];
-  obj_size = 1+info->prims+info->ptrs;
+  const uint8_t prims = header.data.prims;
+  const uint8_t ptrs = header.data.ptrs;
+  const word obj_size = 1+prims+ptrs;
+
 
   assert( header.data.gen == 1 );
 
   if( !IS_WHITE(semi, header) ) return;
 
-  dst = semi_bump_grey(semi, obj_size);
+  const hp dst = semi_bump_grey(semi, obj_size);
   header.data.grey = true;
   header.data.black = !semi->black_bit;
 
@@ -89,27 +107,27 @@ void semi_evacuate(SemiSpace *semi, hp* objAddr) {
   }
 }
 
-void semi_scavenge(SemiSpace *semi, Stats *s) {
-  Header header;
-  const ObjectInfo *info;
-  stats_gen1_begin(s);
-  while(semi->grey_space.scavenged<semi->grey_space.free) {
-    header = readHeader(semi->grey_space.scavenged);
-    assert(header.data.grey == true);
-    header.data.grey = false;
-    header.data.black = semi->black_bit;
-    *semi->grey_space.scavenged = header.raw;
+// 0. No grey objects allowed.
+// 1. Deallocate white objects.
+// 2. Turn black objects white.
+void semi_swap_colors(SemiSpace *semi, Stats *s) {
+  assert(semi->grey_space.scavenged == semi->grey_space.free);
 
-    info = &InfoTable[header.data.tag];
-    semi->grey_space.scavenged += 1 + info->prims;
-    for(int i=0;i<info->ptrs;i++) {
-      semi_evacuate(semi, (hp*) semi->grey_space.scavenged);
-      semi->grey_space.scavenged++;
-    }
-  }
+  // printf("Gen1 GC done. White: %d, Grey: %ld, Black: %ld\n", semi->white_space.size, area_used(semi->grey_space), area_used(semi->black_space));
+  s->gen1_copied += area_used(semi->grey_space);
+  // s->gen1_survived += semi->white_space.free;
   // All white objects are now dead and all objects in "grey" area have been
   // marked black. Deallocate "white" area, combine "grey" and "black" area into
   // new white area. Flip black bit.
+
+  const uint64_t heap_size = area_used(semi->grey_space) + area_used(semi->black_space) + semi->white_space.size;
+  // printf("Heap: %lu %lu %lu\n", heap_size*8/1024/1024
+  //                             , area_used(semi->grey_space)*8/1024/1024
+  //                             , area_used(semi->black_space)*8/1024/1024);
+  if(s->max_heap < heap_size)
+    s->max_heap = heap_size;
+
+
   semi->black_bit = !semi->black_bit;
   free(semi->white_space.ptr1);
   free(semi->white_space.ptr2);
@@ -117,26 +135,94 @@ void semi_scavenge(SemiSpace *semi, Stats *s) {
   semi->white_space.ptr2 = semi->black_space.ptr;
   semi->white_space.size = area_used(semi->grey_space) + area_used(semi->black_space);
 
+  // printf("Residency: %d\n", semi->white_space.size*8/1024/1024);
+  if(s->max_residency < semi->white_space.size)
+    s->max_residency = semi->white_space.size;
+
+  // semi->black_space.size = MAX(MIN_AREA,area_used(semi->grey_space) * semi->factor);
+  semi->black_space.size = MAX(MIN_AREA,semi->white_space.size * semi->factor);
+  semi->black_space.ptr = malloc(sizeof(word) * semi->black_space.size);
+
   semi->grey_space.size = semi->white_space.size;
   // semi->grey_space.ptr = calloc(sizeof(word), semi->grey_space.size);
   semi->grey_space.ptr = malloc(sizeof(word) * semi->grey_space.size);
   semi->grey_space.free = semi->grey_space.ptr;
   semi->grey_space.scavenged = semi->grey_space.ptr;
 
-  semi->black_space.size = MAX(MIN_AREA,semi->white_space.size * semi->factor);
-  // semi->black_space.ptr = calloc(sizeof(word), semi->black_space.size);
-  semi->black_space.ptr = malloc(sizeof(word) * semi->black_space.size);
-
-  touchSpace(semi->black_space.ptr, semi->black_space.size);
-  touchSpace(semi->grey_space.ptr, semi->grey_space.size);
-
   semi->black_space.free = semi->black_space.ptr;
 
   assert(area_used(semi->grey_space)==0);
   assert(area_used(semi->black_space)==0);
 
-  stats_gen1_end(s);
+  semi->has_roots = false;
   s->gen1_collections++;
+  stats_gen1_end(s);
+
+  stats_misc_begin(s);
+  touchSpace(semi->black_space.ptr, semi->black_space.size);
+  touchSpace(semi->grey_space.ptr, semi->grey_space.size);
+  stats_misc_end(s);
+}
+
+/*   | white space |
+ *   | grey space |
+ *   | black space     |
+ */
+void semi_scavenge_concurrent(SemiSpace *semi, Stats *s) {
+  Header header;
+  const word scavengedWords = semi->grey_space.scavenged - semi->grey_space.ptr;
+  // return;
+  if(scavengedWords * semi->factor < area_used(semi->black_space)) {
+    word work = area_used(semi->black_space) - scavengedWords * semi->factor;
+    // printf("Concurrent Scavenge: %lu %lu %lu\n", scavengedWords,area_used(semi->black_space),area_used(semi->grey_space));
+    stats_gen1_begin(s);
+    while( work && semi->grey_space.scavenged<semi->grey_space.free) {
+      header = readHeader(semi->grey_space.scavenged);
+      assert(header.data.grey == true);
+      header.data.grey = false;
+      header.data.black = semi->black_bit;
+      *semi->grey_space.scavenged = header.raw;
+
+      const uint8_t prims = header.data.prims;
+      const uint8_t ptrs = header.data.ptrs;
+      if(work < 1+prims+ptrs) work = 0;
+      else work -= 1+prims+ptrs;
+      semi->grey_space.scavenged += 1 + prims;
+      for(int i=0;i<ptrs;i++) {
+        semi_evacuate(semi, (hp*) semi->grey_space.scavenged);
+        semi->grey_space.scavenged++;
+      }
+    }
+    if(work) {
+      semi_swap_colors(semi, s);
+    } else {
+      stats_gen1_end(s);
+    }
+  }
+}
+
+void semi_scavenge(SemiSpace *semi, Stats *s) {
+  Header header;
+  stats_gen1_begin(s);
+  // printf("Semi begin: work done: %lu\n", semi->grey_space.scavenged-semi->grey_space.ptr);
+  hp scav_before = semi->grey_space.scavenged;
+  while(semi->grey_space.scavenged<semi->grey_space.free) {
+    header = readHeader(semi->grey_space.scavenged);
+    assert(header.data.grey == true);
+    header.data.grey = false;
+    header.data.black = semi->black_bit;
+    *semi->grey_space.scavenged = header.raw;
+
+    const uint8_t prims = header.data.prims;
+    const uint8_t ptrs = header.data.ptrs;
+    semi->grey_space.scavenged += 1 + prims;
+    for(int i=0;i<ptrs;i++) {
+      semi_evacuate(semi, (hp*) semi->grey_space.scavenged);
+      semi->grey_space.scavenged++;
+    }
+  }
+  // printf("Semi begin: final work: %lu\n", semi->grey_space.free-scav_before);
+  semi_swap_colors(semi,s);
 }
 
 word semi_size(SemiSpace *semi) {

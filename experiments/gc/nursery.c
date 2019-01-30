@@ -110,10 +110,10 @@ void nursery_evacuate(Nursery *ns, SemiSpace *semi, hp* objAddr) {
 // }
 
 static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr) {
-  hp obj = *objAddr, dst;
+  hp obj = *objAddr;
   Header header;
-  word obj_size;
-  uint8_t prims, ptrs;
+  // word obj_size;
+  uint8_t prims=0, ptrs=0;
 
   header = readHeader(obj);
   while( header.data.isForwardPtr ) {
@@ -123,13 +123,17 @@ static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr) {
   }
   assert( header.data.isForwardPtr == 0);
 
-  prims = InfoTable[header.data.tag].prims;
-  ptrs = InfoTable[header.data.tag].ptrs;
-  obj_size = 1+prims+ptrs;
+  // prims = InfoTable[header.data.tag].prims;
+  // ptrs = InfoTable[header.data.tag].ptrs;
+  prims = header.data.prims;
+  ptrs = header.data.ptrs;
+  // assert(prims == InfoTable[header.data.tag].prims);
+  // assert(ptrs == InfoTable[header.data.tag].ptrs);
+  const word obj_size = 1+prims+ptrs;
 
   switch( header.data.gen ) {
-    case 0:
-      dst = semi_bump_black(semi, obj_size);
+    case 0: {
+      const hp dst = semi_bump_black(semi, obj_size);
       header.data.black = semi->black_bit;
       header.data.gen = 1;
       ns->evacuated += obj_size;
@@ -138,6 +142,7 @@ static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr) {
       writeIndirection(obj, dst);
 
       *dst = header.raw;
+      #pragma clang loop unroll_count(1)
       for(int i=1;i<obj_size;i++) {
         dst[i] = obj[i];
       }
@@ -152,11 +157,11 @@ static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr) {
           for(int i=0;i<ptrs;i++)
             nursery_evacuate_plain(ns, semi, (hp*) dst+1+prims+i);
           return;
-      }
+      }}
     case 1:
       if( !IS_WHITE(semi, header) ) return;
 
-      dst = semi_bump_grey(semi, obj_size);
+      const hp dst = semi_bump_grey(semi, obj_size);
       header.data.grey = true;
       header.data.black = !semi->black_bit;
 
@@ -169,15 +174,14 @@ static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr) {
       }
       return;
     default:
-      abort();
+      __builtin_unreachable();
+      // abort();
   }
 }
 
 static void nursery_evacuate_bypass(Nursery *ns, SemiSpace *semi, hp* objAddr) {
   hp obj = *objAddr;
   Header header;
-  word obj_size;
-  uint8_t prims, ptrs;
 
   header = readHeader(obj);
   while( header.data.isForwardPtr ) {
@@ -187,9 +191,9 @@ static void nursery_evacuate_bypass(Nursery *ns, SemiSpace *semi, hp* objAddr) {
   }
   assert( header.data.isForwardPtr == 0);
 
-  prims = InfoTable[header.data.tag].prims;
-  ptrs = InfoTable[header.data.tag].ptrs;
-  obj_size = 1+prims+ptrs;
+  const uint8_t prims = header.data.prims;
+  const uint8_t ptrs = header.data.ptrs;
+  const word obj_size = 1+prims+ptrs;
 
   if( header.data.gen == 0 ) {
     header.data.black = semi->black_bit;
@@ -198,7 +202,7 @@ static void nursery_evacuate_bypass(Nursery *ns, SemiSpace *semi, hp* objAddr) {
 
     *obj = header.raw;
 
-    if(InfoTable[header.data.tag].ptrs==1) {
+    if(ptrs==1) {
       return nursery_evacuate_bypass(ns, semi, (hp*) obj+1+prims);
     } else {
       for(int i=0;i<ptrs;i++) {
@@ -206,11 +210,11 @@ static void nursery_evacuate_bypass(Nursery *ns, SemiSpace *semi, hp* objAddr) {
       }
     }
   } else if( header.data.gen == 1 ) {
-    hp dst;
+
     // obj is in semi-space gen
     if( !IS_WHITE(semi, header) ) return;
 
-    dst = semi_bump_grey(semi, obj_size);
+    const hp dst = semi_bump_grey(semi, obj_size);
     header.data.grey = true;
     header.data.black = !semi->black_bit;
 
@@ -226,14 +230,19 @@ static void nursery_evacuate_bypass(Nursery *ns, SemiSpace *semi, hp* objAddr) {
   }
 }
 
-void nursery_reset(Nursery *ns, Stats *s) {
+void nursery_reset(Nursery *ns, SemiSpace *semi, Stats *s) {
   s->nursery_n_collections++;
   s->allocated += NURSERY_SIZE - (ns->limit - ns->index);
   s->nursery_copied += ns->evacuated;
+  semi->has_roots = true;
   ns->index = ns->heap;
   ns->limit = ns->heap+NURSERY_SIZE;
   ns->evacuated=0;
   ns->bypass = false;
+
+  stats_nursery_end(s);
+
+  semi_scavenge_concurrent(semi, s);
 }
 
 void nursery_bypass(Nursery *ns, SemiSpace *semi) {

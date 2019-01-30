@@ -9,6 +9,8 @@
 
 typedef uint64_t word;
 
+// enum Timer{MutTimer, Gen0Timer, Gen1Timer, MiscTimer, MaxTimer};
+
 typedef struct {
   uint64_t allocated;
   uint64_t nursery_n_collections;
@@ -17,9 +19,18 @@ typedef struct {
   uint64_t nursery_copied;
 
   uint64_t gen1_collections;
+  uint64_t gen1_copied;
   uint64_t gen1_time;
 
-  uint64_t start_time;
+  uint64_t nursery_start_time;
+  uint64_t gen1_start_time;
+  uint64_t mut_start_time;
+
+  uint64_t misc_start_time;
+  uint64_t misc_time;
+
+  uint64_t max_heap;
+  uint64_t max_residency;
 } Stats;
 
 void stats_init(Stats *s);
@@ -34,20 +45,24 @@ static uint64_t clock_gettime_nsec(clockid_t clk_id) {
 }
 
 static char *pp_time(uint64_t time) {
-  static char buffer[1024];
+  static int i=0;
+  static char buffer[10][128];
+  i = (i+1) % 10;
   if(time < 1000000) {
-    snprintf(buffer, 1024, "%.0fus", ((double)time)/1000);
+    snprintf(buffer[i], 1024, "%.0fus", ((double)time)/1000);
   } else if(time < 1000000000) {
-    snprintf(buffer, 1024, "%.2fms", ((double)time)/1000000);
+    snprintf(buffer[i], 1024, "%.2fms", ((double)time)/1000000);
   } else {
-    snprintf(buffer, 1024, "%.2fs", ((double)time)/1000000000);
+    snprintf(buffer[i], 1024, "%.2fs", ((double)time)/1000000000);
   }
-  return buffer;
+  return buffer[i];
 }
 
 
+#define CLOCK_ID CLOCK_THREAD_CPUTIME_ID
+
 static void stats_nursery_begin(Stats *s) {
-  s->start_time = clock_gettime_nsec(CLOCK_PROCESS_CPUTIME_ID);
+  s->nursery_start_time = clock_gettime_nsec(CLOCK_ID);
   // s->start_time = clock_gettime_nsec(CLOCK_MONOTONIC_COARSE);
   // {
   //   struct rusage usage;
@@ -56,9 +71,9 @@ static void stats_nursery_begin(Stats *s) {
   // }
 }
 static void stats_nursery_end(Stats *s) {
-  uint64_t end_time = clock_gettime_nsec(CLOCK_PROCESS_CPUTIME_ID);
+  uint64_t end_time = clock_gettime_nsec(CLOCK_ID);
   // uint64_t end_time = clock_gettime_nsec(CLOCK_MONOTONIC_COARSE);
-  uint64_t time = end_time - s->start_time;
+  uint64_t time = end_time - s->nursery_start_time;
   s->nursery_time += time;
   if(time > s->nursery_time_max) {
     s->nursery_time_max = time;
@@ -74,14 +89,19 @@ static void stats_nursery_end(Stats *s) {
 }
 
 static void stats_gen1_begin(Stats *s) {
-  s->start_time = clock_gettime_nsec(CLOCK_THREAD_CPUTIME_ID);
-  // s->start_time = clock_gettime_nsec(CLOCK_MONOTONIC_COARSE);
+  s->gen1_start_time = clock_gettime_nsec(CLOCK_ID);
 }
 static void stats_gen1_end(Stats *s) {
-  uint64_t end_time = clock_gettime_nsec(CLOCK_THREAD_CPUTIME_ID);
-  // uint64_t end_time = clock_gettime_nsec(CLOCK_MONOTONIC_COARSE);
-  uint64_t time = end_time - s->start_time;
-  s->gen1_time += time;
+  uint64_t end_time = clock_gettime_nsec(CLOCK_ID);
+  s->gen1_time += end_time - s->gen1_start_time;
+}
+
+static void stats_misc_begin(Stats *s) {
+  s->misc_start_time = clock_gettime_nsec(CLOCK_ID);
+}
+static void stats_misc_end(Stats *s) {
+  uint64_t end_time = clock_gettime_nsec(CLOCK_ID);
+  s->misc_time += end_time - s->misc_start_time;
 }
 
 #endif

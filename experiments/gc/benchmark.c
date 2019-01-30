@@ -23,7 +23,7 @@ static void warmup(Nursery *ns, SemiSpace *semi) {
     if(new==NULL) {
       // printf("Nursery full\n");
       nursery_evacuate(ns, semi, &obj);
-      nursery_reset(ns, &s);
+      nursery_reset(ns, semi, &s);
       semi_scavenge(semi, &s); // Turn black objects white.
       semi_scavenge(semi, &s); // Clear white objects.
       break;
@@ -40,7 +40,7 @@ static void bench1(int buckets, int len, int iterations) {
   Nursery ns;
   SemiSpace semi;
 
-  stats_init(&s);
+
   nursery_init(&ns);
   semi_init(&semi);
   warmup(&ns, &semi);
@@ -49,33 +49,48 @@ static void bench1(int buckets, int len, int iterations) {
   assert(roots != NULL);
   assert(counts != NULL);
 
+  stats_init(&s);
+
   for(int i=0; i<buckets; i++) {
     hp root = allocate(&ns, &semi, Zero, (MkZero){});
     assert(root != NULL);
     roots[i] = root;
   }
 
+  int high=0;
+
   for(unsigned int i=0; i<iterations; i++) {
     for(int j=buckets-1;j>=0;j--) {
       if( i%(1<<j) == 0 ) {
         hp root=NULL;
         do {
-          if( counts[j] == len ) {
+          if( counts[j] == len*(j+1) ) {
             root = allocate(&ns, &semi, Zero, (MkZero){});
             counts[j]=0;
           } else {
             root = allocate(&ns, &semi, Succ, (MkSucc){roots[j]});
           }
           if(root==NULL) {
+            word sum=0;
+            for(int n=0;n<buckets;n++) {
+              sum += counts[n];
+              // printf("%d ", counts[n]);
+            }
+            if(sum>high) {
+              printf("Sum: %lu KB\n", sum*2*8/1024);
+              high = sum;
+            }
+
             stats_nursery_begin(&s);
             for(int n=0;n<buckets;n++) {
               nursery_evacuate(&ns, &semi, &roots[n]);
             }
-            nursery_reset(&ns, &s);
-            stats_nursery_end(&s);
+            nursery_reset(&ns, &semi, &s);
             if(!semi_check(&semi, NURSERY_SIZE)) {
+
               semi_scavenge(&semi, &s);
             }
+            // nursery_bypass(&ns, &semi);
             continue;
           }
           roots[j] = root;
@@ -85,21 +100,21 @@ static void bench1(int buckets, int len, int iterations) {
     }
   }
 
-  semi_close(&semi);
+  semi_close(&semi, &s);
   stats_pprint(&s);
 }
 
-static void bench2(int iterations, bool largeObject, bool bypass) {
+static void bench2(const int iterations, const bool largeObject, const bool bypass) {
   Stats s;
   Nursery ns;
   SemiSpace semi;
   hp obj;
 
-  stats_init(&s);
   nursery_init(&ns);
   semi_init(&semi);
 
   warmup(&ns, &semi);
+  stats_init(&s);
 
   obj = allocate(&ns, &semi, Zero, (MkZero){});
   assert(obj!=NULL);
@@ -114,8 +129,7 @@ static void bench2(int iterations, bool largeObject, bool bypass) {
       if(new==NULL) {
         stats_nursery_begin(&s);
         nursery_evacuate(&ns, &semi, &obj);
-        nursery_reset(&ns, &s);
-        stats_nursery_end(&s);
+        nursery_reset(&ns, &semi, &s);
         if(!semi_check(&semi, NURSERY_SIZE)) {
           semi_scavenge(&semi, &s);
         }
@@ -125,7 +139,7 @@ static void bench2(int iterations, bool largeObject, bool bypass) {
     }
     obj = new;
   }
-  semi_close(&semi);
+  semi_close(&semi, &s);
   stats_pprint(&s);
 }
 
@@ -135,22 +149,21 @@ static void bench3(int iterations) {
   SemiSpace semi;
   hp obj;
 
-  stats_init(&s);
   nursery_init(&ns);
   semi_init(&semi);
+  stats_init(&s);
 
   for(int i=0; i<iterations; i++) {
     if(allocate(&ns, &semi, Succ, (MkZero){}) == NULL) {
       stats_nursery_begin(&s);
-      nursery_reset(&ns, &s);
-      stats_nursery_end(&s);
+      nursery_reset(&ns, &semi, &s);
 
       if(!semi_check(&semi, NURSERY_SIZE)) {
         semi_scavenge(&semi, &s);
       }
     }
   }
-  semi_close(&semi);
+  semi_close(&semi, &s);
   stats_pprint(&s);
 }
 
@@ -191,7 +204,7 @@ int main(int argc, char* argv[]) {
     print_usage(argv[0]);
   } else {
     if(strcmp(argv[1], "1")==0) {
-      bench1(20, 10000, 40000000);
+      bench1(20, 10000, 100000000);
     } else if(strcmp(argv[1], "2a")==0) {
       bench2(100000000, false, false);
     } else if(strcmp(argv[1], "2b")==0) {
@@ -206,8 +219,5 @@ int main(int argc, char* argv[]) {
       print_usage(argv[0]);
     }
   }
-  // bench1(15, 10000, 10000000);
-  // bench2(100000000);
-  // bench3(1000000000);
   return 0;
 }

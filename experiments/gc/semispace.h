@@ -11,6 +11,7 @@
 typedef struct {
   unsigned int black_bit:1;
   double factor;
+  bool has_roots;
 
   struct {
     hp ptr1;
@@ -35,7 +36,7 @@ typedef struct {
 #define area_limit(area) (area.ptr+area.size)
 #define area_used(area) (area.free-area.ptr)
 void semi_init(SemiSpace *semi);
-void semi_close(SemiSpace *semi);
+void semi_close(SemiSpace *semi, Stats*);
 
 // hp semi_bump_grey(SemiSpace *semi, word size);
 // hp semi_bump_black(SemiSpace *semi, word size);
@@ -43,6 +44,7 @@ bool semi_check(SemiSpace *semi, word size);
 
 void semi_evacuate(SemiSpace *semi, hp* objAddr);
 void semi_scavenge(SemiSpace *semi, Stats*);
+void semi_scavenge_concurrent(SemiSpace *semi, Stats *s);
 word semi_size(SemiSpace *semi);
 
 #define IS_WHITE(semi, header) (!(IS_BLACK(semi,header) || IS_GREY(header)))
