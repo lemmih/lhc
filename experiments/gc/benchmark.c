@@ -15,6 +15,7 @@
 static void warmup(Nursery *ns, SemiSpace *semi) {
   Stats s;
   hp obj, new=NULL;
+  stats_init(&s);
   obj = allocate(ns, semi, Zero, (MkZero){});
   assert(obj!=NULL);
 
@@ -22,6 +23,7 @@ static void warmup(Nursery *ns, SemiSpace *semi) {
     new = allocate(ns, semi, Branch, (MkBranch){obj, obj});
     if(new==NULL) {
       // printf("Nursery full\n");
+      stats_timer_begin(&s, Gen0Timer);
       nursery_evacuate(ns, semi, &obj);
       nursery_reset(ns, semi, &s);
       semi_scavenge(semi, &s); // Turn black objects white.
@@ -33,7 +35,7 @@ static void warmup(Nursery *ns, SemiSpace *semi) {
 }
 
 
-static void bench1(int buckets, int len, int iterations) {
+static void bench1(const int buckets, const int len, const int iterations) {
   hp* roots;
   int* counts;
   Stats s;
@@ -50,6 +52,7 @@ static void bench1(int buckets, int len, int iterations) {
   assert(counts != NULL);
 
   stats_init(&s);
+  stats_timer_begin(&s, MutTimer);
 
   for(int i=0; i<buckets; i++) {
     hp root = allocate(&ns, &semi, Zero, (MkZero){});
@@ -58,47 +61,47 @@ static void bench1(int buckets, int len, int iterations) {
   }
 
   int high=0;
+  word sum=0;
 
   for(unsigned int i=0; i<iterations; i++) {
-    for(int j=buckets-1;j>=0;j--) {
-      if( i%(1<<j) == 0 ) {
-        hp root=NULL;
-        do {
-          if( counts[j] == len*(j+1) ) {
-            root = allocate(&ns, &semi, Zero, (MkZero){});
-            counts[j]=0;
-          } else {
-            root = allocate(&ns, &semi, Succ, (MkSucc){roots[j]});
-          }
-          if(root==NULL) {
-            word sum=0;
-            for(int n=0;n<buckets;n++) {
-              sum += counts[n];
-              // printf("%d ", counts[n]);
-            }
-            if(sum>high) {
-              printf("Sum: %lu KB\n", sum*2*8/1024);
-              high = sum;
-            }
+    for(int j=0;j<buckets && (i%(1<<j) == 0);j++) {
+      hp root=NULL;
+      do {
+        if( counts[j] == len*(j+1) ) {
+          root = allocate(&ns, &semi, Zero, (MkZero){});
+          sum-=counts[j];
+          counts[j]=0;
+        } else {
+          root = allocate(&ns, &semi, Succ, (MkSucc){roots[j]});
+        }
+        if(root==NULL) {
 
-            stats_nursery_begin(&s);
-            for(int n=0;n<buckets;n++) {
-              nursery_evacuate(&ns, &semi, &roots[n]);
-            }
-            nursery_reset(&ns, &semi, &s);
-            if(!semi_check(&semi, NURSERY_SIZE)) {
-
-              semi_scavenge(&semi, &s);
-            }
-            // nursery_bypass(&ns, &semi);
-            continue;
+          if(sum>high) {
+            printf("Sum: %lu KB\t\t\r", sum*2*8/1024);
+            high = sum;
+            fflush(stdout);
           }
-          roots[j] = root;
-          counts[j]++;
-        } while(false);
-      }
+
+          stats_timer_begin(&s, Gen0Timer);
+          for(int n=0;n<buckets;n++) {
+            nursery_evacuate(&ns, &semi, &roots[n]);
+          }
+          nursery_reset(&ns, &semi, &s);
+          if(!semi_check(&semi, NURSERY_SIZE)) {
+
+            semi_scavenge(&semi, &s);
+          }
+          continue;
+        }
+        roots[j] = root;
+        counts[j]++;
+        sum++;
+      } while(false);
     }
   }
+  printf("\n");
+  stats_timer_end(&s);
+
 
   semi_close(&semi, &s);
   stats_pprint(&s);
@@ -115,6 +118,7 @@ static void bench2(const int iterations, const bool largeObject, const bool bypa
 
   warmup(&ns, &semi);
   stats_init(&s);
+  stats_timer_begin(&s, MutTimer);
 
   obj = allocate(&ns, &semi, Zero, (MkZero){});
   assert(obj!=NULL);
@@ -127,7 +131,7 @@ static void bench2(const int iterations, const bool largeObject, const bool bypa
       else
         new = allocate(&ns, &semi, Succ, (MkSucc){obj});
       if(new==NULL) {
-        stats_nursery_begin(&s);
+        stats_timer_begin(&s, Gen0Timer);
         nursery_evacuate(&ns, &semi, &obj);
         nursery_reset(&ns, &semi, &s);
         if(!semi_check(&semi, NURSERY_SIZE)) {
@@ -139,6 +143,7 @@ static void bench2(const int iterations, const bool largeObject, const bool bypa
     }
     obj = new;
   }
+  stats_timer_end(&s);
   semi_close(&semi, &s);
   stats_pprint(&s);
 }
@@ -152,10 +157,11 @@ static void bench3(int iterations) {
   nursery_init(&ns);
   semi_init(&semi);
   stats_init(&s);
+  stats_timer_begin(&s, MutTimer);
 
   for(int i=0; i<iterations; i++) {
     if(allocate(&ns, &semi, Succ, (MkZero){}) == NULL) {
-      stats_nursery_begin(&s);
+      stats_timer_begin(&s, Gen0Timer);
       nursery_reset(&ns, &semi, &s);
 
       if(!semi_check(&semi, NURSERY_SIZE)) {
@@ -163,6 +169,7 @@ static void bench3(int iterations) {
       }
     }
   }
+  stats_timer_end(&s);
   semi_close(&semi, &s);
   stats_pprint(&s);
 }
@@ -183,17 +190,17 @@ void enable_lowlatency() {
   CPU_ZERO(&set);
   CPU_SET(sched_getcpu(), &set);
   if(sched_setaffinity(0, sizeof(set), &set) == -1) {
-    printf("Failed to set affinity.\n");
+    // printf("Failed to set affinity.\n");
   }
 
   sched_getparam(0, &param);
   param.sched_priority = sched_get_priority_max(SCHED_FIFO);
   if(sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
-    printf("Failed to set scheduler.\n");
+    // printf("Failed to set scheduler.\n");
   }
 
   if(nice(-19) == -1) {
-    printf("Failed to set priority.\n");
+    // printf("Failed to set priority.\n");
   }
 }
 

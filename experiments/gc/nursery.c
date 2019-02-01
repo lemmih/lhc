@@ -202,12 +202,17 @@ static void nursery_evacuate_bypass(Nursery *ns, SemiSpace *semi, hp* objAddr) {
 
     *obj = header.raw;
 
-    if(ptrs==1) {
-      return nursery_evacuate_bypass(ns, semi, (hp*) obj+1+prims);
-    } else {
-      for(int i=0;i<ptrs;i++) {
-        nursery_evacuate_bypass(ns, semi, (hp*) obj+1+prims+i);
-      }
+    switch(ptrs) {
+      case 0: return;
+      case 1: return nursery_evacuate_bypass(ns, semi, (hp*) obj+1+prims);
+      case 2:
+        nursery_evacuate_bypass(ns, semi, (hp*) obj+1+prims);
+        return nursery_evacuate_bypass(ns, semi, (hp*) obj+1+prims+1);
+      default:
+        for(int i=0;i<ptrs;i++) {
+          nursery_evacuate_bypass(ns, semi, (hp*) obj+1+prims+i);
+        }
+        return;
     }
   } else if( header.data.gen == 1 ) {
 
@@ -222,6 +227,7 @@ static void nursery_evacuate_bypass(Nursery *ns, SemiSpace *semi, hp* objAddr) {
     writeIndirection(obj, dst);
 
     *dst = header.raw;
+    #pragma clang loop unroll_count(1)
     for(int i=1;i<obj_size;i++) {
       dst[i] = obj[i];
     }
@@ -240,7 +246,7 @@ void nursery_reset(Nursery *ns, SemiSpace *semi, Stats *s) {
   ns->evacuated=0;
   ns->bypass = false;
 
-  stats_nursery_end(s);
+  stats_timer_end(s);
 
   semi_scavenge_concurrent(semi, s);
 }

@@ -33,7 +33,7 @@ void semi_close(SemiSpace *semi, Stats *s) {
   // stats_misc_begin(s);
   semi_scavenge(semi, s);
   // stats_misc_end(s);
-
+  stats_timer_begin(s, MiscTimer);
   s->gen1_copied += area_used(semi->grey_space);
   const uint64_t heap_size = area_used(semi->grey_space) + area_used(semi->black_space) + semi->white_space.size;
   // printf("Heap: %lu %lu %lu\n", heap_size*8/1024/1024
@@ -62,6 +62,7 @@ void semi_close(SemiSpace *semi, Stats *s) {
   semi->black_space.ptr = NULL;
   semi->black_space.free = NULL;
   semi->black_space.size = 0;
+  stats_timer_end(s);
 }
 
 // When a nursery is full, all objects in the nursery should be copied to the
@@ -102,6 +103,7 @@ void semi_evacuate(SemiSpace *semi, hp* objAddr) {
   writeIndirection(obj, dst);
 
   *dst = header.raw;
+  #pragma clang loop unroll_count(1)
   for(int i=1;i<obj_size;i++) {
     dst[i] = obj[i];
   }
@@ -156,12 +158,11 @@ void semi_swap_colors(SemiSpace *semi, Stats *s) {
 
   semi->has_roots = false;
   s->gen1_collections++;
-  stats_gen1_end(s);
 
-  stats_misc_begin(s);
+  stats_timer_begin(s, MiscTimer);
   touchSpace(semi->black_space.ptr, semi->black_space.size);
   touchSpace(semi->grey_space.ptr, semi->grey_space.size);
-  stats_misc_end(s);
+  stats_timer_end(s);
 }
 
 /*   | white space |
@@ -175,7 +176,7 @@ void semi_scavenge_concurrent(SemiSpace *semi, Stats *s) {
   if(scavengedWords * semi->factor < area_used(semi->black_space)) {
     word work = area_used(semi->black_space) - scavengedWords * semi->factor;
     // printf("Concurrent Scavenge: %lu %lu %lu\n", scavengedWords,area_used(semi->black_space),area_used(semi->grey_space));
-    stats_gen1_begin(s);
+    stats_timer_begin(s, Gen1Timer);
     while( work && semi->grey_space.scavenged<semi->grey_space.free) {
       header = readHeader(semi->grey_space.scavenged);
       assert(header.data.grey == true);
@@ -195,15 +196,14 @@ void semi_scavenge_concurrent(SemiSpace *semi, Stats *s) {
     }
     if(work) {
       semi_swap_colors(semi, s);
-    } else {
-      stats_gen1_end(s);
     }
+    stats_timer_end(s);
   }
 }
 
 void semi_scavenge(SemiSpace *semi, Stats *s) {
   Header header;
-  stats_gen1_begin(s);
+  stats_timer_begin(s, Gen1Timer);
   // printf("Semi begin: work done: %lu\n", semi->grey_space.scavenged-semi->grey_space.ptr);
   hp scav_before = semi->grey_space.scavenged;
   while(semi->grey_space.scavenged<semi->grey_space.free) {
@@ -223,6 +223,7 @@ void semi_scavenge(SemiSpace *semi, Stats *s) {
   }
   // printf("Semi begin: final work: %lu\n", semi->grey_space.free-scav_before);
   semi_swap_colors(semi,s);
+  stats_timer_end(s);
 }
 
 word semi_size(SemiSpace *semi) {

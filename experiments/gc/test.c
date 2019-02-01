@@ -73,10 +73,10 @@ int main(void) {
     assert(readHeader(leaf).data.gen == 0); // 0 => nursery
 
     nursery_evacuate(&ns, &semi, &leaf);
-    nursery_reset(&ns, &s);
+    nursery_reset(&ns, &semi, &s);
     assert(readHeader(leaf).data.gen == 1);
     assert(!nursery_member(&ns, leaf));
-    semi_close(&semi);
+    semi_close(&semi, &s);
   }
 
   { // Shared object evacuation
@@ -98,7 +98,7 @@ int main(void) {
     // Check that the leaf node hasn't been duplicated.
     assert(((MkBranch*)readObject(branch))->left == ((MkBranch*)readObject(branch))->right);
 
-    semi_close(&semi);
+    semi_close(&semi, &s);
   }
 
   { // SemiSpace GC check
@@ -133,7 +133,7 @@ int main(void) {
     assert(readHeader(leaf).data.black == !semi.black_bit);
     assert(semi_size(&semi) == 2);
 
-    semi_close(&semi);
+    semi_close(&semi, &s);
   }
   {
     hp leaf, prevAddr;
@@ -152,7 +152,7 @@ int main(void) {
     assert(readHeader(leaf).data.black == semi.black_bit);
     assert(leaf == prevAddr);
 
-    semi_close(&semi);
+    semi_close(&semi, &s);
   }
 
   printf("All OK.\n");
