@@ -1,0 +1,12 @@
+Nursery
+
+SemiSpace
+
+Immix
+
+
+
+Questions:
+  Remembered set?
+  Finalizers?
+  Stable pointers?

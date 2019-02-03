@@ -16,15 +16,6 @@ static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr);
 static void nursery_evacuate_bypass(Nursery *ns, SemiSpace *semi, hp* objAddr);
 static void nursery_evacuate_plain_stack(Nursery *ns, SemiSpace *semi, hp* stack[], int idx);
 
-void nursery_init(Nursery *ns) {
-  memset(ns->heap, 0, sizeof(ns->heap));
-  touchSpace(ns->heap, NURSERY_SIZE);
-  ns->index=ns->heap;
-  ns->limit=ns->heap+NURSERY_SIZE;
-  ns->evacuated=0;
-  ns->bypass = false;
-}
-
 
 // Depth-first evacuation of objects from nursery to semi-space.
 // Semi-space is garanteed to have enough space. No need to check.
@@ -112,23 +103,30 @@ void nursery_evacuate(Nursery *ns, SemiSpace *semi, hp* objAddr) {
 static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr) {
   hp obj = *objAddr;
   Header header;
-  // word obj_size;
-  uint8_t prims=0, ptrs=0;
+
+  if(!nursery_member(ns, obj)) {
+    if(IS_IN_AREA(semi->black_space, obj) || IS_IN_AREA(semi->grey_space, obj)) {
+      return;
+    }
+  }
 
   header = readHeader(obj);
   while( header.data.isForwardPtr ) {
     obj = (hp) ((word)header.forwardPtr & (~1));
     *objAddr = obj;
+    if(!nursery_member(ns, obj)) {
+      if(IS_IN_AREA(semi->black_space, obj) || IS_IN_AREA(semi->grey_space, obj)) {
+        return;
+      }
+    }
     header = readHeader(obj);
   }
   assert( header.data.isForwardPtr == 0);
 
-  // prims = InfoTable[header.data.tag].prims;
-  // ptrs = InfoTable[header.data.tag].ptrs;
-  prims = header.data.prims;
-  ptrs = header.data.ptrs;
-  // assert(prims == InfoTable[header.data.tag].prims);
-  // assert(ptrs == InfoTable[header.data.tag].ptrs);
+  const uint8_t prims = header.data.prims;
+  const uint8_t ptrs = header.data.ptrs;
+  assert(prims == InfoTable[header.data.tag].prims);
+  assert(ptrs == InfoTable[header.data.tag].ptrs);
   const word obj_size = 1+prims+ptrs;
 
   switch( header.data.gen ) {
@@ -151,24 +149,28 @@ static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr) {
         case 0: return;
         case 1: return nursery_evacuate_plain(ns, semi, (hp*) dst+1+prims);
         case 2:
+          objAddr = (hp*) dst+1+prims+1;
           nursery_evacuate_plain(ns, semi, (hp*) dst+1+prims);
-          return nursery_evacuate_plain(ns, semi, (hp*) dst+1+prims+1);
+          return nursery_evacuate_plain(ns, semi, objAddr);
         default:
           for(int i=0;i<ptrs;i++)
             nursery_evacuate_plain(ns, semi, (hp*) dst+1+prims+i);
           return;
       }}
     case 1:
-      if( !IS_WHITE(semi, header) ) return;
+      assert( IS_WHITE(semi, header) );
 
       const hp dst = semi_bump_grey(semi, obj_size);
       header.data.grey = true;
       header.data.black = !semi->black_bit;
 
+      ns->roots += obj_size;
+
       *objAddr = dst;
       writeIndirection(obj, dst);
 
       *dst = header.raw;
+      #pragma clang loop unroll_count(1)
       for(int i=1;i<obj_size;i++) {
         dst[i] = obj[i];
       }
@@ -232,23 +234,9 @@ static void nursery_evacuate_bypass(Nursery *ns, SemiSpace *semi, hp* objAddr) {
       dst[i] = obj[i];
     }
   } else {
-    abort();
+    __builtin_unreachable();
+    // abort();
   }
-}
-
-void nursery_reset(Nursery *ns, SemiSpace *semi, Stats *s) {
-  s->nursery_n_collections++;
-  s->allocated += NURSERY_SIZE - (ns->limit - ns->index);
-  s->nursery_copied += ns->evacuated;
-  semi->has_roots = true;
-  ns->index = ns->heap;
-  ns->limit = ns->heap+NURSERY_SIZE;
-  ns->evacuated=0;
-  ns->bypass = false;
-
-  stats_timer_end(s);
-
-  semi_scavenge_concurrent(semi, s);
 }
 
 void nursery_bypass(Nursery *ns, SemiSpace *semi) {

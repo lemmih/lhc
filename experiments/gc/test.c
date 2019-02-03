@@ -9,7 +9,8 @@
 #include <stdio.h>
 #include <assert.h>
 
-
+#define TEST(name, code) \
+  /*printf("%s\n", name);*/ code
 
 
 int main(void) {
@@ -22,6 +23,10 @@ int main(void) {
     Header h;
     assert(sizeof(h)==sizeof(word));
   }
+
+  TEST("Number of tags = InfoTable entries", {
+    assert(sizeof(InfoTable)/sizeof(ObjectInfo) == TAG_MAX);
+  });
 
   {
     assert(InfoTable[Leaf].ptrs == 0);
@@ -72,8 +77,10 @@ int main(void) {
     assert(leaf != NULL);
     assert(readHeader(leaf).data.gen == 0); // 0 => nursery
 
+    stats_timer_begin(&s, Gen0Timer);
     nursery_evacuate(&ns, &semi, &leaf);
     nursery_reset(&ns, &semi, &s);
+
     assert(readHeader(leaf).data.gen == 1);
     assert(!nursery_member(&ns, leaf));
     semi_close(&semi, &s);
@@ -135,6 +142,7 @@ int main(void) {
 
     semi_close(&semi, &s);
   }
+
   {
     hp leaf, prevAddr;
     nursery_init(&ns);

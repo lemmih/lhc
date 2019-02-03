@@ -4,6 +4,8 @@
 #include "semispace.h"
 #include "objects.h"
 #include "stats.h"
+#include "lib_bintree.h"
+#include "lib_shadowstack.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +13,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sched.h>
+#include <x86intrin.h>
 
 static void warmup(Nursery *ns, SemiSpace *semi) {
   Stats s;
@@ -76,11 +79,11 @@ static void bench1(const int buckets, const int len, const int iterations) {
         }
         if(root==NULL) {
 
-          if(sum>high) {
-            printf("Sum: %lu KB\t\t\r", sum*2*8/1024);
-            high = sum;
-            fflush(stdout);
-          }
+          // if(sum>high) {
+          //   printf("Sum: %lu KB\t\t\r", sum*2*8/1024);
+          //   high = sum;
+          //   fflush(stdout);
+          // }
 
           stats_timer_begin(&s, Gen0Timer);
           for(int n=0;n<buckets;n++) {
@@ -99,7 +102,7 @@ static void bench1(const int buckets, const int len, const int iterations) {
       } while(false);
     }
   }
-  printf("\n");
+  // printf("\n");
   stats_timer_end(&s);
 
 
@@ -112,6 +115,8 @@ static void bench2(const int iterations, const bool largeObject, const bool bypa
   Nursery ns;
   SemiSpace semi;
   hp obj;
+  register hp index;
+  register hp limit;
 
   nursery_init(&ns);
   semi_init(&semi);
@@ -123,14 +128,67 @@ static void bench2(const int iterations, const bool largeObject, const bool bypa
   obj = allocate(&ns, &semi, Zero, (MkZero){});
   assert(obj!=NULL);
 
+  index = ns.index;
+  limit = ns.limit;
+
   for(int i=0; i<iterations; i++) {
     hp new = NULL;
     while(new==NULL) {
-      if(largeObject)
-        new = allocate(&ns, &semi, Branch, (MkBranch){obj, obj});
-      else
-        new = allocate(&ns, &semi, Succ, (MkSucc){obj});
+      if(largeObject && 0) {
+        // new = allocate(&ns, &semi, Branch, (MkBranch){obj, obj});
+        {
+          Header header;
+
+          __builtin_assume(index != NULL);
+          __builtin_assume(limit != NULL);
+
+          if(limit < index+(2+1)) {
+            new = NULL;
+          } else {
+            new = index;
+            Object o = (Object)((MkBranch){obj, obj});
+
+            header.raw = 0;
+            header.data.tag = Branch;
+            header.data.prims = 0;
+            header.data.ptrs = 2;
+            *index = header.raw;
+            index++;
+            memcpy(index, &o, 16);
+            index += 2;
+
+            __builtin_assume(obj != NULL);
+          }
+        }
+      } else {
+        // new = allocate(&ns, &semi, Succ, (MkSucc){obj});
+        {
+          Header header;
+
+          __builtin_assume(index != NULL);
+          __builtin_assume(limit != NULL);
+
+          if(limit < index+(1+1)) {
+            new = NULL;
+          } else {
+            new = index;
+            Object o = (Object)((MkSucc){obj});
+
+            header.raw = 0;
+            header.data.tag = Succ;
+            header.data.prims = 0;
+            header.data.ptrs = 1;
+            *index = header.raw;
+            index++;
+            memcpy(index, &o, 8);
+            index += 1;
+
+            __builtin_assume(obj != NULL);
+          }
+        }
+      }
       if(new==NULL) {
+        ns.index = index;
         stats_timer_begin(&s, Gen0Timer);
         nursery_evacuate(&ns, &semi, &obj);
         nursery_reset(&ns, &semi, &s);
@@ -139,6 +197,8 @@ static void bench2(const int iterations, const bool largeObject, const bool bypa
         }
         if(bypass)
           nursery_bypass(&ns, &semi);
+        index = ns.index;
+        limit = ns.limit;
       }
     }
     obj = new;
@@ -148,31 +208,123 @@ static void bench2(const int iterations, const bool largeObject, const bool bypa
   stats_pprint(&s);
 }
 
-static void bench3(int iterations) {
+static void bench3(const long int iterations, const bool largeObject) {
   Stats s;
   Nursery ns;
   SemiSpace semi;
   hp obj;
+  register hp index;
+  register hp limit;
 
   nursery_init(&ns);
   semi_init(&semi);
+  warmup(&ns, &semi);
   stats_init(&s);
   stats_timer_begin(&s, MutTimer);
 
-  for(int i=0; i<iterations; i++) {
-    if(allocate(&ns, &semi, Succ, (MkZero){}) == NULL) {
+  index = ns.index;
+  limit = ns.limit;
+
+  for(long int i=0; i<iterations; i++) {
+    if(largeObject) {
+      // obj = allocate(&ns, &semi, IntBranch, (MkIntBranch){i, (hp)i, (hp)i});
+      {
+        Header header;
+
+        __builtin_assume(index != NULL);
+        __builtin_assume(limit != NULL);
+
+        if(limit < index+(3+1)) {
+          obj = NULL;
+        } else {
+          obj = index;
+          Object o = (Object)((MkIntBranch){i, (hp)i, (hp)i});
+
+          header.raw = 0;
+          header.data.tag = IntBranch;
+          header.data.prims = 1;
+          header.data.ptrs = 2;
+          *index = header.raw;
+          index++;
+          memcpy(index, &o, 24);
+          index += 3;
+
+          __builtin_assume(obj != NULL);
+        }
+      }
+    } else {
+      // obj = allocate(&ns, &semi, Unit, (MkUnit){});
+      {
+        Header header;
+
+        __builtin_assume(index != NULL);
+        __builtin_assume(limit != NULL);
+
+        if(limit < index+(0+1)) {
+          obj = NULL;
+        } else {
+          obj = index;
+          Object o = (Object)((MkUnit){});
+
+          header.raw = 0;
+          header.data.tag = Unit;
+          header.data.prims = 0;
+          header.data.ptrs = 0;
+          *index = header.raw;
+          index++;
+          memcpy(index, &o, 0);
+          index += 0;
+
+          __builtin_assume(obj != NULL);
+        }
+      }
+    }
+    if(obj == NULL) {
+      ns.index = index;
       stats_timer_begin(&s, Gen0Timer);
       nursery_reset(&ns, &semi, &s);
-
       if(!semi_check(&semi, NURSERY_SIZE)) {
         semi_scavenge(&semi, &s);
       }
+      index = ns.index;
+      limit = ns.limit;
     }
   }
   stats_timer_end(&s);
   semi_close(&semi, &s);
   stats_pprint(&s);
 }
+
+void bench4(int iterations) {
+  Stats s;
+  Nursery ns;
+  SemiSpace semi;
+  hp tree;
+
+  srandom(0xdeadbeef);
+
+  nursery_init(&ns);
+  semi_init(&semi);
+  warmup(&ns, &semi);
+  stats_init(&s);
+  stats_timer_begin(&s, MutTimer);
+
+  tree = bintree_new(&ns, &semi, &s);
+  ss_push(&tree);
+  for(int i=0; i<iterations; i++)
+    tree = bintree_insert(&ns, &semi, &s, tree, random());
+
+  // bintree_print(tree);
+  ss_pop();
+
+  stats_timer_end(&s);
+  semi_close(&semi, &s);
+  stats_pprint(&s);
+}
+
+// static void bench4(int iterations) {
+//
+// }
 
 void print_usage(char *prog) {
   printf("Usage: %s {n}\n", prog);
@@ -181,9 +333,13 @@ void print_usage(char *prog) {
   printf("  n=2b  Allocate 100%% long-lived objects. 1-Child objects + nursery bypass.\n");
   printf("  n=2c  Allocate 100%% long-lived objects. 2-Child objects.\n");
   printf("  n=2d  Allocate 100%% long-lived objects. 2-Child objects + nursery bypass.\n");
-  printf("  n=3   Allocate 0%% long-lived objects.\n");
+  printf("  n=3a   Allocate 0%% long-lived objects. Small objects.\n");
+  printf("  n=3b   Allocate 0%% long-lived objects. Large objects.\n");
+  printf("  n=4   Insert into binary tree.\n");
 }
 
+// OK:  0 1 2 3 4 6
+// BAD: 6 4 3
 void enable_lowlatency() {
   struct sched_param param;
   cpu_set_t set;
@@ -220,8 +376,12 @@ int main(int argc, char* argv[]) {
       bench2(100000000, true, false);
     } else if(strcmp(argv[1], "2d")==0) {
       bench2(100000000, true, true);
-    } else if(strcmp(argv[1], "3")==0) {
-      bench3(1000000000);
+    } else if(strcmp(argv[1], "3a")==0) {
+      bench3(3000000000, false);
+    } else if(strcmp(argv[1], "3b")==0) {
+      bench3(3000000000, true);
+    } else if(strcmp(argv[1], "4")==0) {
+      bench4(3000000);
     } else {
       print_usage(argv[0]);
     }

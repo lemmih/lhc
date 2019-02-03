@@ -9,9 +9,16 @@ typedef struct {
   uint8_t ptrs;
 } ObjectInfo;
 
-enum Tag{Unit, Leaf, Branch, Zero, Succ, TAG_MAX};
+enum Tag
+  { Unit,  Leaf,  Branch, Zero,  Succ,  IntBranch, TAG_MAX};
+static const ObjectInfo InfoTable[] =
+  { {0,0}, {1,0}, {0,2},  {0,0}, {0,1}, {1,2} };
 
-static const ObjectInfo InfoTable[] = { {0,0}, {1,0}, {0,2}, {0,0}, {0,1} };
+typedef struct {
+  word n;
+  hp left;
+  hp right;
+} MkIntBranch;
 
 typedef struct {
 } MkUnit;
@@ -39,6 +46,7 @@ typedef union {
   MkBranch branch;
   MkZero zero;
   MkSucc succ;
+  MkIntBranch intbranch;
 } Object;
 
 #endif

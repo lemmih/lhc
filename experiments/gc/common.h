@@ -1,6 +1,8 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+// #define NDEBUG
+
 #include <stdint.h>
 
 typedef uint64_t word;

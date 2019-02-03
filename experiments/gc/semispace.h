@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "stats.h"
+#include "utils.h"
 #include <stdbool.h>
 #include <assert.h>
 
@@ -38,11 +39,8 @@ typedef struct {
 void semi_init(SemiSpace *semi);
 void semi_close(SemiSpace *semi, Stats*);
 
-// hp semi_bump_grey(SemiSpace *semi, word size);
-// hp semi_bump_black(SemiSpace *semi, word size);
 bool semi_check(SemiSpace *semi, word size);
 
-void semi_evacuate(SemiSpace *semi, hp* objAddr);
 void semi_scavenge(SemiSpace *semi, Stats*);
 void semi_scavenge_concurrent(SemiSpace *semi, Stats *s);
 word semi_size(SemiSpace *semi);
@@ -51,7 +49,9 @@ word semi_size(SemiSpace *semi);
 #define IS_BLACK(semi, header) (header.data.black == semi->black_bit)
 #define IS_GREY(header) (header.data.grey)
 
-static hp semi_bump_black(SemiSpace *semi, word size) {
+#define IS_IN_AREA(area, o) (o >= area.ptr && o <= area.free)
+
+static hp semi_bump_black(SemiSpace *semi, const word size) {
   hp ret;
   assert(semi->black_space.free+size <= area_limit(semi->black_space));
   ret = semi->black_space.free;
@@ -59,15 +59,52 @@ static hp semi_bump_black(SemiSpace *semi, word size) {
   return ret;
 }
 
-static hp semi_bump_grey(SemiSpace *semi, word size) {
+static hp semi_bump_grey(SemiSpace *semi, const word size) {
   hp ret;
   assert(semi->grey_space.free+size <= area_limit(semi->grey_space));
   ret = semi->grey_space.free;
+  if(!ret) abort(); // clang spills something if this is removed. :-/
   semi->grey_space.free += size;
   return ret;
 }
 
 
+inline static void semi_evacuate(SemiSpace *semi, hp* objAddr) {
+  hp obj = *objAddr;
+  Header header;
+
+  header = readHeader(obj);
+  while( header.data.isForwardPtr ) {
+    obj = (hp) ((word)header.forwardPtr & (~1));
+    *objAddr = obj;
+    header = readHeader(obj);
+  }
+  assert( header.data.isForwardPtr == 0 );
+
+  const uint8_t prims = header.data.prims;
+  const uint8_t ptrs = header.data.ptrs;
+  const word obj_size = 1+prims+ptrs;
+
+
+  assert( header.data.gen == 1 );
+  if( !IS_WHITE(semi, header) ) return;
+
+  header.data.grey = true;
+  header.data.black = !semi->black_bit;
+
+  const hp dst = semi_bump_grey(semi, obj_size);
+
+
+  *objAddr = dst;
+  writeIndirection(obj, dst);
+
+  *dst = header.raw;
+  #pragma clang loop unroll_count(1)
+  for(int i=1;i<obj_size;i++) {
+    dst[i] = obj[i];
+  }
+
+}
 
 
 #endif

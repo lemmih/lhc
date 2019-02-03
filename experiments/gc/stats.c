@@ -26,7 +26,7 @@ void stats_pprint(Stats *s) {
   word allocated        = s->allocated*8/1024/1024;
   word nursery_copied   = (s->nursery_copied*8/1024/1024);
   word gen1_copied   = (s->gen1_copied*8/1024/1024);
-  word nursery_survival = (nursery_copied*100) / allocated;
+  word nursery_survival = (nursery_copied*100) / MAX(1,allocated);
 
   /*
                   Mutator     Nursery      Gen 1
@@ -64,13 +64,14 @@ void stats_pprint(Stats *s) {
     , pp_bytes(s->gen1_copied)
     , nursery_survival
     , nursery_copied==0?0:(gen1_copied*100) / nursery_copied
-    , (double)(mut_time*100)/(mut_time+nursery_time)
+    , (double)(mut_time*100)/(MAX(mut_time+nursery_time,1))
     , pp_speed(s->nursery_copied, s->timers[MutTimer] + s->timers[Gen0Timer])
     , pp_time(s->nursery_time_max)
-    , pp_time(s->timers[Gen0Timer]/s->nursery_n_collections)
+    , pp_time(s->timers[Gen0Timer]/(MAX(s->nursery_n_collections,1)))
     , s->gen1_collections
   );
 
+  printf("Total time:         %s\n", pp_time(s->timers[MutTimer]+s->timers[Gen0Timer]+s->timers[Gen1Timer]));
   printf("Misc time:          %s\n", pp_time(s->timers[MiscTimer]));
   printf("Max heap:           %lu MB\n", s->max_heap*8/1024/1024);
   printf("Max residency:      %lu MB (%lu sample(s))\n", s->max_residency*8/1024/1024,s->gen1_collections);

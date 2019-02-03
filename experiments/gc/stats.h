@@ -33,8 +33,6 @@ typedef struct {
 } Stats;
 
 void stats_init(Stats *s);
-// static void stats_nursery_begin();
-// static void stats_nursery_end(Stats *s);
 void stats_pprint(Stats *s);
 
 static uint64_t clock_gettime_nsec(clockid_t clk_id) {
@@ -68,10 +66,10 @@ static char *pp_speed(uint64_t words, uint64_t time) {
   i = (i+1) % 10;
   if(rate < 1024) {
     snprintf(buffer[i], 128, "%4lu KB/s", rate);
-  } if(rate < 1024*1024*10) {
+  } if(rate < 1024*1024*10) { // Less than 10000 MB/s
     snprintf(buffer[i], 128, "%4lu MB/s", rate/1024);
   } else {
-    snprintf(buffer[i], 128, "%4.3f GB/s", (double)rate/1024/1024);
+    snprintf(buffer[i], 128, "%4.1f GB/s", (double)rate/1024/1024);
   }
   return buffer[i];
 }
@@ -94,50 +92,7 @@ static char *pp_bytes(uint64_t words) {
 }
 
 
-#define CLOCK_ID CLOCK_THREAD_CPUTIME_ID
-
-// static void stats_nursery_begin(Stats *s) {
-//   s->nursery_start_time = clock_gettime_nsec(CLOCK_ID);
-//   // s->start_time = clock_gettime_nsec(CLOCK_MONOTONIC_COARSE);
-//   // {
-//   //   struct rusage usage;
-//   //   getrusage(RUSAGE_SELF, &usage);
-//   //   printf("Page faults: %ld -> ", usage.ru_minflt);
-//   // }
-// }
-// static void stats_nursery_end(Stats *s) {
-//   uint64_t end_time = clock_gettime_nsec(CLOCK_ID);
-//   // uint64_t end_time = clock_gettime_nsec(CLOCK_MONOTONIC_COARSE);
-//   uint64_t time = end_time - s->nursery_start_time;
-//   s->nursery_time += time;
-//   if(time > s->nursery_time_max) {
-//     s->nursery_time_max = time;
-//     // printf("New max time: %s\n", pp_time(time));
-//   }
-//
-//   // {
-//   //   struct rusage usage;
-//   //   getrusage(RUSAGE_SELF, &usage);
-//   //   printf("%ld %ld %ld %ld\n", usage.ru_minflt, time, usage.ru_nvcsw, usage.ru_nivcsw);
-//   // }
-//
-// }
-
-// static void stats_gen1_begin(Stats *s) {
-//   s->gen1_start_time = clock_gettime_nsec(CLOCK_ID);
-// }
-// static void stats_gen1_end(Stats *s) {
-//   uint64_t end_time = clock_gettime_nsec(CLOCK_ID);
-//   s->gen1_time += end_time - s->gen1_start_time;
-// }
-//
-// static void stats_misc_begin(Stats *s) {
-//   s->misc_start_time = clock_gettime_nsec(CLOCK_ID);
-// }
-// static void stats_misc_end(Stats *s) {
-//   uint64_t end_time = clock_gettime_nsec(CLOCK_ID);
-//   s->misc_time += end_time - s->misc_start_time;
-// }
+#define CLOCK_ID CLOCK_PROCESS_CPUTIME_ID
 
 static void stats_timer_begin(Stats *s, enum Timer t) {
   uint64_t now = clock_gettime_nsec(CLOCK_ID);
