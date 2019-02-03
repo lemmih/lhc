@@ -10,3 +10,7 @@ Questions:
   Remembered set?
   Finalizers?
   Stable pointers?
+
+
+Performance:
+  Don't touch objects unless you're going to copy them.

@@ -26,9 +26,9 @@ hp bintree_insert(Nursery *ns, SemiSpace *semi, Stats *s, hp tree, word value) {
 
   switch( header.data.tag) {
     case Unit:
-      ss_push(&tree);
-      ss_allocate(ret, ns, semi, s, IntBranch, (MkIntBranch){value, tree, tree});
-      ss_pop();
+      SS_USE(&tree, {
+        ss_allocate(ret, ns, semi, s, IntBranch, (MkIntBranch){value, tree, tree});
+      });
       return ret;
     case IntBranch: {
       MkIntBranch* branch = (MkIntBranch*)readObject(tree);
@@ -37,20 +37,20 @@ hp bintree_insert(Nursery *ns, SemiSpace *semi, Stats *s, hp tree, word value) {
       hp right = branch->right;
       if( n > value ) {
         // Insert to the left.
-        ss_push(&right);
-        hp subtree = bintree_insert(ns, semi, s, left, value);
-        ss_push(&subtree);
-        ss_allocate(ret, ns, semi, s, IntBranch, (MkIntBranch){n, subtree, right});
-        ss_pop();
-        ss_pop();
+        SS_USE(&right, {
+          hp subtree = bintree_insert(ns, semi, s, left, value);
+          SS_USE(&subtree, {
+            ss_allocate(ret, ns, semi, s, IntBranch, (MkIntBranch){n, subtree, right});
+          });
+        });
         return ret;
       } else if( n < value ) {
-        ss_push(&left);
-        hp subtree = bintree_insert(ns, semi, s, right, value);
-        ss_push(&subtree);
-        ss_allocate(ret, ns, semi, s, IntBranch, (MkIntBranch){n, left, subtree});
-        ss_pop();
-        ss_pop();
+        SS_USE(&left, {
+          hp subtree = bintree_insert(ns, semi, s, right, value);
+          SS_USE(&subtree, {
+            ss_allocate(ret, ns, semi, s, IntBranch, (MkIntBranch){n, left, subtree});
+          });
+        });
         return ret;
       } else {
         // Already in tree. Just return.

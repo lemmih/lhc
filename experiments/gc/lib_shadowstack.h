@@ -10,6 +10,8 @@ void ss_push(hp* ref);
 void ss_pop();
 void ss_mark();
 
+#define SS_USE(ref, code) \
+  ss_push(ref); code; ss_pop()
 
 #define _ss_allocate(ret, ns, semi, s, t, prims, ptrs, o, size)     \
   do {                                                              \
