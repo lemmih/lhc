@@ -46,8 +46,8 @@ void semi_scavenge_concurrent(SemiSpace *semi, Stats *s);
 word semi_size(SemiSpace *semi);
 
 #define IS_WHITE(semi, header) (!(IS_BLACK(semi,header) || IS_GREY(header)))
-#define IS_BLACK(semi, header) (header.data.black == semi->black_bit)
-#define IS_GREY(header) (header.data.grey)
+#define IS_BLACK(semi, header) ((header).data.black == (semi)->black_bit)
+#define IS_GREY(header) ((header).data.grey)
 
 #define IS_IN_AREA(area, o) (o >= area.ptr && o <= area.free)
 
@@ -62,8 +62,10 @@ static hp semi_bump_black(SemiSpace *semi, const word size) {
 static hp semi_bump_grey(SemiSpace *semi, const word size) {
   hp ret;
   assert(semi->grey_space.free+size <= area_limit(semi->grey_space));
+  // __builtin_assume(semi->grey_space.free != NULL);
   ret = semi->grey_space.free;
   if(!ret) abort(); // clang spills something if this is removed. :-/
+  // __builtin_assume(ret != NULL);
   semi->grey_space.free += size;
   return ret;
 }
@@ -93,6 +95,7 @@ inline static void semi_evacuate(SemiSpace *semi, hp* objAddr) {
   header.data.black = !semi->black_bit;
 
   const hp dst = semi_bump_grey(semi, obj_size);
+  __builtin_assume(dst != NULL);
 
 
   *objAddr = dst;

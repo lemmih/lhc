@@ -79,6 +79,7 @@ bool semi_check(SemiSpace *semi, word size) {
 // 1. Deallocate white objects.
 // 2. Turn black objects white.
 void semi_swap_colors(SemiSpace *semi, Stats *s) {
+  hp old1, old2;
   assert(semi->grey_space.scavenged == semi->grey_space.free);
 
   // printf("Gen1 GC done. White: %d, Grey: %ld, Black: %ld\n", semi->white_space.size, area_used(semi->grey_space), area_used(semi->black_space));
@@ -97,8 +98,8 @@ void semi_swap_colors(SemiSpace *semi, Stats *s) {
 
 
   semi->black_bit = !semi->black_bit;
-  free(semi->white_space.ptr1);
-  free(semi->white_space.ptr2);
+  old1 = semi->white_space.ptr1;
+  old2 = semi->white_space.ptr2;
   semi->white_space.ptr1 = semi->grey_space.ptr;
   semi->white_space.ptr2 = semi->black_space.ptr;
   semi->white_space.size = area_used(semi->grey_space) + area_used(semi->black_space);
@@ -126,6 +127,8 @@ void semi_swap_colors(SemiSpace *semi, Stats *s) {
   s->gen1_collections++;
 
   stats_timer_begin(s, MiscTimer);
+  free(old1);
+  free(old2);
   touchSpace(semi->black_space.ptr, semi->black_space.size);
   touchSpace(semi->grey_space.ptr, semi->grey_space.size);
   stats_timer_end(s);

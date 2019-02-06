@@ -38,10 +38,9 @@ static void warmup(Nursery *ns, SemiSpace *semi) {
 }
 
 
-static void bench1(const int buckets, const int len, const int iterations) {
+static void bench1(Stats *s, const int buckets, const int len, const int iterations) {
   hp* roots;
   int* counts;
-  Stats s;
   Nursery ns;
   SemiSpace semi;
 
@@ -54,8 +53,7 @@ static void bench1(const int buckets, const int len, const int iterations) {
   assert(roots != NULL);
   assert(counts != NULL);
 
-  stats_init(&s);
-  stats_timer_begin(&s, MutTimer);
+  stats_timer_begin(s, MutTimer);
 
   for(int i=0; i<buckets; i++) {
     hp root = allocate(&ns, &semi, Zero, (MkZero){});
@@ -85,14 +83,14 @@ static void bench1(const int buckets, const int len, const int iterations) {
           //   fflush(stdout);
           // }
 
-          stats_timer_begin(&s, Gen0Timer);
+          stats_timer_begin(s, Gen0Timer);
           for(int n=0;n<buckets;n++) {
             nursery_evacuate(&ns, &semi, &roots[n]);
           }
-          nursery_reset(&ns, &semi, &s);
+          nursery_reset(&ns, &semi, s);
           if(!semi_check(&semi, NURSERY_SIZE)) {
 
-            semi_scavenge(&semi, &s);
+            semi_scavenge(&semi, s);
           }
           continue;
         }
@@ -103,15 +101,13 @@ static void bench1(const int buckets, const int len, const int iterations) {
     }
   }
   // printf("\n");
-  stats_timer_end(&s);
+  stats_timer_end(s);
 
 
-  semi_close(&semi, &s);
-  stats_pprint(&s);
+  semi_close(&semi, s);
 }
 
-static void bench2(const int iterations, const bool largeObject, const bool bypass) {
-  Stats s;
+static void bench2(Stats *s, const int iterations, const bool largeObject, const bool bypass) {
   Nursery ns;
   SemiSpace semi;
   hp obj;
@@ -122,8 +118,7 @@ static void bench2(const int iterations, const bool largeObject, const bool bypa
   semi_init(&semi);
 
   warmup(&ns, &semi);
-  stats_init(&s);
-  stats_timer_begin(&s, MutTimer);
+  stats_timer_begin(s, MutTimer);
 
   obj = allocate(&ns, &semi, Zero, (MkZero){});
   assert(obj!=NULL);
@@ -189,11 +184,11 @@ static void bench2(const int iterations, const bool largeObject, const bool bypa
       }
       if(new==NULL) {
         ns.index = index;
-        stats_timer_begin(&s, Gen0Timer);
+        stats_timer_begin(s, Gen0Timer);
         nursery_evacuate(&ns, &semi, &obj);
-        nursery_reset(&ns, &semi, &s);
+        nursery_reset(&ns, &semi, s);
         if(!semi_check(&semi, NURSERY_SIZE)) {
-          semi_scavenge(&semi, &s);
+          semi_scavenge(&semi, s);
         }
         if(bypass)
           nursery_bypass(&ns, &semi);
@@ -203,13 +198,11 @@ static void bench2(const int iterations, const bool largeObject, const bool bypa
     }
     obj = new;
   }
-  stats_timer_end(&s);
-  semi_close(&semi, &s);
-  stats_pprint(&s);
+  stats_timer_end(s);
+  semi_close(&semi, s);
 }
 
-static void bench3(const long int iterations, const bool largeObject) {
-  Stats s;
+static void bench3(Stats *s, const long int iterations, const bool largeObject) {
   Nursery ns;
   SemiSpace semi;
   hp obj;
@@ -219,8 +212,7 @@ static void bench3(const long int iterations, const bool largeObject) {
   nursery_init(&ns);
   semi_init(&semi);
   warmup(&ns, &semi);
-  stats_init(&s);
-  stats_timer_begin(&s, MutTimer);
+  stats_timer_begin(s, MutTimer);
 
   index = ns.index;
   limit = ns.limit;
@@ -281,22 +273,20 @@ static void bench3(const long int iterations, const bool largeObject) {
     }
     if(obj == NULL) {
       ns.index = index;
-      stats_timer_begin(&s, Gen0Timer);
-      nursery_reset(&ns, &semi, &s);
+      stats_timer_begin(s, Gen0Timer);
+      nursery_reset(&ns, &semi, s);
       if(!semi_check(&semi, NURSERY_SIZE)) {
-        semi_scavenge(&semi, &s);
+        semi_scavenge(&semi, s);
       }
       index = ns.index;
       limit = ns.limit;
     }
   }
-  stats_timer_end(&s);
-  semi_close(&semi, &s);
-  stats_pprint(&s);
+  stats_timer_end(s);
+  semi_close(&semi, s);
 }
 
-void bench4(int iterations) {
-  Stats s;
+void bench4(Stats *s, int iterations) {
   Nursery ns;
   SemiSpace semi;
   hp tree;
@@ -306,20 +296,18 @@ void bench4(int iterations) {
   nursery_init(&ns);
   semi_init(&semi);
   warmup(&ns, &semi);
-  stats_init(&s);
-  stats_timer_begin(&s, MutTimer);
+  stats_timer_begin(s, MutTimer);
 
-  tree = bintree_new(&ns, &semi, &s);
+  tree = bintree_new(&ns, &semi, s);
   ss_push(&tree);
   for(int i=0; i<iterations; i++)
-    tree = bintree_insert(&ns, &semi, &s, tree, random());
+    tree = bintree_insert(&ns, &semi, s, tree, random());
 
   // bintree_print(tree);
   ss_pop();
 
-  stats_timer_end(&s);
-  semi_close(&semi, &s);
-  stats_pprint(&s);
+  stats_timer_end(s);
+  semi_close(&semi, s);
 }
 
 // static void bench4(int iterations) {
@@ -328,6 +316,7 @@ void bench4(int iterations) {
 
 void print_usage(char *prog) {
   printf("Usage: %s {n}\n", prog);
+  printf("  n=0   Run all benchmarks.\n");
   printf("  n=1   Allocate objects where count*duration is constant.\n");
   printf("  n=2a  Allocate 100%% long-lived objects. 1-Child objects.\n");
   printf("  n=2b  Allocate 100%% long-lived objects. 1-Child objects + nursery bypass.\n");
@@ -361,30 +350,40 @@ void enable_lowlatency() {
 }
 
 int main(int argc, char* argv[]) {
+  Stats s;
+  stats_init(&s);
   enable_lowlatency();
 
   if(argc != 2) {
     print_usage(argv[0]);
   } else {
-    if(strcmp(argv[1], "1")==0) {
-      bench1(20, 10000, 100000000);
+    if(strcmp(argv[1], "0")==0) {
+      bench1(&s, 20, 10000, 100000000);
+      bench2(&s, 50000000, false, false);
+      bench2(&s, 50000000, true, false);
+      bench3(&s, 3000000000, false);
+      bench3(&s, 3000000000, true);
+      bench4(&s, 3000000);
+    } else if(strcmp(argv[1], "1")==0) {
+      bench1(&s, 20, 10000, 100000000);
     } else if(strcmp(argv[1], "2a")==0) {
-      bench2(100000000, false, false);
+      bench2(&s, 100000000, false, false);
     } else if(strcmp(argv[1], "2b")==0) {
-      bench2(100000000, false, true);
+      bench2(&s, 100000000, false, true);
     } else if(strcmp(argv[1], "2c")==0) {
-      bench2(100000000, true, false);
+      bench2(&s, 100000000, true, false);
     } else if(strcmp(argv[1], "2d")==0) {
-      bench2(100000000, true, true);
+      bench2(&s, 100000000, true, true);
     } else if(strcmp(argv[1], "3a")==0) {
-      bench3(3000000000, false);
+      bench3(&s, 3000000000, false);
     } else if(strcmp(argv[1], "3b")==0) {
-      bench3(3000000000, true);
+      bench3(&s, 3000000000, true);
     } else if(strcmp(argv[1], "4")==0) {
-      bench4(3000000);
+      bench4(&s, 3000000);
     } else {
       print_usage(argv[0]);
     }
   }
+  stats_pprint(&s);
   return 0;
 }

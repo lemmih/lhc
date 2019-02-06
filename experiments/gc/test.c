@@ -9,160 +9,202 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define TEST(name, code) \
-  /*printf("%s\n", name);*/ code
+#include <criterion/criterion.h>
+// #include <criterion/assert.h>
+#include <signal.h>
 
 
-int main(void) {
-  Stats s;
+Test(static, sizeof_header) {
+  cr_assert(sizeof(Header) == sizeof(word));
+}
+Test(static, sizeof_infotable) {
+  cr_assert(sizeof(InfoTable)/sizeof(ObjectInfo) == TAG_MAX);
+}
+Test(static, intotable_spotcheck) {
+  cr_assert(InfoTable[Leaf].ptrs == 0);
+  cr_assert(InfoTable[Leaf].prims == 1);
+  cr_assert(InfoTable[Branch].ptrs == 2);
+}
+
+
+Test(nursery, new) {
+  Nursery ns;
+  nursery_init(&ns);
+}
+Test(nursery, aroundtrip) {
+  Nursery ns;
+  hp leaf;
+  nursery_init(&ns);
+
+  leaf = allocate(&ns, NULL, Leaf, (MkLeaf){10});
+  cr_assert(readHeader(leaf).data.tag == Leaf);
+  cr_assert(((MkLeaf*)readObject(leaf))->n == 10);
+}
+Test(nursery, overflow) {
+  // Allocation must fail eventually.
+  Nursery ns;
+  int i;
+  nursery_init(&ns);
+
+  for(i=0;i<NURSERY_SIZE*2;i++) {
+    hp leaf = allocate(&ns, NULL, Unit, (MkUnit){});
+    if(!leaf)
+      break;
+  }
+  cr_assert(i==NURSERY_SIZE);
+}
+Test(nursery, allocations) {
+  // No early allocation failure.
+  Nursery ns;
+  nursery_init(&ns);
+
+  for(int i=0;i<NURSERY_SIZE/2;i++) {
+    hp leaf = allocate(&ns, NULL, Unit, (MkUnit){});
+    cr_assert(leaf);
+  }
+}
+Test(nursery, object_mismatch, .signal=SIGABRT) {
+  Nursery ns;
+  nursery_init(&ns);
+
+  allocate(&ns, NULL, Leaf, (MkBranch){NULL,NULL});
+}
+Test(nursery, evacuation) {
+  // Nursery evacuation
   Nursery ns;
   SemiSpace semi;
+  Stats s;
+  hp leaf;
+  nursery_init(&ns);
+  semi_init(&semi);
 
-  stats_init(&s);
-  { // Header must be exactly one word.
-    Header h;
-    assert(sizeof(h)==sizeof(word));
-  }
+  leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
+  cr_assert_not_null(leaf);
+  cr_assert(readHeader(leaf).data.gen == 0); // 0 => nursery
 
-  TEST("Number of tags = InfoTable entries", {
-    assert(sizeof(InfoTable)/sizeof(ObjectInfo) == TAG_MAX);
-  });
+  stats_timer_begin(&s, Gen0Timer);
+  nursery_evacuate(&ns, &semi, &leaf);
+  nursery_reset(&ns, &semi, &s);
 
-  {
-    assert(InfoTable[Leaf].ptrs == 0);
-    assert(InfoTable[Leaf].prims == 1);
-    assert(InfoTable[Branch].ptrs == 2);
-  }
+  cr_assert(readHeader(leaf).data.gen == 1);
+  cr_assert(!nursery_member(&ns, leaf));
+  semi_close(&semi, &s);
+}
 
-  { // Can initialize new nursery.
-    nursery_init(&ns);
-  }
+Test(semispace, shared_object) {
+  // Shared object evacuation
+  Nursery ns;
+  SemiSpace semi;
+  Stats s;
+  hp leaf, branch;
+  nursery_init(&ns);
+  semi_init(&semi);
 
-  { // Allocate/Read round-trip.
-    hp leaf;
-    nursery_init(&ns);
+  leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
+  branch = allocate(&ns, &semi, Branch, (MkBranch){leaf,leaf});
 
-    leaf = allocate(&ns, NULL, Leaf, (MkLeaf){10});
-    assert(readHeader(leaf).data.tag == Leaf);
-    assert(((MkLeaf*)readObject(leaf))->n == 10);
-  }
+  nursery_evacuate(&ns, &semi, &branch);
+  // Check that the leaf object in nursery points forward.
+  cr_assert(readHeader(leaf).data.isForwardPtr == 1);
+  // Update leaf reference and check that the new object isn't a forwarding
+  // pointer.
+  nursery_evacuate(&ns, &semi, &leaf);
+  cr_assert(readHeader(leaf).data.isForwardPtr == 0);
 
-  { // Allocation must fail eventually.
-    int i;
-    nursery_init(&ns);
+  // Check that the leaf node hasn't been duplicated.
+  cr_assert(((MkBranch*)readObject(branch))->left == ((MkBranch*)readObject(branch))->right);
 
-    for(i=0;i<NURSERY_SIZE*2;i++) {
-      hp leaf = allocate(&ns, NULL, Unit, (MkUnit){});
-      if(!leaf)
-        break;
-    }
-    assert(i==NURSERY_SIZE);
-  }
+  semi_close(&semi, &s);
+}
+Test(semispace, gc) {
+  // SemiSpace GC check
+  Nursery ns;
+  SemiSpace semi;
+  Stats s;
+  hp leaf;
+  nursery_init(&ns);
+  semi_init(&semi);
 
-  { // No early allocation failure.
-    nursery_init(&ns);
+  leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
+  cr_assert(readHeader(leaf).data.gen == 0);
 
-    for(int i=0;i<NURSERY_SIZE/2;i++) {
-      hp leaf = allocate(&ns, NULL, Unit, (MkUnit){});
-      assert(leaf);
-    }
-  }
+  nursery_evacuate(&ns, &semi, &leaf);
+  cr_assert(readHeader(leaf).data.gen == 1);
+  cr_assert(readHeader(leaf).data.grey == 0);
+  cr_assert(readHeader(leaf).data.black == semi.black_bit);
+  cr_assert(semi_size(&semi) == 2);
 
-  { // Nursery evacuation
-    hp leaf;
-    nursery_init(&ns);
-    semi_init(&semi);
+  semi_scavenge(&semi, &s);
+  cr_assert(readHeader(leaf).data.gen == 1);
+  cr_assert(readHeader(leaf).data.grey == 0);
+  cr_assert(readHeader(leaf).data.black == !semi.black_bit);
+  cr_assert(semi_size(&semi) == 2);
 
-    leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
-    assert(leaf != NULL);
-    assert(readHeader(leaf).data.gen == 0); // 0 => nursery
+  semi_evacuate(&semi, &leaf);
+  cr_assert(readHeader(leaf).data.gen == 1);
+  cr_assert(readHeader(leaf).data.grey == 1);
+  cr_assert(readHeader(leaf).data.black == !semi.black_bit);
+  cr_assert(semi_size(&semi) == 4);
 
-    stats_timer_begin(&s, Gen0Timer);
-    nursery_evacuate(&ns, &semi, &leaf);
-    nursery_reset(&ns, &semi, &s);
+  semi_scavenge(&semi, &s);
+  cr_assert(readHeader(leaf).data.gen == 1);
+  cr_assert(readHeader(leaf).data.grey == 0);
+  cr_assert(readHeader(leaf).data.black == !semi.black_bit);
+  cr_assert(semi_size(&semi) == 2);
 
-    assert(readHeader(leaf).data.gen == 1);
-    assert(!nursery_member(&ns, leaf));
-    semi_close(&semi, &s);
-  }
+  semi_close(&semi, &s);
+}
+Test(semispace, bypass) {
+  Nursery ns;
+  SemiSpace semi;
+  Stats s;
+  hp leaf, prevAddr;
+  nursery_init(&ns);
+  semi_init(&semi);
 
-  { // Shared object evacuation
-    hp leaf, branch;
-    nursery_init(&ns);
-    semi_init(&semi);
+  nursery_bypass(&ns, &semi);
 
-    leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
-    branch = allocate(&ns, &semi, Branch, (MkBranch){leaf,leaf});
+  leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
+  prevAddr = leaf;
+  cr_assert(readHeader(leaf).data.gen == 0);
 
-    nursery_evacuate(&ns, &semi, &branch);
-    // Check that the leaf object in nursery points forward.
-    assert(readHeader(leaf).data.isForwardPtr == 1);
-    // Update leaf reference and check that the new object isn't a forwarding
-    // pointer.
-    nursery_evacuate(&ns, &semi, &leaf);
-    assert(readHeader(leaf).data.isForwardPtr == 0);
+  nursery_evacuate(&ns, &semi, &leaf);
+  cr_assert(readHeader(leaf).data.gen == 1);
+  cr_assert(readHeader(leaf).data.grey == 0);
+  cr_assert(readHeader(leaf).data.black == semi.black_bit);
+  cr_assert(leaf == prevAddr);
 
-    // Check that the leaf node hasn't been duplicated.
-    assert(((MkBranch*)readObject(branch))->left == ((MkBranch*)readObject(branch))->right);
+  semi_close(&semi, &s);
+}
+Test(semispace, black_allocation) {
+  // Newly objects in gen1 /must/ be black.
+  // Test:
+  //  1. Allocate object, move it to semi, run GC to turn the object white.
+  //  2. Allocate pointer to previous object.
+  //  3. Move it to semi.
+  //  4. Read pointer to make sure it points to a non-white object.
+  Nursery ns;
+  SemiSpace semi;
+  Stats s;
+  hp zero, succ;
 
-    semi_close(&semi, &s);
-  }
+  nursery_init(&ns);
+  semi_init(&semi);
 
-  { // SemiSpace GC check
-    hp leaf;
-    nursery_init(&ns);
-    semi_init(&semi);
+  zero = allocate(&ns, &semi, Zero, (MkZero){});
+  nursery_evacuate(&ns, &semi, &zero);
+  cr_assert(readHeader(zero).data.gen == 1);
+  cr_assert(IS_BLACK(&semi, readHeader(zero)));
 
-    leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
-    assert(readHeader(leaf).data.gen == 0);
+  semi_scavenge(&semi, &s);
+  cr_assert(IS_WHITE(&semi, readHeader(zero)));
 
-    nursery_evacuate(&ns, &semi, &leaf);
-    assert(readHeader(leaf).data.gen == 1);
-    assert(readHeader(leaf).data.grey == 0);
-    assert(readHeader(leaf).data.black == semi.black_bit);
-    assert(semi_size(&semi) == 2);
+  succ = allocate(&ns, &semi, Succ, (MkSucc){zero});
+  nursery_evacuate(&ns, &semi, &succ);
+  cr_assert(readHeader(succ).data.gen == 1);
+  cr_assert(IS_BLACK(&semi, readHeader(succ)));
 
-    semi_scavenge(&semi, &s);
-    assert(readHeader(leaf).data.gen == 1);
-    assert(readHeader(leaf).data.grey == 0);
-    assert(readHeader(leaf).data.black == !semi.black_bit);
-    assert(semi_size(&semi) == 2);
-
-    semi_evacuate(&semi, &leaf);
-    assert(readHeader(leaf).data.gen == 1);
-    assert(readHeader(leaf).data.grey == 1);
-    assert(readHeader(leaf).data.black == !semi.black_bit);
-    assert(semi_size(&semi) == 4);
-
-    semi_scavenge(&semi, &s);
-    assert(readHeader(leaf).data.gen == 1);
-    assert(readHeader(leaf).data.grey == 0);
-    assert(readHeader(leaf).data.black == !semi.black_bit);
-    assert(semi_size(&semi) == 2);
-
-    semi_close(&semi, &s);
-  }
-
-  {
-    hp leaf, prevAddr;
-    nursery_init(&ns);
-    semi_init(&semi);
-
-    nursery_bypass(&ns, &semi);
-
-    leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
-    prevAddr = leaf;
-    assert(readHeader(leaf).data.gen == 0);
-
-    nursery_evacuate(&ns, &semi, &leaf);
-    assert(readHeader(leaf).data.gen == 1);
-    assert(readHeader(leaf).data.grey == 0);
-    assert(readHeader(leaf).data.black == semi.black_bit);
-    assert(leaf == prevAddr);
-
-    semi_close(&semi, &s);
-  }
-
-  printf("All OK.\n");
-  return 0;
+  zero = ((MkSucc*)readObject(succ))->next;
+  cr_assert(readHeader(zero).data.gen == 1);
+  cr_assert(!IS_WHITE(&semi, readHeader(zero)));
 }

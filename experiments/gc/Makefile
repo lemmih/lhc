@@ -7,11 +7,20 @@ SHARED=stats.o header.o nursery.o utils.o objects.o semispace.o \
 %.o: %.c $(DEPS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+%.s: %.c $(DEPS)
+	$(CC) $(CFLAGS) -S $<
+
+%.ll: %.c $(DEPS)
+	$(CC) $(CFLAGS) -S -emit-llvm $<
+
 bench: benchmark.o $(SHARED)
 	$(CC) -o bench benchmark.o $(SHARED)
 
-test: test.c $(DEPS) $(SHARED:.o=.c)
-	$(CC) -o test test.c $(SHARED:.o=.c)
+test: FORCE
+	@$(CC) -lcriterion -o test test.c $(SHARED:.o=.c)
+	@./test --tap=tmp 2> /dev/null; cat tmp; rm tmp
+
+FORCE:
 
 clean:
 	rm -f ./*.o ./bench ./test

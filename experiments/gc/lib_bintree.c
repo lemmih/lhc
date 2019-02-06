@@ -58,6 +58,7 @@ hp bintree_insert(Nursery *ns, SemiSpace *semi, Stats *s, hp tree, word value) {
       }
     }
     default:
+      printf("Invalid tag: %d\n", header.data.tag);
       abort();
   }
 }

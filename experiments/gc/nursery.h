@@ -13,7 +13,6 @@
 #include <assert.h>
 #include <stdbool.h>
 
-
 #define NURSERY_SIZE (1024*512/sizeof(word))
 // #define NURSERY_SIZE (1024*1024/sizeof(word))
 

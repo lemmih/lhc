@@ -27,6 +27,7 @@ void stats_pprint(Stats *s) {
   word nursery_copied   = (s->nursery_copied*8/1024/1024);
   word gen1_copied   = (s->gen1_copied*8/1024/1024);
   word nursery_survival = (nursery_copied*100) / MAX(1,allocated);
+  word gen1_survival = nursery_copied==0?0:(gen1_copied*100) / nursery_copied;
 
   /*
                   Mutator     Nursery      Gen 1
@@ -48,7 +49,7 @@ void stats_pprint(Stats *s) {
     "Rate:         %-15s%-15s%s\n"
     "Written:      %-15s%-15s%s\n"
     "Survival:                     %3lu%%           %3lu%%\n"
-    "Productivity: %4.1f%%          %s\n"
+    "Productivity: %3.0f%%           %-15s%s\n"
     "\n"
     "Pauses:       max: %s, avg: %s\n"
     "Collections:                                %4lu\n"
@@ -66,6 +67,7 @@ void stats_pprint(Stats *s) {
     , nursery_copied==0?0:(gen1_copied*100) / nursery_copied
     , (double)(mut_time*100)/(MAX(mut_time+nursery_time,1))
     , pp_speed(s->nursery_copied, s->timers[MutTimer] + s->timers[Gen0Timer])
+    , pp_speed(gen1_survival?s->gen1_copied/gen1_survival*100:0,s->timers[Gen1Timer])
     , pp_time(s->nursery_time_max)
     , pp_time(s->timers[Gen0Timer]/(MAX(s->nursery_n_collections,1)))
     , s->gen1_collections
