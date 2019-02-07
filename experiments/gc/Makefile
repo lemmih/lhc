@@ -18,7 +18,7 @@ bench: benchmark.o $(SHARED)
 
 test: FORCE
 	@$(CC) -lcriterion -o test test.c $(SHARED:.o=.c)
-	@./test --tap=tmp 2> /dev/null; cat tmp; rm tmp
+	@./test --tap=tmp 2> /dev/null; cat tmp; rm -f ./tmp
 
 FORCE:
 

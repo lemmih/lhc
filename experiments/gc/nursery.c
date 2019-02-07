@@ -12,26 +12,19 @@
 #include <assert.h>
 #include <stdbool.h>
 
-static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr);
+inline static void nursery_evacuate_one(Nursery *ns, SemiSpace *semi, hp* objAddr);
+static hp nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr, hp);
 static void nursery_evacuate_noroots(Nursery *ns, SemiSpace *semi, hp* objAddr);
 static void nursery_evacuate_bypass(Nursery *ns, SemiSpace *semi, hp* objAddr);
 static void nursery_evacuate_plain_stack(Nursery *ns, SemiSpace *semi, hp* stack[], int idx);
 
 
-// Depth-first evacuation of objects from nursery to semi-space.
-// Semi-space is garanteed to have enough space. No need to check.
-// Objects from nursery are moved to black area and immediately
-// scavenged. Reachable white objects from semi-space are evacuated
-// to grey space and not scavenged.
-void nursery_evacuate(Nursery *ns, SemiSpace *semi, hp* objAddr) {
-  if(ns->bypass) {
-    return nursery_evacuate_bypass(ns, semi, objAddr);
-  } else {
-    return nursery_evacuate_plain(ns, semi, objAddr);
-  }
+void nursery_begin(Nursery *ns, SemiSpace *semi, Stats *s) {
+  ns->scavenged = semi->black_space.free;
+  stats_timer_begin(s, Gen0Timer);
 }
 
-static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr) {
+inline static void nursery_evacuate_one_copy(Nursery *ns, SemiSpace *semi, hp* objAddr) {
   hp obj = *objAddr;
 
   if(!nursery_member(ns, obj)) {
@@ -64,7 +57,195 @@ static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr) {
       const hp dst = semi_bump_black(semi, obj_size);
       header.data.black = semi->black_bit;
       header.data.gen = 1;
-      ns->evacuated += obj_size;
+
+      *objAddr = dst;
+      writeIndirection(obj, dst);
+
+      *dst = header.raw;
+      #pragma clang loop unroll_count(1)
+      for(int i=1;i<obj_size;i++) {
+        dst[i] = obj[i];
+      }
+      return;
+    }
+    case 1:
+      assert( IS_WHITE(semi, header) );
+
+      const hp dst = semi_bump_grey(semi, obj_size);
+      header.data.grey = true;
+      header.data.black = !semi->black_bit;
+
+      *objAddr = dst;
+      writeIndirection(obj, dst);
+
+      *dst = header.raw;
+      #pragma clang loop unroll_count(1)
+      for(int i=1;i<obj_size;i++) {
+        dst[i] = obj[i];
+      }
+
+      return;
+    default:
+      __builtin_unreachable();
+      // abort();
+  }
+}
+
+// Faster with breadth-first:
+// 2c
+//   2c has huge number of branches.
+// Faster with depth-first:
+// 1 2a 4
+
+// #define BFS
+
+void nursery_scavenge(Nursery *ns, SemiSpace *semi) {
+  Header header;
+  #ifndef BFS
+  ns->evacuated += semi->black_space.free - ns->scavenged;
+  return;
+  #endif
+  hp start=ns->scavenged, scavenged = ns->scavenged;
+  word evacuated=0;
+  while(scavenged < semi->black_space.free) {
+    header = readHeader(scavenged);
+
+    const uint8_t prims = header.data.prims;
+    const uint8_t ptrs = header.data.ptrs;
+    scavenged += 1 + prims;
+    for(int i=0;i<ptrs;i++) {
+      nursery_evacuate_one_copy(ns, semi, (hp*) scavenged);
+      scavenged++;
+    }
+  }
+  ns->evacuated += scavenged - start;
+  ns->scavenged = NULL;
+}
+
+// static hp black_free;
+
+// Depth-first evacuation of objects from nursery to semi-space.
+// Semi-space is garanteed to have enough space. No need to check.
+// Objects from nursery are moved to black area and immediately
+// scavenged. Reachable white objects from semi-space are evacuated
+// to grey space and not scavenged.
+void nursery_evacuate(Nursery *ns, SemiSpace *semi, hp* objAddr) {
+  #ifdef BFS
+  return nursery_evacuate_one(ns, semi, objAddr);
+  #else
+  semi->black_space.free = nursery_evacuate_plain(ns, semi, objAddr,semi->black_space.free);
+  #endif
+  // if(ns->bypass) {
+  //   return nursery_evacuate_bypass(ns, semi, objAddr);
+  // } else {
+
+  // }
+}
+
+inline static void nursery_evacuate_one(Nursery *ns, SemiSpace *semi, hp* objAddr) {
+  hp obj = *objAddr;
+
+  if(!nursery_member(ns, obj)) {
+    if(IS_IN_AREA(semi->black_space, obj) || IS_IN_AREA(semi->grey_space, obj)) {
+      return;
+    }
+  }
+
+  Header header = readHeader(obj);
+  while( header.data.isForwardPtr ) {
+    obj = (hp) ((word)header.forwardPtr & (~1));
+    *objAddr = obj;
+    if(!nursery_member(ns, obj)) {
+      if(IS_IN_AREA(semi->black_space, obj) || IS_IN_AREA(semi->grey_space, obj)) {
+        return;
+      }
+    }
+    header = readHeader(obj);
+  }
+  assert( header.data.isForwardPtr == 0);
+
+  const uint8_t prims = header.data.prims;
+  const uint8_t ptrs = header.data.ptrs;
+  assert(prims == InfoTable[header.data.tag].prims);
+  assert(ptrs == InfoTable[header.data.tag].ptrs);
+  const word obj_size = 1+prims+ptrs;
+
+  switch( header.data.gen ) {
+    case 0: {
+      const hp dst = semi_bump_black(semi, obj_size);
+      header.data.black = semi->black_bit;
+      header.data.gen = 1;
+
+      *objAddr = dst;
+      writeIndirection(obj, dst);
+
+      *dst = header.raw;
+      #pragma clang loop unroll_count(1)
+      for(int i=1;i<obj_size;i++) {
+        dst[i] = obj[i];
+      }
+
+      return;
+    }
+    case 1:
+      assert( IS_WHITE(semi, header) );
+
+      const hp dst = semi_bump_grey(semi, obj_size);
+      header.data.grey = true;
+      header.data.black = !semi->black_bit;
+
+      *objAddr = dst;
+      writeIndirection(obj, dst);
+
+      *dst = header.raw;
+      #pragma clang loop unroll_count(1)
+      for(int i=1;i<obj_size;i++) {
+        dst[i] = obj[i];
+      }
+      return;
+    default:
+      __builtin_unreachable();
+      // abort();
+  }
+}
+
+static hp nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr, hp black_free) {
+  hp obj = *objAddr;
+
+  if(!nursery_member(ns, obj)) {
+    if((obj >= semi->black_space.ptr && obj <= black_free) || IS_IN_AREA(semi->grey_space, obj)) {
+    // if(IS_IN_AREA(semi->black_space, obj) || IS_IN_AREA(semi->grey_space, obj)) {
+      return black_free;
+    }
+  }
+
+  Header header = readHeader(obj);
+  while( header.data.isForwardPtr ) {
+    obj = (hp) ((word)header.forwardPtr & (~1));
+    *objAddr = obj;
+    if(!nursery_member(ns, obj)) {
+      // if(IS_IN_AREA(semi->black_space, obj) || IS_IN_AREA(semi->grey_space, obj)) {
+      if((obj >= semi->black_space.ptr && obj <= black_free) || IS_IN_AREA(semi->grey_space, obj)) {
+        return black_free;
+      }
+    }
+    header = readHeader(obj);
+  }
+  assert( header.data.isForwardPtr == 0);
+
+  const uint8_t prims = header.data.prims;
+  const uint8_t ptrs = header.data.ptrs;
+  assert(prims == InfoTable[header.data.tag].prims);
+  assert(ptrs == InfoTable[header.data.tag].ptrs);
+  const word obj_size = 1+prims+ptrs;
+
+  switch( header.data.gen ) {
+    case 0: {
+      // const hp dst = semi_bump_black(semi, obj_size);
+      const hp dst = black_free;
+      black_free += obj_size;
+      header.data.black = semi->black_bit;
+      header.data.gen = 1;
 
       *objAddr = dst;
       writeIndirection(obj, dst);
@@ -76,27 +257,23 @@ static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr) {
       }
 
       switch(ptrs) {
-        case 0: return;
-        case 1: return nursery_evacuate_plain(ns, semi, (hp*) dst+1+prims);
+        case 0: return black_free;
+        case 1: return nursery_evacuate_plain(ns, semi, (hp*) dst+1+prims, black_free);
         case 2:
           objAddr = (hp*) dst+1+prims+1;
-          nursery_evacuate_plain(ns, semi, (hp*) dst+1+prims);
-          return nursery_evacuate_plain(ns, semi, objAddr);
+          black_free = nursery_evacuate_plain(ns, semi, (hp*) dst+1+prims, black_free);
+          return nursery_evacuate_plain(ns, semi, objAddr, black_free);
         default:
           for(int i=0;i<ptrs;i++)
-            nursery_evacuate_plain(ns, semi, (hp*) dst+1+prims+i);
-          return;
+            black_free = nursery_evacuate_plain(ns, semi, (hp*) dst+1+prims+i, black_free);
+          return black_free;
       }}
     case 1:
       assert( IS_WHITE(semi, header) );
 
-      // if( !IS_WHITE(semi, header)) return;
-
       const hp dst = semi_bump_grey(semi, obj_size);
       header.data.grey = true;
       header.data.black = !semi->black_bit;
-
-      // ns->roots += obj_size;
 
       *objAddr = dst;
       writeIndirection(obj, dst);
@@ -106,7 +283,7 @@ static void nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr) {
       for(int i=1;i<obj_size;i++) {
         dst[i] = obj[i];
       }
-      return;
+      return black_free;
     default:
       __builtin_unreachable();
       // abort();

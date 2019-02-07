@@ -22,6 +22,7 @@ typedef struct {
   word evacuated;
   bool bypass;
   unsigned int roots;
+  hp scavenged;
   word heap[NURSERY_SIZE];
 } Nursery;
 
@@ -41,10 +42,12 @@ static void nursery_init(Nursery *ns) {
 #define allocate(ns, semi, tag, ...) _allocate(ns, semi, tag, InfoTable[tag].prims, InfoTable[tag].ptrs, ((Object)(__VA_ARGS__)), sizeof((__VA_ARGS__)))
 // hp _allocate(Nursery *ns, enum Tag t, Object o, unsigned long size);
 
+void nursery_begin(Nursery *ns, SemiSpace *semi, Stats *s);
 void nursery_evacuate(Nursery *ns, SemiSpace *semi, hp* objAddr);
 // void nursery_reset(Nursery *ns, SemiSpace *semi, Stats *);
 void nursery_bypass(Nursery *ns, SemiSpace *semi);
 bool nursery_member(Nursery *ns, hp obj);
+void nursery_scavenge(Nursery *ns, SemiSpace *semi);
 
 static hp _allocate(Nursery *ns, SemiSpace *semi, enum Tag t, uint8_t prims, uint8_t ptrs, Object o, unsigned long size) {
   Header header;
@@ -75,8 +78,10 @@ static hp _allocate(Nursery *ns, SemiSpace *semi, enum Tag t, uint8_t prims, uin
   // }
   return ret;
 }
-static void nursery_reset(Nursery *ns, SemiSpace *semi, Stats *s) {
+static void nursery_end(Nursery *ns, SemiSpace *semi, Stats *s) {
   // printf("NS: %u %u %u%%\n", ns->evacuated, ns->roots, ns->roots*100/ns->evacuated);
+
+  nursery_scavenge(ns, semi);
 
   s->nursery_n_collections++;
   s->allocated += NURSERY_SIZE - (ns->limit - ns->index);
@@ -91,7 +96,7 @@ static void nursery_reset(Nursery *ns, SemiSpace *semi, Stats *s) {
 
   stats_timer_end(s);
 
-  semi_scavenge_concurrent(semi, s);
+  // semi_scavenge_concurrent(semi, s);
 
 }
 

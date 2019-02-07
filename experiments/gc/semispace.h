@@ -64,7 +64,7 @@ static hp semi_bump_grey(SemiSpace *semi, const word size) {
   assert(semi->grey_space.free+size <= area_limit(semi->grey_space));
   // __builtin_assume(semi->grey_space.free != NULL);
   ret = semi->grey_space.free;
-  if(!ret) abort(); // clang spills something if this is removed. :-/
+  // if(!ret) abort(); // clang spills something if this is removed. :-/
   // __builtin_assume(ret != NULL);
   semi->grey_space.free += size;
   return ret;

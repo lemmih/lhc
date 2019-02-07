@@ -26,9 +26,9 @@ static void warmup(Nursery *ns, SemiSpace *semi) {
     new = allocate(ns, semi, Branch, (MkBranch){obj, obj});
     if(new==NULL) {
       // printf("Nursery full\n");
-      stats_timer_begin(&s, Gen0Timer);
+      nursery_begin(ns, semi, &s);
       nursery_evacuate(ns, semi, &obj);
-      nursery_reset(ns, semi, &s);
+      nursery_end(ns, semi, &s);
       semi_scavenge(semi, &s); // Turn black objects white.
       semi_scavenge(semi, &s); // Clear white objects.
       break;
@@ -83,13 +83,13 @@ static void bench1(Stats *s, const int buckets, const int len, const int iterati
           //   fflush(stdout);
           // }
 
-          stats_timer_begin(s, Gen0Timer);
+          nursery_begin(&ns, &semi, s);
           for(int n=0;n<buckets;n++) {
             nursery_evacuate(&ns, &semi, &roots[n]);
           }
-          nursery_reset(&ns, &semi, s);
+          nursery_end(&ns, &semi, s);
+          semi_scavenge_concurrent(&semi, s);
           if(!semi_check(&semi, NURSERY_SIZE)) {
-
             semi_scavenge(&semi, s);
           }
           continue;
@@ -129,7 +129,7 @@ static void bench2(Stats *s, const int iterations, const bool largeObject, const
   for(int i=0; i<iterations; i++) {
     hp new = NULL;
     while(new==NULL) {
-      if(largeObject && 0) {
+      if(largeObject) {
         // new = allocate(&ns, &semi, Branch, (MkBranch){obj, obj});
         {
           Header header;
@@ -152,7 +152,7 @@ static void bench2(Stats *s, const int iterations, const bool largeObject, const
             memcpy(index, &o, 16);
             index += 2;
 
-            __builtin_assume(obj != NULL);
+            __builtin_assume(new != NULL);
           }
         }
       } else {
@@ -178,15 +178,16 @@ static void bench2(Stats *s, const int iterations, const bool largeObject, const
             memcpy(index, &o, 8);
             index += 1;
 
-            __builtin_assume(obj != NULL);
+            __builtin_assume(new != NULL);
           }
         }
       }
       if(new==NULL) {
         ns.index = index;
-        stats_timer_begin(s, Gen0Timer);
+        nursery_begin(&ns, &semi, s);
         nursery_evacuate(&ns, &semi, &obj);
-        nursery_reset(&ns, &semi, s);
+        nursery_end(&ns, &semi, s);
+        semi_scavenge_concurrent(&semi, s);
         if(!semi_check(&semi, NURSERY_SIZE)) {
           semi_scavenge(&semi, s);
         }
@@ -273,8 +274,9 @@ static void bench3(Stats *s, const long int iterations, const bool largeObject) 
     }
     if(obj == NULL) {
       ns.index = index;
-      stats_timer_begin(s, Gen0Timer);
-      nursery_reset(&ns, &semi, s);
+      nursery_begin(&ns, &semi, s);
+      nursery_end(&ns, &semi, s);
+      semi_scavenge_concurrent(&semi, s);
       if(!semi_check(&semi, NURSERY_SIZE)) {
         semi_scavenge(&semi, s);
       }
@@ -367,13 +369,13 @@ int main(int argc, char* argv[]) {
     } else if(strcmp(argv[1], "1")==0) {
       bench1(&s, 20, 10000, 100000000);
     } else if(strcmp(argv[1], "2a")==0) {
-      bench2(&s, 100000000, false, false);
+      bench2(&s, 50000000, false, false);
     } else if(strcmp(argv[1], "2b")==0) {
-      bench2(&s, 100000000, false, true);
+      bench2(&s, 50000000, false, true);
     } else if(strcmp(argv[1], "2c")==0) {
-      bench2(&s, 100000000, true, false);
+      bench2(&s, 50000000, true, false);
     } else if(strcmp(argv[1], "2d")==0) {
-      bench2(&s, 100000000, true, true);
+      bench2(&s, 50000000, true, true);
     } else if(strcmp(argv[1], "3a")==0) {
       bench3(&s, 3000000000, false);
     } else if(strcmp(argv[1], "3b")==0) {

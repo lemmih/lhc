@@ -18,9 +18,10 @@ void ss_mark();
     do {                                                            \
       ret = _allocate(ns, semi, t, prims, ptrs, o, size);           \
       if(ret==NULL) {                                               \
-        stats_timer_begin(s, Gen0Timer);                            \
+        nursery_begin(ns, semi, s);                                 \
         ss_mark(ns, semi);                                          \
-        nursery_reset(ns, semi, s);                                 \
+        nursery_end(ns, semi, s);                                   \
+        semi_scavenge_concurrent(semi, s);                          \
         if(!semi_check(semi, NURSERY_SIZE)) {                       \
           semi_scavenge(semi, s);                                   \
         }                                                           \
