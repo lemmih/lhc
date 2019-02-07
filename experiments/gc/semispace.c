@@ -162,29 +162,32 @@ void semi_scavenge_concurrent(SemiSpace *semi, Stats *s) {
 
   // return;
   if(scavengedWords * semi->factor < area_used(semi->black_space)) {
-    word work = area_used(semi->black_space) - scavengedWords * semi->factor;
-    word* grey_scavenged = semi->grey_space.scavenged;
-    // printf("Concurrent Scavenge: %lu %lu %lu\n", scavengedWords,area_used(semi->black_space),area_used(semi->grey_space));
+    const word limit = area_used(semi->black_space) - scavengedWords * semi->factor;
+    hp grey = semi->grey_space.free;
+    unsigned int black_bit = semi->black_bit;
+    word work = 0;
+    hp grey_scavenged = semi->grey_space.scavenged;
     stats_timer_begin(s, Gen1Timer);
-    while( work && grey_scavenged<semi->grey_space.free) {
+    while( work < limit && grey_scavenged<grey) {
+      bool temporal = true; // (grey-grey_scavenged)*8/1024 < 6*1024;
       Header header = readHeader(grey_scavenged);
       assert(header.data.grey == true);
       header.data.grey = false;
-      header.data.black = semi->black_bit;
+      header.data.black = black_bit;
       *grey_scavenged = header.raw;
 
       const uint8_t prims = header.data.prims;
       const uint8_t ptrs = header.data.ptrs;
-      if(work < 1+prims+ptrs) work = 0;
-      else work -= 1+prims+ptrs;
+      work += 1 + prims + ptrs;
       grey_scavenged += 1 + prims;
       for(int i=0;i<ptrs;i++) {
-        semi_evacuate(semi, (hp*) grey_scavenged);
+        grey = semi_evacuate_ret((hp*) grey_scavenged, black_bit, temporal, grey);
         grey_scavenged++;
       }
     }
     semi->grey_space.scavenged = grey_scavenged;
-    if(work) {
+    semi->grey_space.free = grey;
+    if(grey_scavenged == semi->grey_space.free) {
       semi_swap_colors(semi, s);
     }
     stats_timer_end(s);

@@ -134,9 +134,6 @@ static void bench2(Stats *s, const int iterations, const bool largeObject, const
         {
           Header header;
 
-          __builtin_assume(index != NULL);
-          __builtin_assume(limit != NULL);
-
           if(limit < index+(2+1)) {
             new = NULL;
           } else {
@@ -151,17 +148,12 @@ static void bench2(Stats *s, const int iterations, const bool largeObject, const
             index++;
             memcpy(index, &o, 16);
             index += 2;
-
-            __builtin_assume(new != NULL);
           }
         }
       } else {
         // new = allocate(&ns, &semi, Succ, (MkSucc){obj});
         {
           Header header;
-
-          __builtin_assume(index != NULL);
-          __builtin_assume(limit != NULL);
 
           if(limit < index+(1+1)) {
             new = NULL;
@@ -177,8 +169,6 @@ static void bench2(Stats *s, const int iterations, const bool largeObject, const
             index++;
             memcpy(index, &o, 8);
             index += 1;
-
-            __builtin_assume(new != NULL);
           }
         }
       }
@@ -203,7 +193,7 @@ static void bench2(Stats *s, const int iterations, const bool largeObject, const
   semi_close(&semi, s);
 }
 
-static void bench3(Stats *s, const long int iterations, const bool largeObject) {
+static void bench3(Stats *s, const long int iterations, const int objType) {
   Nursery ns;
   SemiSpace semi;
   hp obj;
@@ -219,15 +209,32 @@ static void bench3(Stats *s, const long int iterations, const bool largeObject) 
   limit = ns.limit;
 
   for(long int i=0; i<iterations; i++) {
-    if(largeObject) {
+    if(objType==2) {
+      // obj = allocate(&ns, &semi, IntBranch, (MkIntBranch){0, (hp)0, (hp)0});
+      {
+        Header header;
+        if(index+2*(3+1) >= limit) {
+          obj = NULL;
+        } else {
+          obj = index;
+
+          header.raw = 0;
+          header.data.tag = IntBranch;
+          header.data.prims = 1;
+          header.data.ptrs = 2;
+          *index = header.raw;
+          index++;
+          index[0] = 0xDEADBEEF;
+          index[1] = 0xBEEF;
+          index[2] = 0xDEAD;
+          index += 3;
+        }
+      }
+    } else if(objType==1) {
       // obj = allocate(&ns, &semi, IntBranch, (MkIntBranch){i, (hp)i, (hp)i});
       {
         Header header;
-
-        __builtin_assume(index != NULL);
-        __builtin_assume(limit != NULL);
-
-        if(limit < index+(3+1)) {
+        if(index+(3+1) >= limit) {
           obj = NULL;
         } else {
           obj = index;
@@ -241,17 +248,12 @@ static void bench3(Stats *s, const long int iterations, const bool largeObject) 
           index++;
           memcpy(index, &o, 24);
           index += 3;
-
-          __builtin_assume(obj != NULL);
         }
       }
-    } else {
+    } else if(objType==0) {
       // obj = allocate(&ns, &semi, Unit, (MkUnit){});
       {
         Header header;
-
-        __builtin_assume(index != NULL);
-        __builtin_assume(limit != NULL);
 
         if(limit < index+(0+1)) {
           obj = NULL;
@@ -267,8 +269,6 @@ static void bench3(Stats *s, const long int iterations, const bool largeObject) 
           index++;
           memcpy(index, &o, 0);
           index += 0;
-
-          __builtin_assume(obj != NULL);
         }
       }
     }
@@ -327,6 +327,7 @@ void print_usage(char *prog) {
   printf("  n=2d  Allocate 100%% long-lived objects. 2-Child objects + nursery bypass.\n");
   printf("  n=3a   Allocate 0%% long-lived objects. Small objects.\n");
   printf("  n=3b   Allocate 0%% long-lived objects. Large objects.\n");
+  printf("  n=3c   Allocate 0%% long-lived objects. Large objects. Constant data.\n");
   printf("  n=4   Insert into binary tree.\n");
 }
 
@@ -365,8 +366,9 @@ int main(int argc, char* argv[]) {
       bench1(&s, 20, 10000, 100000000);
       bench2(&s, 50000000, false, false);
       bench2(&s, 50000000, true, false);
-      bench3(&s, 3000000000, false);
-      bench3(&s, 3000000000, true);
+      bench3(&s, 3000000000, 0);
+      bench3(&s, 3000000000, 1);
+      bench3(&s, 3000000000, 2);
       bench4(&s, 3000000);
     } else if(strcmp(argv[1], "1")==0) {
       bench1(&s, 20, 10000, 100000000);
@@ -379,9 +381,11 @@ int main(int argc, char* argv[]) {
     } else if(strcmp(argv[1], "2d")==0) {
       bench2(&s, 50000000, true, true);
     } else if(strcmp(argv[1], "3a")==0) {
-      bench3(&s, 3000000000, false);
+      bench3(&s, 3000000000, 0);
     } else if(strcmp(argv[1], "3b")==0) {
-      bench3(&s, 3000000000, true);
+      bench3(&s, 3000000000, 1);
+    } else if(strcmp(argv[1], "3c")==0) {
+      bench3(&s, 3000000000, 2);
     } else if(strcmp(argv[1], "4")==0) {
       bench4(&s, 3000000);
     } else {

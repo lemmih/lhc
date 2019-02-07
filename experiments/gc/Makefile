@@ -1,5 +1,5 @@
 CC=clang
-CFLAGS=-O3 -DNDEBUG
+CFLAGS=-O3 -DNDEBUG -DCLANG
 DEPS=common.h header.h nursery.h objects.h semispace.h stats.h utils.h
 SHARED=stats.o header.o nursery.o utils.o objects.o semispace.o \
        lib_bintree.o lib_shadowstack.o

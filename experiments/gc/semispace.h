@@ -87,7 +87,6 @@ inline static void semi_evacuate(SemiSpace *semi, hp* objAddr) {
   const uint8_t ptrs = header.data.ptrs;
   const word obj_size = 1+prims+ptrs;
 
-
   assert( header.data.gen == 1 );
   if( !IS_WHITE(semi, header) ) return;
 
@@ -95,8 +94,9 @@ inline static void semi_evacuate(SemiSpace *semi, hp* objAddr) {
   header.data.black = !semi->black_bit;
 
   const hp dst = semi_bump_grey(semi, obj_size);
+  #ifdef CLANG
   __builtin_assume(dst != NULL);
-
+  #endif
 
   *objAddr = dst;
   writeIndirection(obj, dst);
@@ -106,8 +106,59 @@ inline static void semi_evacuate(SemiSpace *semi, hp* objAddr) {
   for(int i=1;i<obj_size;i++) {
     dst[i] = obj[i];
   }
-
 }
 
+
+inline static hp semi_evacuate_ret(hp* objAddr, unsigned int black_bit, bool temporal, hp grey) {
+  hp obj = *objAddr;
+  Header header;
+
+  header = readHeader(obj);
+  while( header.data.isForwardPtr ) {
+    obj = (hp) ((word)header.forwardPtr & (~1));
+    *objAddr = obj;
+    header = readHeader(obj);
+  }
+  assert( header.data.isForwardPtr == 0 );
+
+  const uint8_t prims = header.data.prims;
+  const uint8_t ptrs = header.data.ptrs;
+  const word obj_size = 1+prims+ptrs;
+
+  assert( header.data.gen == 1 );
+  if( IS_GREY(header) || header.data.black == black_bit ) return grey;
+  // if( !IS_WHITE(semi, header) ) return grey;
+
+  header.data.grey = true;
+  header.data.black = !black_bit;
+
+  const hp dst = grey;
+  grey += obj_size;
+  #ifdef CLANG
+  __builtin_assume(dst != NULL);
+  #endif
+
+
+  if(temporal) {
+    *dst = header.raw;
+    #pragma clang loop unroll_count(1)
+    for(int i=1;i<obj_size;i++) {
+      dst[i] = obj[i];
+    }
+  } else {
+    __builtin_nontemporal_store(header.raw,dst);
+    #pragma clang loop unroll_count(1)
+    for(int i=1;i<obj_size;i++) {
+      __builtin_nontemporal_store(obj[i],&dst[i]);
+      __builtin_nontemporal_store(obj[i],&dst[i]);
+    }
+
+  }
+
+  *objAddr = dst;
+  writeIndirection(obj, dst);
+
+  return grey;
+}
 
 #endif

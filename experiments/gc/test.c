@@ -13,6 +13,13 @@
 // #include <criterion/assert.h>
 #include <signal.h>
 
+#define SETUP \
+  Nursery ns;\
+  SemiSpace semi;\
+  Stats s;\
+  nursery_init(&ns);\
+  semi_init(&semi)
+
 
 Test(static, sizeof_header) {
   cr_assert(sizeof(Header) == sizeof(word));
@@ -71,12 +78,8 @@ Test(nursery, object_mismatch, .signal=SIGABRT) {
 }
 Test(nursery, evacuation) {
   // Nursery evacuation
-  Nursery ns;
-  SemiSpace semi;
-  Stats s;
+  SETUP;
   hp leaf;
-  nursery_init(&ns);
-  semi_init(&semi);
 
   leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
   cr_assert_not_null(leaf);
@@ -93,12 +96,8 @@ Test(nursery, evacuation) {
 
 Test(semispace, shared_object) {
   // Shared object evacuation
-  Nursery ns;
-  SemiSpace semi;
-  Stats s;
+  SETUP;
   hp leaf, branch;
-  nursery_init(&ns);
-  semi_init(&semi);
 
   leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
   branch = allocate(&ns, &semi, Branch, (MkBranch){leaf,leaf});
@@ -120,12 +119,8 @@ Test(semispace, shared_object) {
 }
 Test(semispace, gc) {
   // SemiSpace GC check
-  Nursery ns;
-  SemiSpace semi;
-  Stats s;
+  SETUP;
   hp leaf;
-  nursery_init(&ns);
-  semi_init(&semi);
 
   leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
   cr_assert(readHeader(leaf).data.gen == 0);
@@ -158,12 +153,8 @@ Test(semispace, gc) {
 }
 Test(semispace, bypass) {
   cr_skip_test();
-  Nursery ns;
-  SemiSpace semi;
-  Stats s;
+  SETUP;
   hp leaf, prevAddr;
-  nursery_init(&ns);
-  semi_init(&semi);
 
   nursery_bypass(&ns, &semi);
 
@@ -188,13 +179,8 @@ Test(semispace, black_allocation) {
   //  2. Allocate pointer to previous object.
   //  3. Move it to semi.
   //  4. Read pointer to make sure it points to a non-white object.
-  Nursery ns;
-  SemiSpace semi;
-  Stats s;
+  SETUP;
   hp zero, succ;
-
-  nursery_init(&ns);
-  semi_init(&semi);
 
   zero = allocate(&ns, &semi, Zero, (MkZero){});
   nursery_begin(&ns, &semi, &s);
@@ -216,4 +202,55 @@ Test(semispace, black_allocation) {
   zero = ((MkSucc*)readObject(succ))->next;
   cr_assert(readHeader(zero).data.gen == 1);
   cr_assert(!IS_WHITE(&semi, readHeader(zero)));
+}
+Test(semispace, cycle) {
+  // Test evacuation of cyclic data.
+  SETUP;
+  hp rec;
+
+  rec = allocate(&ns, &semi, Succ, (MkSucc){NULL});
+  ((MkSucc*)readObject(rec))->next = rec;
+  cr_assert(readHeader(rec).data.gen == 0);
+
+  nursery_begin(&ns, &semi, &s);
+  nursery_evacuate(&ns, &semi, &rec);
+  nursery_end(&ns, &semi, &s);
+
+  cr_assert(readHeader(rec).data.gen == 1);
+  cr_assert(((MkSucc*)readObject(rec))->next == rec);
+}
+Test(nursery, bad_ref) {
+  // Test evacuation of cyclic data.
+  SETUP;
+  hp rec;
+
+  rec = allocate(&ns, &semi, Succ, (MkSucc){NULL});
+  cr_assert(readHeader(rec).data.gen == 0);
+
+  // The nursery doesn't touch pointers outside of the nursery so the NULL
+  // pointer doesn't do any harm.
+  nursery_begin(&ns, &semi, &s);
+  nursery_evacuate(&ns, &semi, &rec);
+  nursery_end(&ns, &semi, &s);
+
+  cr_assert(readHeader(rec).data.gen == 1);
+  cr_assert(((MkSucc*)readObject(rec))->next == NULL);
+}
+Test(semispace, bad_ref, .signal = SIGSEGV) {
+  // Test evacuation of cyclic data.
+  SETUP;
+  hp rec;
+
+  rec = allocate(&ns, &semi, Succ, (MkSucc){NULL});
+
+  nursery_begin(&ns, &semi, &s);
+  nursery_evacuate(&ns, &semi, &rec);
+  nursery_end(&ns, &semi, &s);
+
+  semi_scavenge(&semi, &s);
+  nursery_begin(&ns, &semi, &s);
+  nursery_evacuate(&ns, &semi, &rec);
+  nursery_end(&ns, &semi, &s);
+  semi_scavenge(&semi, &s); // This should cause a segfault.
+  cr_assert_fail("Expected segfault.");
 }

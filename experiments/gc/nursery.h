@@ -57,8 +57,10 @@ static hp _allocate(Nursery *ns, SemiSpace *semi, enum Tag t, uint8_t prims, uin
 
   assert(prims+ptrs == size/sizeof(word));
 
+  #ifdef CLANG
   __builtin_assume(ns->index != NULL);
   __builtin_assume(ns->limit != NULL);
+  #endif
 
   if(ns->limit < ns->index+(size/sizeof(word)+1))
     return NULL;
@@ -74,7 +76,9 @@ static hp _allocate(Nursery *ns, SemiSpace *semi, enum Tag t, uint8_t prims, uin
   memcpy(ns->index, &o, size);
   ns->index += size/sizeof(word);
 
+  #ifdef CLANG
   __builtin_assume(ret != NULL);
+  #endif
 
   // if(ns->bypass) {
   //   nursery_evacuate(ns, semi, &ret);
@@ -100,9 +104,6 @@ static void nursery_end(Nursery *ns, SemiSpace *semi, Stats *s) {
 
 
   stats_timer_end(s);
-
-  // semi_scavenge_concurrent(semi, s);
-
 }
 
 
