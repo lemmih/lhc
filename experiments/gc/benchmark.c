@@ -273,6 +273,7 @@ static void bench3(Stats *s, const long int iterations, const bool largeObject) 
       }
     }
     if(obj == NULL) {
+      // index = ns.heap;
       ns.index = index;
       nursery_begin(&ns, &semi, s);
       nursery_end(&ns, &semi, s);
@@ -358,6 +359,7 @@ int main(int argc, char* argv[]) {
 
   if(argc != 2) {
     print_usage(argv[0]);
+    return -1;
   } else {
     if(strcmp(argv[1], "0")==0) {
       bench1(&s, 20, 10000, 100000000);
@@ -384,6 +386,7 @@ int main(int argc, char* argv[]) {
       bench4(&s, 3000000);
     } else {
       print_usage(argv[0]);
+      return -1;
     }
   }
   stats_pprint(&s);

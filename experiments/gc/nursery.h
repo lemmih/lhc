@@ -13,6 +13,9 @@
 #include <assert.h>
 #include <stdbool.h>
 
+// If undefined, use depth-first search.
+// #define BreadthFirstSearch
+
 #define NURSERY_SIZE (1024*512/sizeof(word))
 // #define NURSERY_SIZE (1024*1024/sizeof(word))
 
@@ -22,7 +25,7 @@ typedef struct {
   word evacuated;
   bool bypass;
   unsigned int roots;
-  hp scavenged;
+  hp black_start;
   word heap[NURSERY_SIZE];
 } Nursery;
 
@@ -81,12 +84,14 @@ static hp _allocate(Nursery *ns, SemiSpace *semi, enum Tag t, uint8_t prims, uin
 static void nursery_end(Nursery *ns, SemiSpace *semi, Stats *s) {
   // printf("NS: %u %u %u%%\n", ns->evacuated, ns->roots, ns->roots*100/ns->evacuated);
 
+  #ifdef BreadthFirstSearch
   nursery_scavenge(ns, semi);
+  #endif
+
 
   s->nursery_n_collections++;
   s->allocated += NURSERY_SIZE - (ns->limit - ns->index);
-  s->nursery_copied += ns->evacuated;
-  ns->evacuated=0;
+  s->nursery_copied += semi->black_space.free - ns->black_start;
   semi->has_roots = true;
   ns->limit = ns->heap+NURSERY_SIZE;
   ns->bypass = false;

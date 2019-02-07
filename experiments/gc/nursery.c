@@ -20,7 +20,7 @@ static void nursery_evacuate_plain_stack(Nursery *ns, SemiSpace *semi, hp* stack
 
 
 void nursery_begin(Nursery *ns, SemiSpace *semi, Stats *s) {
-  ns->scavenged = semi->black_space.free;
+  ns->black_start = semi->black_space.free;
   stats_timer_begin(s, Gen0Timer);
 }
 
@@ -97,15 +97,9 @@ inline static void nursery_evacuate_one_copy(Nursery *ns, SemiSpace *semi, hp* o
 // Faster with depth-first:
 // 1 2a 4
 
-// #define BFS
-
 void nursery_scavenge(Nursery *ns, SemiSpace *semi) {
   Header header;
-  #ifndef BFS
-  ns->evacuated += semi->black_space.free - ns->scavenged;
-  return;
-  #endif
-  hp start=ns->scavenged, scavenged = ns->scavenged;
+  hp start=ns->black_start, scavenged = ns->black_start;
   word evacuated=0;
   while(scavenged < semi->black_space.free) {
     header = readHeader(scavenged);
@@ -118,8 +112,6 @@ void nursery_scavenge(Nursery *ns, SemiSpace *semi) {
       scavenged++;
     }
   }
-  ns->evacuated += scavenged - start;
-  ns->scavenged = NULL;
 }
 
 // static hp black_free;
@@ -130,7 +122,7 @@ void nursery_scavenge(Nursery *ns, SemiSpace *semi) {
 // scavenged. Reachable white objects from semi-space are evacuated
 // to grey space and not scavenged.
 void nursery_evacuate(Nursery *ns, SemiSpace *semi, hp* objAddr) {
-  #ifdef BFS
+  #ifdef BreadthFirstSearch
   return nursery_evacuate_one(ns, semi, objAddr);
   #else
   semi->black_space.free = nursery_evacuate_plain(ns, semi, objAddr,semi->black_space.free);
