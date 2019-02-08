@@ -112,7 +112,9 @@ inline static void semi_evacuate(SemiSpace *semi, hp* objAddr) {
 inline static hp semi_evacuate_ret(hp* objAddr, unsigned int black_bit, bool temporal, hp grey) {
   hp obj = *objAddr;
   Header header;
+  word old_header;
 
+retry:
   if(temporal)
     header = readHeader(obj);
   else
@@ -125,6 +127,7 @@ inline static hp semi_evacuate_ret(hp* objAddr, unsigned int black_bit, bool tem
     else
       header.raw = __builtin_nontemporal_load(obj);
   }
+  old_header = header.raw;
   assert( header.data.isForwardPtr == 0 );
 
   const uint8_t prims = header.data.prims;
@@ -143,6 +146,15 @@ inline static hp semi_evacuate_ret(hp* objAddr, unsigned int black_bit, bool tem
 
 
   if(temporal) {
+    if(InfoTable[header.data.tag].mutable) {
+      Header whitehole;
+      whitehole.raw = 0;
+      whitehole.data.tag = Whitehole;
+      if(!__sync_bool_compare_and_swap (obj, old_header, whitehole.raw)) {
+        printf("CAS failed.\n");
+        goto retry;
+      }
+    }
     *dst = header.raw;
     #pragma clang loop unroll_count(1)
     for(int i=1;i<obj_size;i++) {
@@ -150,6 +162,7 @@ inline static hp semi_evacuate_ret(hp* objAddr, unsigned int black_bit, bool tem
     }
     writeIndirection(obj, dst);
   } else {
+    // XXX: This code doesn't support mutable objects.
     __builtin_nontemporal_store(header.raw,dst);
     // #pragma clang loop unroll_count(1)
     for(int i=1;i<obj_size;i++) {

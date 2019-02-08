@@ -44,6 +44,9 @@ Test(static, intotable_spotcheck) {
   cr_assert(InfoTable[Leaf].ptrs == 0);
   cr_assert(InfoTable[Leaf].prims == 1);
   cr_assert(InfoTable[Branch].ptrs == 2);
+  cr_assert(!InfoTable[Branch].mutable);
+  cr_assert(!InfoTable[Leaf].mutable);
+  cr_assert(InfoTable[IORef].mutable);
 }
 
 

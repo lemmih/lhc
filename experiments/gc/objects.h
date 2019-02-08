@@ -2,22 +2,27 @@
 #define __OBJECTS_H__
 
 #include "common.h"
+#include <stdbool.h>
 
 // move to common.h?
 
 enum Tag
-  { Unit,  Leaf,  Branch, Zero,  Succ,  IntBranch, IORef, TAG_MAX};
+  { Unit,  Leaf,  Branch, Zero,  Succ,  IntBranch, IORef
+  , Whitehole, TAG_MAX};
 
 typedef struct {
   enum Tag tag;
   uint8_t prims;
   uint8_t ptrs;
+  bool mutable;
 } ObjectInfo;
 
 static const ObjectInfo InfoTable[] =
   { {Unit,0,0}, {Leaf,1,0}, {Branch,0,2}, {Zero,0,0}, {Succ,0,1}
   , {IntBranch,1,2}
-  , {.tag=IORef,.prims=0,.ptrs=1} };
+  , {.tag=IORef,.prims=0,.ptrs=1, .mutable=true}
+  , {.tag=Whitehole, .prims=0, .ptrs=0}
+};
 
 typedef struct {
   hp ptr;

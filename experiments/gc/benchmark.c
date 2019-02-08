@@ -313,6 +313,40 @@ void bench4(Stats *s, int iterations) {
   semi_close(&semi, s);
 }
 
+static void bench5(Stats *s, const int iterations, const bool bypass) {
+  Nursery ns;
+  SemiSpace semi;
+  hp obj;
+
+  nursery_init(&ns);
+  semi_init(&semi);
+
+  warmup(&ns, &semi);
+  stats_timer_begin(s, MutTimer);
+
+  obj = allocate(&ns, &semi, Zero, (MkZero){});
+
+  for(int i=0; i<iterations; i++) {
+    const hp new = allocate(&ns, &semi, IORef, (MkIORef){obj});
+    if(new==NULL) {
+      nursery_begin(&ns, &semi, s);
+      nursery_evacuate(&ns, &semi, &obj);
+      nursery_end(&ns, &semi, s);
+      semi_scavenge_concurrent(&semi, s);
+      if(!semi_check(&semi, NURSERY_SIZE)) {
+        semi_scavenge(&semi, s);
+      }
+      if(bypass)
+        nursery_bypass(&ns, &semi);
+      obj = allocate(&ns, &semi, IORef, (MkIORef){obj});
+    } else {
+      obj = new;
+    }
+  }
+  stats_timer_end(s);
+  semi_close(&semi, s);
+}
+
 // static void bench4(int iterations) {
 //
 // }
@@ -325,10 +359,11 @@ void print_usage(char *prog) {
   printf("  n=2b  Allocate 100%% long-lived objects. 1-Child objects + nursery bypass.\n");
   printf("  n=2c  Allocate 100%% long-lived objects. 2-Child objects.\n");
   printf("  n=2d  Allocate 100%% long-lived objects. 2-Child objects + nursery bypass.\n");
-  printf("  n=3a   Allocate 0%% long-lived objects. Small objects.\n");
-  printf("  n=3b   Allocate 0%% long-lived objects. Large objects.\n");
-  printf("  n=3c   Allocate 0%% long-lived objects. Large objects. Constant data.\n");
+  printf("  n=3a  Allocate 0%% long-lived objects. Small objects.\n");
+  printf("  n=3b  Allocate 0%% long-lived objects. Large objects.\n");
+  printf("  n=3c  Allocate 0%% long-lived objects. Large objects. Constant data.\n");
   printf("  n=4   Insert into binary tree.\n");
+  printf("  n=5   Allocate 100%% long-lived IORefs.\n");
 }
 
 // OK:  0 1 2 3 4 6
@@ -388,6 +423,8 @@ int main(int argc, char* argv[]) {
       bench3(&s, 3000000000, 2);
     } else if(strcmp(argv[1], "4")==0) {
       bench4(&s, 3000000);
+    } else if(strcmp(argv[1], "5")==0) {
+      bench5(&s, 50000000, false);
     } else {
       print_usage(argv[0]);
       return -1;
