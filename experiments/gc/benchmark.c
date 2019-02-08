@@ -61,50 +61,41 @@ static void bench1(Stats *s, const int buckets, const int len, const int iterati
     roots[i] = root;
   }
 
-  int high=0;
-  word sum=0;
+#define GC \
+  nursery_begin(&ns, &semi, s); \
+  for(int n=0;n<buckets;n++) { \
+    nursery_evacuate(&ns, &semi, &roots[n]); \
+  } \
+  nursery_end(&ns, &semi, s); \
+  semi_scavenge_concurrent(&semi, s); \
+  if(!semi_check(&semi, NURSERY_SIZE)) { \
+    semi_scavenge(&semi, s); \
+  }
 
   for(unsigned int i=0; i<iterations; i++) {
     for(int j=0;j<buckets && (i%(1<<j) == 0);j++) {
-      hp root=NULL;
-      do {
-        if( counts[j] == len*(j+1) ) {
+      hp root;
+      if( counts[j] == len*(j+1) ) {
+        root = allocate(&ns, &semi, Zero, (MkZero){});
+        counts[j]=0;
+        if(root==NULL) {
+          GC;
           root = allocate(&ns, &semi, Zero, (MkZero){});
-          sum-=counts[j];
-          counts[j]=0;
-        } else {
+        }
+      } else {
+        root = allocate(&ns, &semi, Succ, (MkSucc){roots[j]});
+        if(!root) {
+          GC;
           root = allocate(&ns, &semi, Succ, (MkSucc){roots[j]});
         }
-        if(root==NULL) {
-
-          // if(sum>high) {
-          //   printf("Sum: %lu KB\t\t\r", sum*2*8/1024);
-          //   high = sum;
-          //   fflush(stdout);
-          // }
-
-          nursery_begin(&ns, &semi, s);
-          for(int n=0;n<buckets;n++) {
-            nursery_evacuate(&ns, &semi, &roots[n]);
-          }
-          nursery_end(&ns, &semi, s);
-          semi_scavenge_concurrent(&semi, s);
-          if(!semi_check(&semi, NURSERY_SIZE)) {
-            semi_scavenge(&semi, s);
-          }
-          continue;
-        }
-        roots[j] = root;
-        counts[j]++;
-        sum++;
-      } while(false);
+      }
+      roots[j] = root;
+      counts[j]++;
     }
   }
-  // printf("\n");
   stats_timer_end(s);
-
-
   semi_close(&semi, s);
+#undef GC
 }
 
 static void bench2(Stats *s, const int iterations, const bool largeObject, const bool bypass) {
@@ -126,71 +117,41 @@ static void bench2(Stats *s, const int iterations, const bool largeObject, const
   index = ns.index;
   limit = ns.limit;
 
-  for(int i=0; i<iterations; i++) {
-    hp new = NULL;
-    while(new==NULL) {
-      if(largeObject) {
-        // new = allocate(&ns, &semi, Branch, (MkBranch){obj, obj});
-        {
-          Header header;
+#define GC \
+  nursery_begin(&ns, &semi, s); \
+  nursery_evacuate(&ns, &semi, &obj); \
+  nursery_end(&ns, &semi, s); \
+  semi_scavenge_concurrent(&semi, s); \
+  if(!semi_check(&semi, NURSERY_SIZE)) { \
+    semi_scavenge(&semi, s); \
+  } \
+  if(bypass) \
+    nursery_bypass(&ns, &semi);
 
-          if(limit < index+(2+1)) {
-            new = NULL;
-          } else {
-            new = index;
-            Object o = (Object)((MkBranch){obj, obj});
-
-            header.raw = 0;
-            header.data.tag = Branch;
-            header.data.prims = 0;
-            header.data.ptrs = 2;
-            *index = header.raw;
-            index++;
-            memcpy(index, &o, 16);
-            index += 2;
-          }
-        }
-      } else {
-        // new = allocate(&ns, &semi, Succ, (MkSucc){obj});
-        {
-          Header header;
-
-          if(limit < index+(1+1)) {
-            new = NULL;
-          } else {
-            new = index;
-            Object o = (Object)((MkSucc){obj});
-
-            header.raw = 0;
-            header.data.tag = Succ;
-            header.data.prims = 0;
-            header.data.ptrs = 1;
-            *index = header.raw;
-            index++;
-            memcpy(index, &o, 8);
-            index += 1;
-          }
-        }
-      }
+  if(largeObject) {
+    for(int i=0; i<iterations; i++) {
+      const hp new = allocate(&ns, &semi, Branch, (MkBranch){obj, obj});
       if(new==NULL) {
-        ns.index = index;
-        nursery_begin(&ns, &semi, s);
-        nursery_evacuate(&ns, &semi, &obj);
-        nursery_end(&ns, &semi, s);
-        semi_scavenge_concurrent(&semi, s);
-        if(!semi_check(&semi, NURSERY_SIZE)) {
-          semi_scavenge(&semi, s);
-        }
-        if(bypass)
-          nursery_bypass(&ns, &semi);
-        index = ns.index;
-        limit = ns.limit;
+        GC;
+        obj = allocate(&ns, &semi, Branch, (MkBranch){obj, obj});
+      } else {
+        obj = new;
       }
     }
-    obj = new;
+  } else {
+    for(int i=0; i<iterations; i++) {
+      const hp new = allocate(&ns, &semi, Succ, (MkSucc){obj});
+      if(new==NULL) {
+        GC;
+        obj = allocate(&ns, &semi, Succ, (MkSucc){obj});
+      } else {
+        obj = new;
+      }
+    }
   }
   stats_timer_end(s);
   semi_close(&semi, s);
+  #undef GC
 }
 
 static void bench3(Stats *s, const long int iterations, const int objType) {
@@ -273,7 +234,6 @@ static void bench3(Stats *s, const long int iterations, const int objType) {
       }
     }
     if(obj == NULL) {
-      // index = ns.heap;
       ns.index = index;
       nursery_begin(&ns, &semi, s);
       nursery_end(&ns, &semi, s);
@@ -289,7 +249,7 @@ static void bench3(Stats *s, const long int iterations, const int objType) {
   semi_close(&semi, s);
 }
 
-void bench4(Stats *s, int iterations) {
+static void bench4(Stats *s, int iterations) {
   Nursery ns;
   SemiSpace semi;
   hp tree;
@@ -400,11 +360,12 @@ int main(int argc, char* argv[]) {
     if(strcmp(argv[1], "0")==0) {
       bench1(&s, 20, 10000, 100000000);
       bench2(&s, 50000000, false, false);
-      bench2(&s, 50000000, true, false);
+      bench2(&s, 40000000, true, false);
       bench3(&s, 3000000000, 0);
       bench3(&s, 3000000000, 1);
       bench3(&s, 3000000000, 2);
       bench4(&s, 3000000);
+      bench5(&s, 50000000, false);
     } else if(strcmp(argv[1], "1")==0) {
       bench1(&s, 20, 10000, 100000000);
     } else if(strcmp(argv[1], "2a")==0) {
@@ -412,9 +373,9 @@ int main(int argc, char* argv[]) {
     } else if(strcmp(argv[1], "2b")==0) {
       bench2(&s, 50000000, false, true);
     } else if(strcmp(argv[1], "2c")==0) {
-      bench2(&s, 50000000, true, false);
+      bench2(&s, 40000000, true, false);
     } else if(strcmp(argv[1], "2d")==0) {
-      bench2(&s, 50000000, true, true);
+      bench2(&s, 40000000, true, true);
     } else if(strcmp(argv[1], "3a")==0) {
       bench3(&s, 3000000000, 0);
     } else if(strcmp(argv[1], "3b")==0) {
