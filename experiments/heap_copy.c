@@ -75,6 +75,18 @@ int main() {
   from_size = (uint64_t)1024*1024*512 / sizeof(uint64_t);
   to_size   = (uint64_t)1024*1024*1024*1 / sizeof(uint64_t);
 
+  printf("This program copies data from random locations in a from-space to\n"
+         "a continuous to-space. The copied data is overwritten with a\n"
+         "forwarding pointer. This simulates a garbage collection cycle\n"
+         "in a semi-space garbage collector.\n"
+         "The size of the from-space is %lu MB and the to-space is %lu MB.\n"
+         "Both temporal and non-temporal moves are tested. The data in to-space\n"
+         "is never accessed again so non-temporal moves should be fastest.\n"
+         , from_size*sizeof(uint64_t)/1024/1024
+         , to_size*sizeof(uint64_t)/1024/1024
+       );
+
+
   from_area = mmap(NULL, from_size*sizeof(uint64_t), PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   to_area = mmap(NULL, to_size*sizeof(uint64_t), PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   assert(from_area != NULL);
@@ -85,12 +97,12 @@ int main() {
   uint64_t total = clock_gettime_nsec(CLOCK_PROCESS_CPUTIME_ID) - start;
   printf("Zeroed pages: %s\n", pp_speed(to_size+from_size, total));
 
-  printf("%6s%15s%15s\n","Size","Non-Temporal","Temporal");
+  printf("%15s%15s%15s\n","Object size","Non-Temporal","Temporal");
   for(int object_size=1; object_size<=16; object_size++) {
     start = clock_gettime_nsec(CLOCK_PROCESS_CPUTIME_ID);
     heap_copy(from_area, from_size, to_area, to_size, false, object_size);
     total = clock_gettime_nsec(CLOCK_PROCESS_CPUTIME_ID) - start;
-    printf("%6d%15s", object_size, pp_speed(to_size, total));
+    printf("%15d%15s", object_size, pp_speed(to_size, total));
 
     start = clock_gettime_nsec(CLOCK_PROCESS_CPUTIME_ID);
     heap_copy(from_area, from_size, to_area, to_size, true, object_size);
