@@ -4,15 +4,24 @@
 #include "common.h"
 
 // move to common.h?
+
+enum Tag
+  { Unit,  Leaf,  Branch, Zero,  Succ,  IntBranch, IORef, TAG_MAX};
+
 typedef struct {
+  enum Tag tag;
   uint8_t prims;
   uint8_t ptrs;
 } ObjectInfo;
 
-enum Tag
-  { Unit,  Leaf,  Branch, Zero,  Succ,  IntBranch, TAG_MAX};
 static const ObjectInfo InfoTable[] =
-  { {0,0}, {1,0}, {0,2},  {0,0}, {0,1}, {1,2} };
+  { {Unit,0,0}, {Leaf,1,0}, {Branch,0,2}, {Zero,0,0}, {Succ,0,1}
+  , {IntBranch,1,2}
+  , {.tag=IORef,.prims=0,.ptrs=1} };
+
+typedef struct {
+  hp ptr;
+} MkIORef;
 
 typedef struct {
   word n;
@@ -47,6 +56,7 @@ typedef union {
   MkZero zero;
   MkSucc succ;
   MkIntBranch intbranch;
+  MkIORef ioref;
 } Object;
 
 #endif

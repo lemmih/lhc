@@ -27,6 +27,19 @@ Test(static, sizeof_header) {
 Test(static, sizeof_infotable) {
   cr_assert(sizeof(InfoTable)/sizeof(ObjectInfo) == TAG_MAX);
 }
+Test(static, valid_infotable) {
+  bool seen[TAG_MAX];
+  for(int i=0; i<TAG_MAX; i++) {
+    seen[i] = false;
+  }
+  for(int i=0; i<TAG_MAX; i++) {
+    cr_assert(seen[InfoTable[i].tag] == false, "Duplicate ObjectInfo for %d", InfoTable[i].tag);
+    seen[InfoTable[i].tag] = true;
+  }
+  for(int i=0; i<TAG_MAX; i++) {
+    cr_assert(seen[i] == true, "Missing ObjectInfo for %d", i);
+  }
+}
 Test(static, intotable_spotcheck) {
   cr_assert(InfoTable[Leaf].ptrs == 0);
   cr_assert(InfoTable[Leaf].prims == 1);
