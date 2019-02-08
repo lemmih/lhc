@@ -169,7 +169,7 @@ void semi_scavenge_concurrent(SemiSpace *semi, Stats *s) {
     hp grey_scavenged = semi->grey_space.scavenged;
     stats_timer_begin(s, Gen1Timer);
     while( work < limit && grey_scavenged<grey) {
-      bool temporal = true; // (grey-grey_scavenged)*8/1024 < 6*1024;
+      bool temporal = true; //(grey-grey_scavenged)*8/1024 < 6*1024;
       Header header = readHeader(grey_scavenged);
       assert(header.data.grey == true);
       header.data.grey = false;

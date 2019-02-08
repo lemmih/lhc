@@ -113,11 +113,17 @@ inline static hp semi_evacuate_ret(hp* objAddr, unsigned int black_bit, bool tem
   hp obj = *objAddr;
   Header header;
 
-  header = readHeader(obj);
+  if(temporal)
+    header = readHeader(obj);
+  else
+    header.raw = __builtin_nontemporal_load(obj);
   while( header.data.isForwardPtr ) {
     obj = (hp) ((word)header.forwardPtr & (~1));
     *objAddr = obj;
-    header = readHeader(obj);
+    if(temporal)
+      header = readHeader(obj);
+    else
+      header.raw = __builtin_nontemporal_load(obj);
   }
   assert( header.data.isForwardPtr == 0 );
 
@@ -134,9 +140,6 @@ inline static hp semi_evacuate_ret(hp* objAddr, unsigned int black_bit, bool tem
 
   const hp dst = grey;
   grey += obj_size;
-  #ifdef CLANG
-  __builtin_assume(dst != NULL);
-  #endif
 
 
   if(temporal) {
@@ -145,18 +148,25 @@ inline static hp semi_evacuate_ret(hp* objAddr, unsigned int black_bit, bool tem
     for(int i=1;i<obj_size;i++) {
       dst[i] = obj[i];
     }
+    writeIndirection(obj, dst);
   } else {
     __builtin_nontemporal_store(header.raw,dst);
-    #pragma clang loop unroll_count(1)
+    // #pragma clang loop unroll_count(1)
     for(int i=1;i<obj_size;i++) {
-      __builtin_nontemporal_store(obj[i],&dst[i]);
-      __builtin_nontemporal_store(obj[i],&dst[i]);
+      word val = __builtin_nontemporal_load(obj+i);
+      __builtin_nontemporal_store(val,dst+i);
     }
-
+    {
+      Header ind;
+      ind.raw = 0;
+      ind.forwardPtr = dst;
+      ind.data.isForwardPtr = 1;
+      // __builtin_nontemporal_store(ind.raw,obj);
+    }
   }
 
   *objAddr = dst;
-  writeIndirection(obj, dst);
+  // writeIndirection(obj, dst);
 
   return grey;
 }
