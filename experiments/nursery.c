@@ -59,12 +59,15 @@ int main() {
     uint64_t size = 128<<n;
     uint64_t iterations = WRITE_SIZE>>n;
     clock_t start, end;
-    printf("Testing nursery size: %llu kb:\t", (size*WORD_SIZE)/1024);
+    printf("Testing nursery size: %lu kb:\t", (size*WORD_SIZE)/1024);
     fflush(stdout);
     start = clock();
     for(j=0;j<iterations;j++) {
-      for(i=0;i<size;i++) {
-        nursery[i]=i;
+      for(i=0;i<size;) {
+        nursery[i++]=0xDEADBEEF;
+        nursery[i++]=i;
+        nursery[i++]=i;
+        nursery[i++]=i;
       }
     }
     end = clock();
