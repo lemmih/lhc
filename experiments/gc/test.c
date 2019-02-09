@@ -167,24 +167,36 @@ Test(semispace, gc) {
 
   semi_close(&semi, &s);
 }
+// Bypass
+// Objects allocated in nurseries are not black. They're turned black
+// by the stop-the-world GC when they're moved into gen1.
+// Bypass means newly allocated objects are directly allocated in gen1
+// and therefore have to be black.
+// 1. Test the black bit.
+// 2. Test that white references are turned grey.
 Test(semispace, bypass) {
-  cr_skip_test();
+  // cr_skip_test(); // bypass is too expensive to be enabled right now.
   SETUP;
-  hp leaf, prevAddr;
+  hp leaf, succ;
 
   nursery_bypass(&ns, &semi);
 
   leaf = allocate(&ns, &semi, Leaf, (MkLeaf){10});
-  prevAddr = leaf;
-  cr_assert(readHeader(leaf).data.gen == 0);
-
-  nursery_begin(&ns, &semi, &s);
-  nursery_evacuate(&ns, &semi, &leaf);
-  nursery_end(&ns, &semi, &s);
   cr_assert(readHeader(leaf).data.gen == 1);
-  cr_assert(readHeader(leaf).data.grey == 0);
-  cr_assert(readHeader(leaf).data.black == semi.black_bit);
-  cr_assert(leaf == prevAddr);
+  cr_assert(IS_BLACK(&semi, readHeader(leaf)));
+
+  semi_scavenge(&semi, &s); // Flip turn black objects white.
+  nursery_bypass(&ns, &semi); // Reserve a new block in gen1 for allocations.
+  cr_assert(IS_WHITE(&semi, readHeader(leaf)));
+
+  succ = allocate(&ns, &semi, Succ, (MkSucc){leaf});
+  cr_assert(readHeader(succ).data.gen == 1);
+  cr_assert(IS_BLACK(&semi, readHeader(succ)));
+
+  cr_assert(readHeader(leaf).data.isForwardPtr);
+  followIndirection(&leaf);
+  cr_assert(IS_GREY(readHeader(leaf)));
+  cr_assert(!IS_BLACK(&semi, readHeader(leaf)));
 
   semi_close(&semi, &s);
 }

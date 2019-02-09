@@ -111,6 +111,9 @@ static void bench2(Stats *s, const int iterations, const bool largeObject, const
   warmup(&ns, &semi);
   stats_timer_begin(s, MutTimer);
 
+  if(bypass)
+    nursery_bypass(&ns, &semi);
+
   obj = allocate(&ns, &semi, Zero, (MkZero){});
   assert(obj!=NULL);
 
@@ -151,7 +154,7 @@ static void bench2(Stats *s, const int iterations, const bool largeObject, const
   }
   stats_timer_end(s);
   semi_close(&semi, s);
-  #undef GC
+#undef GC
 }
 
 static void bench3(Stats *s, const long int iterations, const int objType) {
@@ -205,6 +208,11 @@ static void bench3(Stats *s, const long int iterations, const int objType) {
           header.data.tag = IntBranch;
           header.data.prims = 1;
           header.data.ptrs = 2;
+          if(((word)obj & 1) == 1) {
+            obj = (hp)((word)obj & ~1);
+            header.data.gen = 1;
+            header.data.black = semi.black_bit;
+          }
           *index = header.raw;
           index++;
           memcpy(index, &o, 24);

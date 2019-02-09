@@ -21,5 +21,15 @@ static void writeIndirection(hp from, hp to) {
   *from = ind.raw;
 }
 
+static void followIndirection(hp* objAddr) {
+  hp obj = *objAddr;
+  Header header = readHeader(obj);
+  while( header.data.isForwardPtr ) {
+    obj = (hp) ((word)header.forwardPtr & (~1));
+    *objAddr = obj;
+    header = readHeader(obj);
+  }
+}
+
 
 #endif
