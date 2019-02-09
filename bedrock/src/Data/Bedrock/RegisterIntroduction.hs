@@ -238,7 +238,7 @@ uniqExpression expr =
         Write dst idx ptr -> do
             ret <- resolve ptr
             case ret of
-              -- [] -> pure (Write dst idx ptr)
+              [] -> pure (Write dst idx ptr)
               (tag:_) -> pure (Write dst idx tag)
         CCall fn vars ->
             CCall fn <$> resolveMany vars
