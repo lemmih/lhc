@@ -30,7 +30,7 @@ check (Branch a b c d) lst n =
   check a (b:c:d:lst) (1+n)
 
 main :: IO ()
-main = dup (make 12)
+main = dup (make 10)
 
 dup a = act a a
 

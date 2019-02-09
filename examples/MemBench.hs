@@ -11,7 +11,7 @@ allocate n i acc = allocate n (i-1) (i:acc)
 main :: IO ()
 main = do
   putStrLn "Allocating a bunch of data"
-  putStrLn (showInt (last (last (reverse (allocate 10000 5000 [])))))
+  putStrLn (showInt (last (last (reverse (allocate 1000 5000 [])))))
 
 entrypoint :: ()
 entrypoint = unsafePerformIO main
