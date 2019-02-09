@@ -14,6 +14,8 @@ typedef union {
     unsigned int tag:10;
     unsigned int prims:5;
     unsigned int ptrs:5;
+    bool mutable:1;
+    // 1+2+1+1+10+5+1 = 21 bits
   } data;
   word raw;
 } Header;

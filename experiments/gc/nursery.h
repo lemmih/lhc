@@ -42,7 +42,7 @@ static void nursery_init(Nursery *ns) {
 }
 
 
-#define allocate(ns, semi, tag, ...) _allocate(ns, semi, tag, InfoTable[tag].prims, InfoTable[tag].ptrs, ((Object)(__VA_ARGS__)), sizeof((__VA_ARGS__)))
+#define allocate(ns, semi, tag, ...) _allocate(ns, semi, tag, InfoTable[tag].prims, InfoTable[tag].ptrs, InfoTable[tag].mutable, ((Object)(__VA_ARGS__)), sizeof((__VA_ARGS__)))
 // hp _allocate(Nursery *ns, enum Tag t, Object o, unsigned long size);
 
 void nursery_begin(Nursery *ns, SemiSpace *semi, Stats *s);
@@ -52,10 +52,13 @@ void nursery_bypass(Nursery *ns, SemiSpace *semi);
 bool nursery_member(Nursery *ns, hp obj);
 void nursery_scavenge(Nursery *ns, SemiSpace *semi);
 
-static hp _allocate(Nursery *ns, SemiSpace *semi, enum Tag t, uint8_t prims, uint8_t ptrs, Object o, unsigned long size) {
+static hp _allocate(Nursery *ns, SemiSpace *semi, enum Tag t, uint8_t prims, uint8_t ptrs, bool mutable, Object o, unsigned long size) {
   Header header;
 
   assert(prims+ptrs == size/sizeof(word));
+  assert(prims == InfoTable[t].prims);
+  assert(ptrs == InfoTable[t].ptrs);
+  assert(mutable == InfoTable[t].mutable);
 
   #ifdef CLANG
   __builtin_assume(ns->index != NULL);
@@ -71,6 +74,7 @@ static hp _allocate(Nursery *ns, SemiSpace *semi, enum Tag t, uint8_t prims, uin
   header.data.tag = t;
   header.data.prims = prims;
   header.data.ptrs = ptrs;
+  header.data.mutable = mutable;
   *ns->index = header.raw;
   ns->index++;
   memcpy(ns->index, &o, size);

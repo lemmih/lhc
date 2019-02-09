@@ -245,6 +245,8 @@ cycle:
 
     const uint8_t prims = header.data.prims;
     const uint8_t ptrs = header.data.ptrs;
+    // const uint8_t prims = InfoTable[header.data.tag].prims;
+    // const uint8_t ptrs = InfoTable[header.data.tag].ptrs;
     assert(prims == InfoTable[header.data.tag].prims);
     assert(ptrs == InfoTable[header.data.tag].ptrs);
     const word obj_size = 1+prims+ptrs;

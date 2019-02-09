@@ -145,8 +145,9 @@ retry:
   grey += obj_size;
 
 
+  assert( header.data.mutable == InfoTable[header.data.tag].mutable);
   if(temporal) {
-    if(InfoTable[header.data.tag].mutable) {
+    if(header.data.mutable) {
       Header whitehole;
       whitehole.raw = 0;
       whitehole.data.tag = Whitehole;
