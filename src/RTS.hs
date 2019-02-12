@@ -6,6 +6,7 @@ import           System.Directory (findExecutable, getTemporaryDirectory)
 import           System.Exit      (ExitCode (..))
 import           System.FilePath  ((</>))
 import           System.Process   (readProcessWithExitCode)
+import           Data.Maybe       (catMaybes, listToMaybe)
 
 -- Compile the RTS (written in c) with clang and link the files directly
 -- into the target code.
@@ -36,7 +37,8 @@ linkRTS target = do
 findLLVMExecutable :: FilePath -> IO FilePath
 findLLVMExecutable exec = do
   mbV6 <- findExecutable (exec++"-6.0")
-  case mbV6 of
+  mbV7 <- findExecutable (exec++"-7")
+  case listToMaybe (catMaybes [mbV6, mbV7]) of
     Just path -> pure path
     Nothing -> do
       mbRet <- findExecutable exec

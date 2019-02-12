@@ -44,9 +44,17 @@ compileHaskell path gcVariant = do
   assertString stderr
   assertExitCode "Compilation failed" code
 
+findAnExecutable :: [String] -> IO (Maybe FilePath)
+findAnExecutable [] = return Nothing
+findAnExecutable (x:xs) = do
+  mbExec <- findExecutable x
+  case mbExec of
+    Just exec -> return (Just exec)
+    Nothing   -> findAnExecutable xs
+
 executeHaskell :: FilePath -> String -> String -> IO ()
 executeHaskell path stdin expected_out = do
-  lli <- assertMaybe "Couldn't find lli executable" =<< findExecutable "lli"
+  lli <- assertMaybe "Couldn't find lli executable" =<< findAnExecutable ["lli", "lli-7", "lli-6.0"]
   (code, stdout, _stderr) <- readProcessWithExitCode lli [replaceExtension path "ll"] stdin
   assertExitCode "Execution failed" code
   assertEqual "Unexpected stdout" expected_out stdout
