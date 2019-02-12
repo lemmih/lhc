@@ -165,6 +165,7 @@ freeVariablesParameter =
     PNodeName{}     -> id
     PVariable var   -> Set.insert var
     PVariables vars -> Set.union (Set.fromList vars)
+    PTypes ts       -> id
 
 freeVariablesSimple :: Expression -> Set Variable -> Set Variable
 freeVariablesSimple simple =

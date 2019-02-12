@@ -127,6 +127,7 @@ instance Pretty Parameter where
       --   | (name, vars) <- nodes ]
       PVariable var -> pretty var
       PVariables var -> Doc.brackets (ppList $ map pretty var)
+      PTypes ts -> Doc.brackets (ppList $ map pretty ts)
 
 instance Pretty Expression where
   pretty simple =

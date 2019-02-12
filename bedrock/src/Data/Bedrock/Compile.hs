@@ -96,12 +96,12 @@ stdPipeline gc =
         -- , PerformHPT
         -- , "no-laziness"     :?> runGen . lowerEvalApply
         -- , "no-unknown-size" :?> runGen . lowerNodeSize
-        , "no-laziness"     :> locallyUnique . runGen Simple.lowerEvalApply
+        , "no-laziness"     :> locallyUnique . localDCE . simplify . runGen Simple.lowerEvalApply
         , "layout"          :> locallyUnique . finalizeNodeLayout
         , "no-void"         :> locallyUnique . simplify . voidEliminate
         , "no-unknown-size" :> locallyUnique . runGen Simple.lowerNodeSize
 
-        , "no-nodes"        :> locallyUnique . simplifySteps 1 . unique . registerIntroduction
+        , "no-nodes"        :> locallyUnique . {-simplifySteps 1 . unique .-} registerIntroduction
         , "no-stack"        :> locallyUnique . StackLayout.lower
         , "no-stack"        :> locallyUnique . mergeAllocsModule . locallyUnique . runGen cpsTransformation
         -- , "no-invoke"       :?> runGen . lowerInvoke

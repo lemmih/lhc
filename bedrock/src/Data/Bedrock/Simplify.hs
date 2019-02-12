@@ -117,6 +117,7 @@ simplifyBlock block =
         Recursive binds rest ->
           Recursive binds <$> simplifyBlock rest
         -- FIXME: Sanity check: con == node
+        Case scrut (Just defaultBranch) [] -> simplifyBlock defaultBranch
         Case scrut Nothing alts@[Alternative (NodePat _con args) branch] -> do
           mbNode <- lookupConstant scrut
           case mbNode of
@@ -194,7 +195,7 @@ simplifyParameter param =
     PNodeName{} -> pure param
     PVariable v -> PVariable <$> resolve v
     PVariables vs -> PVariables <$> mapM resolve vs
-
+    PTypes ts -> PTypes <$> pure ts
 
 
 

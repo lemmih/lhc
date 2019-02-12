@@ -134,6 +134,24 @@ transformExpresion origin binds simple rest =
           (Bind [hp'] (Address hp size) $
            Bind [] (WriteRegister "hp" hp') rest)
           (zip [1..] args)
+    StoreAlloc nodeName tys | [bind] <- binds -> do
+      let size = 1 + length tys
+      hp <- newVariable "hp" NodePtr
+      hp' <- newVariable "hp'" NodePtr
+      tmp <- newVariable "tmp" Node
+      return $
+        Bind [hp] (ReadRegister "hp") $
+        Bind [bind] (TypeCast hp) $
+        Bind [tmp] (MkNode nodeName []) $
+        Bind [] (Write hp 0 tmp) $
+        Bind [hp'] (Address hp size) $
+        Bind [] (WriteRegister "hp" hp') rest
+    StoreWrite bind args -> do
+      let size = 1 + length args
+      return $
+        foldr (\(nth, arg) -> Bind [] (Write bind nth arg))
+          rest
+          (zip [1..] args)
     BumpHeapPtr n -> do
       let size = n
       hp <- newVariable "hp" NodePtr

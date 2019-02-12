@@ -399,7 +399,7 @@ convertExpr lazy expr rest =
         let name = convertName $ Core.varName con
         arity <- requireArity name
         Bind [tmp] (Store (ConstructorName name (arity-length args)) args')
-            <$> rest [tmp]
+          <$> rest [tmp]
     _ | (Var v, _coercion, args) <- collectApps expr, lazy ->
       convertExprs args $ \args' -> do
         v' <- convertVariable v
@@ -536,12 +536,15 @@ convertExpr lazy expr rest =
           name' <- convertVariable name
           Bind [name'] (TypeCast val) <$> convertExpr lazy e2 rest
 
+    -- Allocate the ptrs with the right sizes.
+    -- Then fill in the data.
+    -- x <- allocate (Cons _ _)
+    -- write(x, Cons 1 x)
     Let (Rec []) e2 -> convertExpr lazy e2 rest
     Let (Rec ((name,e1):binds)) e2 -> do
       name' <- convertVariable name
-      Recursive [name'] <$>
-        (convertExpr True e1 $ \[val] ->
-          Bind [name'] (TypeCast val) <$> convertExpr lazy (Let (Rec binds) e2) rest)
+      (convertExprLazy e1 $ \term val ->
+        Bind [name'] (TypeCast val) . Bind [] term <$> convertExpr lazy (Let (Rec binds) e2) rest)
 
     LetStrict name e1 e2 ->
       convertExpr False e1 $ \[val] -> do
@@ -562,6 +565,96 @@ convertExpr lazy expr rest =
       tmp <- deriveVariable val "eval" NodePtr
       Bind [tmp] (Eval val)
           <$> rest [tmp]
+
+splitStore con args rest = do
+  tmp <- newVariable [] "tmp" NodePtr
+  Bind [tmp] (StoreAlloc con (map variableType args))
+    <$> rest (StoreWrite tmp args) tmp
+
+convertExprLazy :: Core.Expr -> (Bedrock.Expression -> Variable -> M Bedrock.Block) -> M Bedrock.Block
+convertExprLazy expr rest =
+  case expr of
+    _ | (Con con, _coercion, args) <- collectApps expr ->
+      convertExprs args $ \args' -> do
+        tmp <- newVariable [] "con" NodePtr
+        let name = convertName $ Core.varName con
+        arity <- requireArity name
+        let con = ConstructorName name (arity-length args)
+        splitStore con args' rest
+    _ | (Var v, _coercion, args) <- collectApps expr ->
+      convertExprs args $ \args' -> do
+        v' <- convertVariable v
+        let fn = variableName v'
+        fnRetTys <- convertResultType args' (Core.varType v)
+        mbArity <- lookupArity fn
+        case mbArity of
+          Just arity | arity >= length args' -> do
+            let con = FunctionName fn (arity-length args')
+            splitStore con args' rest
+          Nothing | null args -> do
+            rest (Literal (LiteralInt 0)) v'
+          _Nothing -> do
+            body <- do
+              tmp <- deriveVariable v' "eval" NodePtr
+              Bind [tmp] (Eval v') <$>
+                applyMany fnRetTys tmp args' (pure . Return)
+            (node, nodeArgs) <- pushFunction [] (Left "ap") body
+            let con = FunctionName node 0
+            splitStore con nodeArgs rest
+    Core.Lit (Core.LitString str) -> do
+        tmp <- newVariable [] "lit" (Primitive $ LLVM.ptr LLVM.i8)
+        Bind [tmp] (Bedrock.Literal (LiteralString str))
+            <$> rest (Literal (LiteralInt 0)) tmp
+    Core.Lit (Core.LitInt int) -> do
+        tmp <- newVariable [] "int" (Primitive LLVM.i64)
+        Bind [tmp] (Bedrock.Literal (LiteralInt int))
+            <$> rest (Literal (LiteralInt 0)) tmp
+    Core.Lit (Core.LitChar c) -> do
+        tmp <- newVariable [] "char" (Primitive LLVM.i32)
+        Bind [tmp] (Bedrock.Literal (LiteralInt $ fromIntegral $ ord c))
+            <$> rest (Literal (LiteralInt 0)) tmp
+    Core.Lit Core.LitVoid -> do
+        tmp <- newVariable [] "void" (Primitive LLVM.VoidType)
+        Bind [tmp] (Bedrock.Literal (LiteralInt 0))
+            <$> rest (Literal (LiteralInt 0)) tmp
+    Lam v sub -> do
+      v' <- mapM convertVariable v
+      (node,nodeArgs) <- do
+          body <- convertExpr False sub (pure . Return)
+          pushFunction v' (Left "lambda") body
+      tmp <- newVariable [] "thunk" NodePtr
+      let con = FunctionName node (length v)
+      splitStore con nodeArgs rest
+    Convert e ty ->
+      error "Convert in lazy mode."
+    WithExternal binder retS external args _st scoped ->
+      error "WithExternal in lazy mode."
+
+    ExternalPure binder external args scoped ->
+      error "ExternalPure in lazy mode."
+
+    Let (NonRec name e1) e2 ->
+      convertExprLazy e1 $ \term val -> do
+          name' <- convertVariable name
+          Bind [name'] (TypeCast val) . Bind [] term
+            <$> convertExprLazy e2 rest
+
+    Let (Rec []) e2 -> convertExprLazy e2 rest
+    Let (Rec ((name,e1):binds)) e2 -> do
+      name' <- convertVariable name
+      Recursive [name'] <$>
+        (convertExprLazy e1 $ \term val ->
+          Bind [name'] (TypeCast val) <$> convertExprLazy (Let (Rec binds) e2) rest)
+
+    LetStrict name e1 e2 -> error "LetStrict in lazy mode. Hoist to fn."
+
+    Core.Case{} -> do
+      body <- convertExpr False expr (pure . Return)
+      (node, nodeArgs) <- pushFunction [] (Left "thunk") body
+      tmp <- newVariable [] "thunk" NodePtr
+      let con = (FunctionName node 0)
+      splitStore con nodeArgs rest
+    _ -> error $ "C->B convertExprLazy: \n" ++ show (pretty expr)
 
 convertExprs :: [Core.Expr] -> ([Variable] -> M Bedrock.Block) -> M Bedrock.Block
 convertExprs [] fn = fn []

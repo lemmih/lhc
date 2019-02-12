@@ -165,12 +165,18 @@ uniqBlock block =
         --     binds' <- resolveMany binds
         --     rest' <- uniqBlock rest
         --     return $ foldr (\(n,b) -> Bind [b] (Load ptr n)) rest' (zip [0..] binds')
+        Bind [bind] (StoreAlloc nodeName tys) rest -> do
+            rest' <- uniqBlock rest
+            return $
+                Bind [] (Alloc $ 1 + length tys) $
+                Bind [bind] (StoreAlloc nodeName tys) rest'
         Bind [bind] (Store nodeName args) rest -> do
             args' <- resolveMany args
             rest' <- uniqBlock rest
             return $
                 Bind [] (Alloc $ 1 + length args) $
-                Bind [bind] (Store nodeName args') rest'
+                Bind [bind] (StoreAlloc nodeName (map variableType args')) $
+                Bind [] (StoreWrite bind args') rest'
         Bind binds simple rest -> lowerMany binds $
             Bind
                 <$> resolveMany binds

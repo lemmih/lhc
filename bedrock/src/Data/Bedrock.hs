@@ -194,6 +194,7 @@ data Parameter
   | PNodeName NodeName
   | PVariable Variable
   | PVariables [Variable]
+  | PTypes [Type]
   deriving (Read, Show, Eq, Data, Generic)
 
 data Expression
@@ -213,6 +214,8 @@ pattern MkNode name args = Builtin "node" [PNodeName name, PVariables args]
 pattern Eval a = Builtin "eval" [PVariable a]
 pattern Apply a b = Builtin "apply" [PVariable a, PVariable b]
 pattern Store node args = Builtin "store" [PNodeName node, PVariables args]
+pattern StoreAlloc node args = Builtin "store_alloc" [PNodeName node, PTypes args]
+pattern StoreWrite ptr args = Builtin "store_write" [PVariable ptr, PVariables args]
 pattern Alloc n = Builtin "alloc" [PInt n]
 pattern BumpHeapPtr n = Builtin "bump" [PInt n]
 

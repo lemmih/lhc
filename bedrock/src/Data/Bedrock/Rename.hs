@@ -205,6 +205,7 @@ uniqParameter param =
     PNodeName node -> PNodeName <$> resolveNodeName node
     PVariable var -> PVariable <$> resolve var
     PVariables vars -> PVariables <$> mapM resolve vars
+    PTypes ts -> PTypes <$> pure ts
 
 uniqSimple :: Expression -> Uniq Expression
 uniqSimple simple =
@@ -401,6 +402,7 @@ locallyParameter param =
     PNodeName node -> PNodeName <$> locallyNodeName node
     PVariable var -> PVariable <$> locallyResolveVariable var
     PVariables vars -> PVariables <$> mapM locallyResolveVariable vars
+    PTypes ts -> PTypes <$> pure ts
 
 locallyExpression :: Expression -> LUniq Expression
 locallyExpression expr =

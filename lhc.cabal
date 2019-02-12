@@ -56,7 +56,6 @@ Executable lhc
  ghc-options:        -fwarn-unused-imports -fwarn-unused-binds
                      -fwarn-incomplete-patterns -fwarn-missing-signatures
                      -fwarn-tabs
-                     -Werror
  Default-language:   Haskell2010
  Extensions:
 

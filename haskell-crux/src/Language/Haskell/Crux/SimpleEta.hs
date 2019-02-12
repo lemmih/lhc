@@ -104,7 +104,8 @@ etaExpr expr =
     -- WithExternal Variable String [Variable] Variable Expr
     -- ExternalPure Variable String [Variable] Expr
     -- Lam [Variable] Expr
-    -- Let LetBind Expr
+    Let binds e ->
+      Let binds <$> etaExpr e
     -- LetStrict Variable Expr Expr
     Case scrut thunk mbDefault alts ->
       Case scrut thunk

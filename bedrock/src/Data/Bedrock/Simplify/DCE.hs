@@ -42,6 +42,8 @@ moduleGraph m =
         Recursive _ block -> blockDependencies block
         TailCall fn _ -> [fn]
         _ -> []
+    altDependencies (Alternative (NodePat (ConstructorName name _) _) block) = name : blockDependencies block
+    altDependencies (Alternative (NodePat (FunctionName name _) _) block) = name : blockDependencies block
     altDependencies (Alternative _ block) = blockDependencies block
     exprDependencies =
       \case
@@ -50,6 +52,8 @@ moduleGraph m =
         Catch a _ b _ -> [a,b]
 
         Store (ConstructorName cons _) _ -> [cons]
+        StoreAlloc (ConstructorName cons _) _ -> [cons]
+        StoreAlloc (FunctionName cons _) _ -> [cons]
         Store (FunctionName fn _) _ -> [fn]
         FunctionPointer fn -> [fn]
 
