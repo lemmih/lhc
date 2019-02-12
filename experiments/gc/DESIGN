@@ -1,8 +1,24 @@
 Weak pointers / finalizers
+  key, value, finalizer
+  Implement as a stack. Insert adds to the end. Delete copies last object over
+  deleted object.
+  If key is alive so is value.
+  Scanned after each gc. References in finalizer to value does not keep value
+  alive.
+  Use a monotonic hash table?
 
 Stable names
+  StableNames gives O(1) comparison of objects.
+  Null implementation possible.
+  Implement using a weak pointer.
 
 Stable ptrs
+  Can be deref'ed: StablePtr a -> IO a
+  Stable pointers keep their target alive even if they themselves are
+  garbage collected. Must be explicitly freed in order to release their target.
+  freeStablePtr :: StablePtr a -> IO ()
+  Implement a hashtable. Insert picks a new globally unique id. The hash table
+  has to be traversed to find roots.
 
 
 
@@ -30,6 +46,10 @@ Mark&Sweep.
     - once gen1 starts allocating into a block, the entire block is considered
       used. If gen1 grabs a block with, say, 50% used lines, none of those
       lines can be freed by the gen2 collector this cycle.
+
+  Max mark stack required: 1/3 of heap.
+  Allocation headroom: 50%
+
 
 Questions:
   Remembered set?
