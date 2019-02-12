@@ -15,19 +15,19 @@ import Text.Printf
 main :: IO ()
 main = return ()
 
-nCycles = 5
+nCycles = 10
 buildScript = "." </> "build.sh"
 
--- programs = ["PowerSet"]
+-- programs = ["Bush"]
 programs = ["Allocate", "BinTree", "Bush", "BushTail", "Imbalanced",
             "MemBench", "PowerSet"]
 
 data Style = Baseline | TailCopy | TailCompact
 
 instance Show Style where
-  show Baseline = "Baseline"
-  show TailCopy = "Tail-copy"
-  show TailCompact = "Tail-compact"
+  show Baseline = "\\textbf{Baseline}"
+  show TailCopy = "\\textbf{Tail-copy}"
+  show TailCompact = "\\textbf{Tail-compact}"
 
 styles = [Baseline, TailCopy, TailCompact]
 
@@ -60,7 +60,7 @@ instance Show (Stat a) where
 
 getStats :: IO ()
 getStats = do
-  sanityCheck
+  -- sanityCheck
 
   ------------------------------------
   -- Runtime
@@ -81,57 +81,57 @@ getStats = do
 
   ------------------------------------
   -- GCStats
-  putStr (replicate (length programs * length styles) '-')
-  putStr "\r"
-  runtimes <- forM programs $ \prog ->
-    forM styles $ \style ->
-      unzip4 <$> replicateM 1 (getStat prog style GCStats)
-  let (collections, copied, allocated, maxheap) = unzip4 (map unzip4 runtimes)
-  let (colTabbed, colAggr) = tabulate show collections
-      (copiedTabbed, copiedAggr) = tabulate showBytes copied
-      (allocTabbed, allocAggr) = tabulate showBytes allocated
-      (heapTabbed, heapAggr) = tabulate showBytes maxheap
-
-  putStr $ ppTable "Collections:" colTabbed
-  putStr $ ppAggregates colAggr
-  putStr $ ppTable "Copied:" copiedTabbed
-  putStr $ ppAggregates copiedAggr
-  putStr $ ppTable "Allocated:" allocTabbed
-  putStr $ ppAggregates allocAggr
-  putStr $ ppTable "Heap size:" heapTabbed
-  putStr $ ppAggregates heapAggr
+  -- putStr (replicate (length programs * length styles) '-')
+  -- putStr "\r"
+  -- runtimes <- forM programs $ \prog ->
+  --   forM styles $ \style ->
+  --     unzip4 <$> replicateM 1 (getStat prog style GCStats)
+  -- let (collections, copied, allocated, maxheap) = unzip4 (map unzip4 runtimes)
+  -- let (colTabbed, colAggr) = tabulate show collections
+  --     (copiedTabbed, copiedAggr) = tabulate showBytes copied
+  --     (allocTabbed, allocAggr) = tabulate showBytes allocated
+  --     (heapTabbed, heapAggr) = tabulate showBytes maxheap
+  --
+  -- putStr $ ppTable "Collections:" colTabbed
+  -- putStr $ ppAggregates colAggr
+  -- putStr $ ppTable "Copied:" copiedTabbed
+  -- putStr $ ppAggregates copiedAggr
+  -- putStr $ ppTable "Allocated:" allocTabbed
+  -- putStr $ ppAggregates allocAggr
+  -- putStr $ ppTable "Heap size:" heapTabbed
+  -- putStr $ ppAggregates heapAggr
 
   ------------------------------------
   -- Perf
-  putStr (replicate (length programs * length styles * nCycles) '-')
-  putStr "\r"
-  runtimes <- forM programs $ \prog ->
-    forM styles $ \style ->
-      unzip7 <$> replicateM nCycles (getStat prog style Perf)
-  let (pageFaults, cycles, instructions, branches, branchMisses, llcLoads, llcMisses) =
-        unzip7 (map unzip7 runtimes)
-  let (pageTabbed, pageAggr) = tabulate showCount pageFaults
-      (cyclesTabbed, cyclesAggr) = tabulate showCount cycles
-      (instructionsTabbed, instructionsAggr) = tabulate showCount instructions
-      (branchesTabbed, branchesAggr) = tabulate showCount branches
-      (branchMissesTabbed, branchMissesAggr) = tabulate showCount branchMisses
-      (llcLoadsTabbed, llcLoadsAggr) = tabulate showCount llcLoads
-      (llcMissesTabbed, llcMissesAggr) = tabulate showCount llcMisses
-
-  putStr $ ppTable "Page faults:" pageTabbed
-  putStr $ ppAggregates pageAggr
-  putStr $ ppTable "Cycles:" cyclesTabbed
-  putStr $ ppAggregates cyclesAggr
-  putStr $ ppTable "Instructions:" instructionsTabbed
-  putStr $ ppAggregates instructionsAggr
-  putStr $ ppTable "Branches:" branchesTabbed
-  putStr $ ppAggregates branchesAggr
-  putStr $ ppTable "Branch Misses:" branchMissesTabbed
-  putStr $ ppAggregates branchMissesAggr
-  putStr $ ppTable "LLC Loads:" llcLoadsTabbed
-  putStr $ ppAggregates llcLoadsAggr
-  putStr $ ppTable "LLC Load Misses:" llcMissesTabbed
-  putStr $ ppAggregates llcMissesAggr
+  -- putStr (replicate (length programs * length styles * nCycles) '-')
+  -- putStr "\r"
+  -- runtimes <- forM programs $ \prog ->
+  --   forM styles $ \style ->
+  --     unzip7 <$> replicateM nCycles (getStat prog style Perf)
+  -- let (pageFaults, cycles, instructions, branches, branchMisses, llcLoads, llcMisses) =
+  --       unzip7 (map unzip7 runtimes)
+  -- let (pageTabbed, pageAggr) = tabulate showCount pageFaults
+  --     (cyclesTabbed, cyclesAggr) = tabulate showCount cycles
+  --     (instructionsTabbed, instructionsAggr) = tabulate showCount instructions
+  --     (branchesTabbed, branchesAggr) = tabulate showCount branches
+  --     (branchMissesTabbed, branchMissesAggr) = tabulate showCount branchMisses
+  --     (llcLoadsTabbed, llcLoadsAggr) = tabulate showCount llcLoads
+  --     (llcMissesTabbed, llcMissesAggr) = tabulate showCount llcMisses
+  --
+  -- putStr $ ppTable "Page faults:" pageTabbed
+  -- putStr $ ppAggregates pageAggr
+  -- putStr $ ppTable "Cycles:" cyclesTabbed
+  -- putStr $ ppAggregates cyclesAggr
+  -- putStr $ ppTable "Instructions:" instructionsTabbed
+  -- putStr $ ppAggregates instructionsAggr
+  -- putStr $ ppTable "Branches:" branchesTabbed
+  -- putStr $ ppAggregates branchesAggr
+  -- putStr $ ppTable "Branch Misses:" branchMissesTabbed
+  -- putStr $ ppAggregates branchMissesAggr
+  -- putStr $ ppTable "LLC Loads:" llcLoadsTabbed
+  -- putStr $ ppAggregates llcLoadsAggr
+  -- putStr $ ppTable "LLC Load Misses:" llcMissesTabbed
+  -- putStr $ ppAggregates llcMissesAggr
 
   return ()
 
@@ -237,10 +237,13 @@ PowerSet   &              1.1s (±0.5\%) &           -0.5\% (±0.5\%) &         
 ppTable :: String -> [[String]] -> String
 ppTable caption table = unlines $
   ["","","", "\\hline","\\multicolumn{4}{|c|}{"++caption++"}\\\\","\\hline"] ++
-  [intercalate "&" ("Name":map show styles) ++ "\\\\" ] ++
-  [ intercalate "&" (prog : progValues) ++ "\\\\"
+  [intercalate "&" ("\\textbf{Name}":map show styles) ++ "\\\\" ] ++
+  [ intercalate "&" (map (pad 15) (prog : progValues)) ++ "\\\\"
   | (prog, progValues) <- zip programs table ] ++
   ["\\hline"]
+
+pad :: Int -> String -> String
+pad n str = str ++ replicate (n-length str) ' '
 
 {-
 \hline
@@ -272,12 +275,12 @@ tabulate ppFn input = (map row input, transpose $ ["Min", "Max", "Mean"] : map c
       | (baseline:rest) <- input ]
     column cs = map showPercent [minimum cs,maximum cs,sum cs / (fromIntegral $ length cs)]
     row (baseline:rest) = showPrimary baseline : map (showRelative (median baseline)) rest
-    showRelative baseMed lst = diff ++ (" (±" ++ dev ++ ")")
+    showRelative baseMed lst = diff -- ++ (" (±" ++ dev ++ ")")
       where
         diff = showPercent' (fromIntegral (med-baseMed) / fromIntegral baseMed)
         med = median lst
         dev = showPercent (deviation lst med)
-    showPrimary lst = ppFn med ++ " (±" ++ dev ++ ")"
+    showPrimary lst = ppFn med -- ++ " (±" ++ dev ++ ")"
       where
         med = median lst
         dev = showPercent (deviation lst med)

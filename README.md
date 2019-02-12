@@ -21,8 +21,7 @@ compiled.
 ```
 stack install cabal-install
 stack exec -- cabal update
-cd packages/lhc-prim/
-stack exec -- cabal install --haskell-suite -w `stack exec -- which lhc`
+(cd packages/lhc-prim/ && stack exec -- cabal install --haskell-suite -w `stack exec -- which lhc`)
 ```
 
 After lhc-prim has been installed, all the programs in `examples/` will be

@@ -58,7 +58,6 @@ library
   ghc-options:        -fwarn-unused-imports -fwarn-unused-binds
                       -fwarn-incomplete-patterns -fwarn-missing-signatures
                       -fwarn-tabs
-                      -Werror
 
 
 executable bedrock
