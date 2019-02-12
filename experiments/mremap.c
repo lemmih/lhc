@@ -40,18 +40,19 @@ void test(size_t page_shift, bool reuse) {
   for(uint64_t j=0;j<TOTAL_MEMORY;j+=size) {
     // printf("Writing chunk: %lu %lu\n", j, TOTAL_MEMORY);
     memset(ptr+j, (int)j, size);
-    if(j+size<TOTAL_MEMORY && reuse) {
-      if(mremap(ptr+j, size, size, MREMAP_MAYMOVE | MREMAP_FIXED, ptr+j+size) == MAP_FAILED) {
-        printf("Error: %s\n", strerror(errno));
-        abort();
+    if(reuse) {
+      if(j+size<TOTAL_MEMORY) {
+        if(mremap(ptr+j, size, size, MREMAP_MAYMOVE | MREMAP_FIXED, ptr+j+size) == MAP_FAILED) {
+          printf("Error: %s\n", strerror(errno));
+          abort();
+        }
+      } else {
+        munmap(ptr+j, size);
       }
-      // munmap(ptr+j, size);
     } else {
       munmap(ptr+j, size);
     }
   }
-  if(reuse)
-    munmap(ptr+TOTAL_MEMORY-size, size);
 }
 
 int main() {
