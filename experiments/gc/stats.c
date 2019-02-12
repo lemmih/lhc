@@ -4,6 +4,12 @@
 #include <string.h>
 #include <time.h>
 
+#include <gsl/gsl_rstat.h>
+#include <gsl/gsl_statistics.h>
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_sort.h>
+
 void stats_init(Stats *s) {
   s->allocated = 0;
   s->nursery_n_collections = 0;
@@ -17,6 +23,10 @@ void stats_init(Stats *s) {
   s->start_time = 0;
   memset(s->timers,  0, sizeof(s->timers));
   s->n_timers=0;
+
+  s->latency_50 = gsl_rstat_quantile_alloc(0.50);
+  s->latency_90 = gsl_rstat_quantile_alloc(0.90);
+  s->latency_99 = gsl_rstat_quantile_alloc(0.99);
 }
 
 void stats_pprint(Stats *s) {
@@ -51,7 +61,8 @@ void stats_pprint(Stats *s) {
     "Survival:                     %3lu%%           %3lu%%\n"
     "Productivity: %3.0f%%           %-15s%s\n"
     "\n"
-    "Pauses:       max: %s, avg: %s\n"
+    "Pauses:        50%%     90%%     99%%     100%%\n"
+    "              %-8s%-8s%-8s%-8s\n"
     "Collections:                                %4lu\n"
     "\n"
     , pp_time(s->timers[MutTimer])
@@ -68,8 +79,10 @@ void stats_pprint(Stats *s) {
     , (double)(mut_time*100)/(MAX(mut_time+nursery_time,1))
     , pp_speed(s->nursery_copied, s->timers[MutTimer] + s->timers[Gen0Timer])
     , pp_speed(gen1_survival?s->gen1_copied/gen1_survival*100:0,s->timers[Gen1Timer])
+    , pp_time((uint64_t)gsl_rstat_quantile_get(s->latency_50))
+    , pp_time((uint64_t)gsl_rstat_quantile_get(s->latency_90))
+    , pp_time((uint64_t)gsl_rstat_quantile_get(s->latency_99))
     , pp_time(s->nursery_time_max)
-    , pp_time(s->timers[Gen0Timer]/(MAX(s->nursery_n_collections,1)))
     , s->gen1_collections
   );
 

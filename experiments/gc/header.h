@@ -15,7 +15,8 @@ typedef union {
     unsigned int black:1;
     unsigned int tag:15;
     bool mutable:1;
-    unsigned int unused:11;
+    unsigned int marked_ptrs:5;
+    unsigned int unused:6;
     // not available on 32bit systems:
     unsigned int prims:5;
     unsigned int ptrs:5;

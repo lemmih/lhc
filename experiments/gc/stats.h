@@ -9,6 +9,12 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include <gsl/gsl_rstat.h>
+#include <gsl/gsl_statistics.h>
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_sort.h>
+
 typedef uint64_t word;
 
 #define TIMER_STACK 8
@@ -30,6 +36,10 @@ typedef struct {
   enum Timer active_timer[TIMER_STACK];
   uint64_t n_timers;
   uint64_t timers[MaxTimer];
+
+  gsl_rstat_quantile_workspace *latency_50;
+  gsl_rstat_quantile_workspace *latency_90;
+  gsl_rstat_quantile_workspace *latency_99;
 } Stats;
 
 void stats_init(Stats *s);
@@ -110,6 +120,9 @@ static void stats_timer_end(Stats *s) {
   uint64_t t = now - s->start_time;
   assert(s->n_timers > 0);
   if(s->active_timer[s->n_timers-1] == Gen0Timer) {
+    gsl_rstat_quantile_add((double)t, s->latency_50);
+    gsl_rstat_quantile_add((double)t, s->latency_90);
+    gsl_rstat_quantile_add((double)t, s->latency_99);
     if(t > s->nursery_time_max) {
       s->nursery_time_max = t;
     }

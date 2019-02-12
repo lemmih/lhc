@@ -197,7 +197,7 @@ void nursery_evacuate_one(Nursery *ns, SemiSpace *semi, hp* objAddr) {
   }
 }
 
-#define STACK_MAX (NURSERY_SIZE/2)
+#define STACK_MAX (NURSERY_SIZE)
 static void nursery_evacuate_stack(Nursery *ns, SemiSpace *semi, hp* objAddr) {
   hp* stack[STACK_MAX];
   int top = -1;

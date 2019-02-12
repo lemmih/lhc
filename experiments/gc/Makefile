@@ -15,7 +15,7 @@ SHARED=stats.o header.o nursery.o utils.o objects.o semispace.o \
 	$(CC) $(CFLAGS) -S -emit-llvm $<
 
 bench: benchmark.o $(SHARED)
-	$(CC) -o bench benchmark.o $(SHARED)
+	$(CC) -lgsl -o bench benchmark.o $(SHARED)
 
 test: FORCE
 	@$(CC) -lcriterion -o test test.c $(SHARED:.o=.c)

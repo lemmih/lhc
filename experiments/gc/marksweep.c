@@ -163,10 +163,8 @@ static void ms_mark_one(MarkSweep *ms) {
   printf("Mark one: Followed object\n");
   assert( header.data.isForwardPtr == 0);
 
-  const uint8_t prims = header.data.prims;
-  const uint8_t ptrs = header.data.ptrs;
-  assert(prims == InfoTable[header.data.tag].prims);
-  assert(ptrs == InfoTable[header.data.tag].ptrs);
+  const uint8_t prims = getObjectPrims(header);
+  const uint8_t ptrs = getObjectPtrs(header);
   const word obj_size = 1+prims+ptrs;
 
   printf("Mark one: Unpacked object: %ld %d %d %d\n", obj_size, prims, ptrs, header.data.gen);
