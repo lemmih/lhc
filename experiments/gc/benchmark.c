@@ -274,14 +274,11 @@ static void bench4(Stats *s, int iterations) {
   for(int i=0; i<iterations; i++)
     tree = bintree_insert(&ns, &semi, s, tree, random());
 
-  // bintree_print(tree);
-  ss_pop();
-
   stats_timer_end(s);
   semi_close(&semi, s);
 }
 
-static void bench5(Stats *s, const int iterations, const bool bypass) {
+static void bench5(Stats *s, const int iterations) {
   Nursery ns;
   SemiSpace semi;
   hp obj;
@@ -304,8 +301,6 @@ static void bench5(Stats *s, const int iterations, const bool bypass) {
       if(!semi_check(&semi, NURSERY_SIZE)) {
         semi_scavenge(&semi, s);
       }
-      if(bypass)
-        nursery_bypass(&ns, &semi);
       obj = allocate(&ns, &semi, IORef, (MkIORef){obj});
     } else {
       obj = new;
@@ -314,10 +309,6 @@ static void bench5(Stats *s, const int iterations, const bool bypass) {
   stats_timer_end(s);
   semi_close(&semi, s);
 }
-
-// static void bench4(int iterations) {
-//
-// }
 
 void print_usage(char *prog) {
   printf("Usage: %s {n}\n", prog);
@@ -334,8 +325,6 @@ void print_usage(char *prog) {
   printf("  n=5   Allocate 100%% long-lived IORefs.\n");
 }
 
-// OK:  0 1 2 3 4 6
-// BAD: 6 4 3
 void enable_lowlatency() {
   struct sched_param param;
   cpu_set_t set;
@@ -373,7 +362,7 @@ int main(int argc, char* argv[]) {
       bench3(&s, 3000000000, 1);
       bench3(&s, 3000000000, 2);
       bench4(&s, 3000000);
-      bench5(&s, 50000000, false);
+      bench5(&s, 50000000);
     } else if(strcmp(argv[1], "1")==0) {
       bench1(&s, 20, 10000, 100000000);
     } else if(strcmp(argv[1], "2a")==0) {
@@ -393,7 +382,7 @@ int main(int argc, char* argv[]) {
     } else if(strcmp(argv[1], "4")==0) {
       bench4(&s, 3000000);
     } else if(strcmp(argv[1], "5")==0) {
-      bench5(&s, 50000000, false);
+      bench5(&s, 50000000);
     } else {
       print_usage(argv[0]);
       return -1;
