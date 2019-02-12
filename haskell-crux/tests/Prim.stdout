@@ -310,12 +310,30 @@ LHC.Prim.max =
 LHC.Prim.length : ∀ sk_76_a. [sk_76_a] →  LHC.Prim.Int
 LHC.Prim.length =
   λ @.sk_76_a^130:* LHC.Prim.lst^131:[sk_76_a] → 
-  LHC.Prim.length @.sk_76_a^130
-    LHC.Prim.lst^131
+  LHC.Prim.length_go @.sk_76_a^130
+      (LHC.Prim.I# (LHC.Prim.i64toi32
+          0)) LHC.Prim.lst^131
+LHC.Prim.length_go : ∀ sk_79_a. LHC.Prim.Int →  [sk_79_a] →  LHC.Prim.Int
+LHC.Prim.length_go =
+  λ @.sk_79_a^132:* LHC.Prim.n^133:LHC.Prim.Int arg^134:[sk_79_a] → 
+  case arg^134 of
+    scrut^135:[sk_79_a]
+    LHC.Prim.Nil  → 
+      LHC.Prim.n^133
+    DEFAULT → 
+      scrut^136 ← LHC.Prim.n^133
+      LHC.Prim.I# LHC.Prim.n^137:LHC.Prim.I32 ← scrut^136:LHC.Prim.Int
+      scrut^138 ← arg^134
+      LHC.Prim.Cons LHC.Prim.x^139:sk_79_a LHC.Prim.xs^140:[sk_79_a] ← scrut^138:[sk_79_a]
+      LHC.Prim.length_go @.sk_79_a^132
+          (LHC.Prim.+ (LHC.Prim.I#
+                LHC.Prim.n^137) (LHC.Prim.I#
+              (LHC.Prim.i64toi32 1)))
+        LHC.Prim.xs^140
 LHC.Prim.emptyString : [LHC.Prim.Char]
 LHC.Prim.emptyString =
   LHC.Prim.Nil
-LHC.Prim.id : ∀ sk_79_a. sk_79_a →  sk_79_a
+LHC.Prim.id : ∀ sk_84_a. sk_84_a →  sk_84_a
 LHC.Prim.id =
-  λ @.sk_79_a^132:* LHC.Prim.x^133:sk_79_a → 
-  LHC.Prim.x^133
+  λ @.sk_84_a^141:* LHC.Prim.x^142:sk_84_a → 
+  LHC.Prim.x^142

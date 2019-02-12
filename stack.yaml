@@ -5,16 +5,11 @@ allow-newer: true
 packages:
 - '.'
 - bedrock
-# - ../haskell-crux
+- haskell-crux
 
 - location:
     git: https://github.com/haskell-suite/haskell-tc.git
     commit: a411e72a2dcabc7cf23cfb79f8801c4d2b102674
-  extra-dep: true
-
-- location:
-    git: https://github.com/Lemmih/haskell-crux
-    commit: b9366eec7860977a14c412bf6f0b3e4abbf66ebe
   extra-dep: true
 
 - location:
