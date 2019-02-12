@@ -49,6 +49,11 @@ unitTests =
   [ sugarTest "Prim"
   , sugarTest "Basic1"
   , sugarTest "Where"
+  , sugarTest "Case1"
+  , sugarTest "Case2"
+  , sugarTest "Do"
+  , sugarTest "List"
+  , sugarTest "Shadow"
   , testGroup "Haskell2010"
     [
     ]
