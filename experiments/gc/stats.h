@@ -81,9 +81,9 @@ static char *pp_bytes(uint64_t words) {
   i = (i+1) % 10;
   if(bytes < 1024) {
     snprintf(buffer[i], 128, "%4lu B", bytes);
-  } if(bytes < 1024*1024) {
+  } else if(bytes < 1024*1024) {
     snprintf(buffer[i], 128, "%4lu KB", bytes/1024);
-  } if(bytes < (uint64_t)1024*1024*1024*10) {
+  } else if(bytes < (uint64_t)1024*1024*1024*10) {
     snprintf(buffer[i], 128, "%4lu MB", bytes/1024/1024);
   } else {
     snprintf(buffer[i], 128, "%4.1f GB", ((double)bytes)/1024/1024/1024);
