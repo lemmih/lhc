@@ -45,10 +45,8 @@ inline static void nursery_evacuate_one_copy(Nursery *ns, SemiSpace *semi, hp* o
   }
   assert( header.data.isForwardPtr == 0);
 
-  const uint8_t prims = header.data.prims;
-  const uint8_t ptrs = header.data.ptrs;
-  assert(prims == InfoTable[header.data.tag].prims);
-  assert(ptrs == InfoTable[header.data.tag].ptrs);
+  const uint8_t prims = getObjectPrims(header);
+  const uint8_t ptrs = getObjectPtrs(header);
   const word obj_size = 1+prims+ptrs;
 
   switch( header.data.gen ) {
@@ -103,8 +101,8 @@ void nursery_scavenge(Nursery *ns, SemiSpace *semi) {
   while(scavenged < semi->black_space.free) {
     header = readHeader(scavenged);
 
-    const uint8_t prims = header.data.prims;
-    const uint8_t ptrs = header.data.ptrs;
+    const uint8_t prims = getObjectPrims(header);
+    const uint8_t ptrs = getObjectPtrs(header);
     scavenged += 1 + prims;
     for(int i=0;i<ptrs;i++) {
       nursery_evacuate_one_copy(ns, semi, (hp*) scavenged);
@@ -156,10 +154,8 @@ void nursery_evacuate_one(Nursery *ns, SemiSpace *semi, hp* objAddr) {
   }
   assert( header.data.isForwardPtr == 0);
 
-  const uint8_t prims = header.data.prims;
-  const uint8_t ptrs = header.data.ptrs;
-  assert(prims == InfoTable[header.data.tag].prims);
-  assert(ptrs == InfoTable[header.data.tag].ptrs);
+  const uint8_t prims = getObjectPrims(header);
+  const uint8_t ptrs = getObjectPtrs(header);
   const word obj_size = 1+prims+ptrs;
 
   switch( header.data.gen ) {
@@ -238,12 +234,8 @@ cycle:
     }
     assert( header.data.isForwardPtr == 0);
 
-    const uint8_t prims = header.data.prims;
-    const uint8_t ptrs = header.data.ptrs;
-    // const uint8_t prims = InfoTable[header.data.tag].prims;
-    // const uint8_t ptrs = InfoTable[header.data.tag].ptrs;
-    assert(prims == InfoTable[header.data.tag].prims);
-    assert(ptrs == InfoTable[header.data.tag].ptrs);
+    const uint8_t prims = getObjectPrims(header);
+    const uint8_t ptrs = getObjectPtrs(header);
     const word obj_size = 1+prims+ptrs;
 
     switch( header.data.gen ) {
@@ -330,10 +322,8 @@ static hp nursery_evacuate_plain(Nursery *ns, SemiSpace *semi, hp* objAddr, hp b
   }
   assert( header.data.isForwardPtr == 0);
 
-  const uint8_t prims = header.data.prims;
-  const uint8_t ptrs = header.data.ptrs;
-  assert(prims == InfoTable[header.data.tag].prims);
-  assert(ptrs == InfoTable[header.data.tag].ptrs);
+  const uint8_t prims = getObjectPrims(header);
+  const uint8_t ptrs = getObjectPtrs(header);
   const word obj_size = 1+prims+ptrs;
 
   switch( header.data.gen ) {

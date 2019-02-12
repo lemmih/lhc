@@ -176,8 +176,8 @@ void semi_scavenge_concurrent(SemiSpace *semi, Stats *s) {
       header.data.black = black_bit;
       *grey_scavenged = header.raw;
 
-      const uint8_t prims = header.data.prims;
-      const uint8_t ptrs = header.data.ptrs;
+      const uint8_t prims = getObjectPrims(header);
+      const uint8_t ptrs = getObjectPtrs(header);
       work += 1 + prims + ptrs;
       grey_scavenged += 1 + prims;
       for(int i=0;i<ptrs;i++) {
@@ -206,8 +206,8 @@ void semi_scavenge(SemiSpace *semi, Stats *s) {
     header.data.black = semi->black_bit;
     *semi->grey_space.scavenged = header.raw;
 
-    const uint8_t prims = header.data.prims;
-    const uint8_t ptrs = header.data.ptrs;
+    const uint8_t prims = getObjectPrims(header);
+    const uint8_t ptrs = getObjectPtrs(header);
     semi->grey_space.scavenged += 1 + prims;
     for(int i=0;i<ptrs;i++) {
       semi_evacuate(semi, (hp*) semi->grey_space.scavenged);
