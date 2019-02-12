@@ -1,0 +1,9 @@
+Main.id : ∀ v2. v2 →  v2
+Main.id =
+  λ @.v2^1:* Main.x^2:v2 → 
+  Main.x^2
+Main.nul : ∀ v5. [v5]
+Main.nul =
+  λ @.v5^3:* → 
+  Main.id (@.LHC.Prim.List @.v5^3)
+    LHC.Prim.Nil

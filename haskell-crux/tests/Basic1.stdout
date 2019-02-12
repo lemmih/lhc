@@ -1,0 +1,13 @@
+Basic1.dot : ∀ v14 v16 v13. (v14 →  v13) →  (v16 →  v14) →  v16 →  v13
+Basic1.dot =
+  λ @.v14^1:* @.v16^2:* @.v13^3:* Basic1.f^4:(v14 →  v13) Basic1.g^5:(v16 →  v14) Basic1.x^6:v16 → 
+  Basic1.f^4 (Basic1.g^5
+      Basic1.x^6)
+Basic1.id : ∀ v8. v8 →  v8
+Basic1.id =
+  λ @.v8^7:* Basic1.x^8:v8 → 
+  Basic1.x^8
+Basic1.apply : ∀ v4 v3. (v4 →  v3) →  v4 →  v3
+Basic1.apply =
+  λ @.v4^9:* @.v3^10:* Basic1.f^11:(v4 →  v3) Basic1.a^12:v4 → 
+  Basic1.f^11 Basic1.a^12

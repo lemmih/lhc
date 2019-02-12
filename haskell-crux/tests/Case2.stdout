@@ -1,0 +1,12 @@
+Case2.x : ∀ v0. v0
+Case2.x =
+  λ @.v0^1:* → 
+  Case2.x @.v0^1
+Case2.y : ()
+Case2.y =
+  Case2.y
+Case2.z : ()
+Case2.z =
+  scrut^2 ← Case2.z
+  LHC.Prim.Unit  ← scrut^2:()
+  LHC.Prim.Unit

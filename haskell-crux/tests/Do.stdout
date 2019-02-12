@@ -1,0 +1,10 @@
+Do.main : ∀ v6. LHC.Prim.IO v6
+Do.main =
+  λ @.v6^1:* → 
+  LHC.Prim.thenIO @.v6^1 @.v6^1
+      (Do.main @.v6^1)
+    (LHC.Prim.thenIO @.v6^1 @.v6^1
+        (Do.main @.v6^1)
+      (LHC.Prim.bindIO @.v6^1 @.v6^1
+          (Do.main @.v6^1) (λ Do.v^2:v6 → 
+        Do.main @.v6^1)))
