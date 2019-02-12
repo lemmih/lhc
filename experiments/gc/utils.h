@@ -3,6 +3,10 @@
 
 #include "header.h"
 #include "objects.h"
+#include <sys/mman.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
 
 void touchSpace(hp ptr, word size);
 
@@ -29,6 +33,18 @@ static void followIndirection(hp* objAddr) {
     *objAddr = obj;
     header = readHeader(obj);
   }
+}
+
+static void* mmap_aligned(size_t alignment, size_t length, int prot, int flags) {
+  word off;
+  void *p = mmap(NULL, length+alignment, prot, flags, -1, 0);
+  assert(p != (void*)-1);
+  off = (word)p%alignment;
+  if(off) {
+    munmap(p, alignment-off);
+    p += alignment - off;
+  }
+  return p;
 }
 
 

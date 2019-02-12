@@ -2,6 +2,7 @@
 #include "objects.h"
 #include "nursery.h"
 #include "semispace.h"
+#include "marksweep.h"
 #include "header.h"
 #include "stats.h"
 #include <stdint.h>
@@ -20,7 +21,12 @@
   nursery_init(&ns);\
   semi_init(&semi)
 
-
+Test(basic, mmap_aligned) {
+  void* p;
+  p = mmap_aligned(MS_BLOCK_SIZE, MS_BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE);
+  cr_assert_not_null(p);
+  cr_assert(GET_BLOCK_PTR(p) == p);
+}
 Test(static, sizeof_header) {
   cr_assert(sizeof(Header) == sizeof(word));
 }
@@ -281,4 +287,64 @@ Test(semispace, bad_ref, .signal = SIGSEGV) {
   nursery_end(&ns, &semi, &s);
   semi_scavenge(&semi, &s); // This should cause a segfault.
   cr_assert_fail("Expected segfault.");
+}
+
+Test(marksweep, block_size) {
+  Block b;
+  MarkStack s;
+  cr_assert(sizeof(Block) == MS_BLOCK_SIZE);
+  cr_assert(sizeof(MarkStack) == MS_BLOCK_SIZE);
+  // cr_assert(MS_CHUNK_SIZE == 8);
+  cr_assert(sizeof(b.data)/sizeof(*b.data) == MS_BLOCK_ENTRIES);
+  cr_assert(sizeof(s.stack)/sizeof(*s.stack) == MS_STACK_ENTRIES);
+}
+Test(marksweep, reserve_block) {
+  MarkSweep ms;
+  Block *block;
+  // cr_skip_test();
+
+  ms_init(&ms);
+  block = ms_reserve_block(&ms);
+  cr_assert_not_null(block);
+  cr_assert(ms_block_popcount(block) == 0);
+
+  ms_mark_object(0,&block->data[0]);
+  ms_mark_object(0,&block->data[MS_BLOCK_ENTRIES-1]);
+}
+Test(marksweep, push_pop) {
+  MarkSweep ms;
+  ms_init(&ms);
+
+  ms_stack_push(&ms, (hp*) NULL);
+  cr_assert_null(ms_stack_pop(&ms));
+  // cr_assert(ms)
+}
+Test(marksweep, sweep_empty) {
+  MarkSweep ms;
+  ms_init(&ms);
+
+  Block *block = ms_reserve_block(&ms);
+
+
+
+  Header header;
+  header.data.tag = Unit;
+  header.data.gen = 2;
+  header.data.prims = InfoTable[Unit].prims;
+  header.data.ptrs = InfoTable[Unit].ptrs;
+  header.data.black = ms.black_bit;
+  block->data[0] = header.raw;
+  block->data[1] = header.raw;
+  block->data[2] = header.raw;
+
+  ms_mark_all(&ms);
+
+  hp ref1 = &block->data[0];
+  ms_stack_push(&ms, &ref1);
+  // hp ref2 = &block->data[1];
+  // ms_stack_push(&ms, &ref2);
+  // hp ref3 = &block->data[2];
+  // ms_stack_push(&ms, &ref3);
+
+  ms_mark_all(&ms);
 }

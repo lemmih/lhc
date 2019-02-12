@@ -1,10 +1,35 @@
+Weak pointers / finalizers
+
+Stable names
+
+Stable ptrs
+
+
+
 Nursery
 
 SemiSpace
 
 Immix
+  Nah.
 
+Mark&Sweep.
+  Tricolor.
 
+  The weak tricolour invariant: All white objects pointed to by a black object
+  are grey protected (that is, reachable from some grey object, either directly
+  or through a chain of white objects).
+
+  Non-compacting.
+  Algorithm:
+    - clear mark bitmaps
+    - add roots to gray set
+    - traverse graph. update bitmap and object color.
+    - flip color bit. (white <=> black)
+    - sort blocks so empty blocks are first.
+    - once gen1 starts allocating into a block, the entire block is considered
+      used. If gen1 grabs a block with, say, 50% used lines, none of those
+      lines can be freed by the gen2 collector this cycle.
 
 Questions:
   Remembered set?
