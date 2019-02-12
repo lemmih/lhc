@@ -4,12 +4,6 @@
 #include <string.h>
 #include <time.h>
 
-#include <gsl/gsl_rstat.h>
-#include <gsl/gsl_statistics.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_sort.h>
-
 void stats_init(Stats *s) {
   s->allocated = 0;
   s->nursery_n_collections = 0;

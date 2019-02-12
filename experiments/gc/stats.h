@@ -10,10 +10,6 @@
 #include <assert.h>
 
 #include <gsl/gsl_rstat.h>
-#include <gsl/gsl_statistics.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_sort.h>
 
 typedef uint64_t word;
 
