@@ -24,6 +24,7 @@ script:
   - stack build
   - stack install cabal-install
   - stack exec -- cabal update
-  - (cd packages/lhc-prim/; stack exec -- cabal install --haskell-suite -w `stack exec -- which lhc`)
+  - stack test --no-run-tests
+  - stack build && (cd packages/lhc-prim/; stack exec -- cabal install --haskell-suite -w `stack exec -- which lhc`)
   - stack test
   - stack clean
