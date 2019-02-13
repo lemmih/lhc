@@ -147,6 +147,8 @@ blockNodes block =
         | Alternative _pattern branch <- alts ]
     Bind _vars (Store node _args) rest ->
       setNodeName node (blockNodes rest)
+    Bind _vars (StoreAlloc node _tys) rest ->
+      setNodeName node (blockNodes rest)
     Bind _vars (MkNode node _args) rest ->
       setNodeName node (blockNodes rest)
     Bind _vars _ rest -> blockNodes rest

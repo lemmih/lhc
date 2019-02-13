@@ -66,6 +66,16 @@ simplifyBlock block =
             Bind [ptr]
                 <$> simplifyExpression expr
                 <*> simplifyBlock rest
+        Bind [ptr] expr@(StoreAlloc name _tys) rest ->
+            bindStore ptr name [] $
+            Bind [ptr]
+                <$> simplifyExpression expr
+                <*> simplifyBlock rest
+        Bind [] expr@(StoreWrite ptr args) rest ->
+            bindStoreArgs ptr args $
+            Bind []
+                <$> simplifyExpression expr
+                <*> simplifyBlock rest
         Bind [node] expr@(MkNode name vars) rest ->
             bindConstant node name vars $
             Bind [node]
@@ -318,6 +328,10 @@ lookupLoad var = do
 bindStore :: Variable -> NodeName -> [Variable] -> M a -> M a
 bindStore var node vars = local $ \env ->
     env{ envStores = Map.insert var (node, vars) (envStores env) }
+
+bindStoreArgs :: Variable -> [Variable] -> M a -> M a
+bindStoreArgs var vars = local $ \env ->
+    env{ envStores = Map.adjust (\(node, _) -> (node, vars)) var (envStores env) }
 
 bindLoad :: Variable -> Variable -> Int -> M a -> M a
 bindLoad var ptr n = local $ \env ->
