@@ -1,4 +1,4 @@
-resolver: lts-10.10
+resolver: lts-12.26
 
 allow-newer: true
 
@@ -9,12 +9,12 @@ packages:
 
 - location:
     git: https://github.com/haskell-suite/haskell-tc.git
-    commit: a411e72a2dcabc7cf23cfb79f8801c4d2b102674
+    commit: e91127b4bddce0f660d36c53cef887a2142b5721
   extra-dep: true
 
 - location:
     git: https://github.com/haskell-suite/haskell-scope.git
-    commit: e552d0ec70d473e4b4e2ac283cb21c4d8116766c
+    commit: 6a149be78c62248ca4b76fc5279b55c01d548010
   extra-dep: true
 
 - location:
@@ -37,11 +37,9 @@ packages:
 
 
 extra-deps:
-- haskell-src-exts-1.20.2
+- haskell-src-exts-1.21.0
 - llvm-hs-pure-6.0.0
 - resolv-0.1.1.1
 - cabal-helper-0.7.3.0
-
-flags:
-  llvm-hs:
-    shared-llvm: true
+- hse-cpp-0.2
+- compact-0.1.0.1

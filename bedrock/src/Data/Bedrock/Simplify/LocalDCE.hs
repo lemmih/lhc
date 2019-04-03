@@ -21,9 +21,11 @@ newtype Out = Out (Map Variable (Set Variable))
 type In = Set Variable
 type M a = ReaderT In (Writer Out) a
 
+instance Semigroup Out where
+  Out m1 <> Out m2 = Out (Map.unionWith Set.union m1 m2)
+
 instance Monoid Out where
   mempty = Out Map.empty
-  mappend (Out m1) (Out m2) = Out (Map.unionWith Set.union m1 m2)
 
 dceFunction :: Function -> Function
 dceFunction fn =
