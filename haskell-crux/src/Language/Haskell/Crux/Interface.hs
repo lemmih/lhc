@@ -50,11 +50,6 @@ writeInterface path iface = writeFileSerialise path iface -- writeCompact path =
 
 readInterface :: FilePath -> IO Interface
 readInterface path = readFileDeserialise path
--- readInterface path = do
---   ret <- unsafeReadCompact path
---   case ret of
---     Left msg    -> error msg
---     Right iface -> pure (getCompact iface)
 
 instance Serialise Interface
 instance Serialise Entity
