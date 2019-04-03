@@ -763,6 +763,7 @@ convertLiteralToExpr lit =
         HS.PrimInt _ int _    -> Lit $ LitInt int
         HS.PrimChar _ char _  -> Lit $ LitChar char
         HS.String _ str _     -> App unpackString (Lit $ LitString str)
+        HS.Char _ char _      -> error "Unhandled Char"
         _                     -> unhandledSyntax lit
 
 convertLiteral :: HS.Literal Typed -> Literal
@@ -771,6 +772,7 @@ convertLiteral lit =
         HS.PrimString _ str _ -> LitString str
         HS.PrimInt _ int _    -> LitInt int
         HS.PrimChar _ char _  -> LitChar char
+        HS.Char _ char _      -> error "Unhandled Lit Char"
         _                     -> unhandledSyntax lit
 
 exprType :: Expr -> M TC.Type

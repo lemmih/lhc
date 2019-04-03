@@ -1,11 +1,19 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Language.Haskell.Crux where
 
+import           Codec.Serialise
 import           Data.List
-import qualified Data.Semigroup as Semigroup
+import qualified Data.Semigroup                    as Semigroup
+import           GHC.Generics
+import           Language.Haskell.Exts             (SrcSpan, SrcSpanInfo)
+import qualified Language.Haskell.Scope            as Scope
 import           Language.Haskell.TypeCheck        (Type (..))
+import qualified Language.Haskell.TypeCheck        as TC
 import           Language.Haskell.TypeCheck.Pretty
 import qualified LLVM.AST                          as LLVM (Type)
+import qualified LLVM.AST                          as LLVM
+import qualified LLVM.AST.AddrSpace                as LLVM (AddrSpace)
 import qualified Text.PrettyPrint.ANSI.Leijen      as Doc
 
 data Module = Module
@@ -13,35 +21,35 @@ data Module = Module
     , cruxDecls    :: [Declaration]
     , cruxNodes    :: [NodeDefinition]
     , cruxNewTypes :: [NewType]
-    } deriving (Show)
+    } deriving (Show, Generic)
 
 data Foreign = Foreign
   { foreignName      :: String
   , foreignReturn    :: LLVM.Type
   , foreignArguments :: [LLVM.Type]
-  } deriving (Show, Read, Eq )
+  } deriving (Show, Read, Eq, Generic)
 
 data Name = Name
   { nameModule     :: [String]
   , nameIdentifier :: String
   , nameUnique     :: Int
-  } deriving (Show, Read, Eq, Ord)
+  } deriving (Show, Read, Eq, Ord, Generic)
 
 data Declaration = Declaration
   { declType :: Type
   , declName :: Name
   , declBody :: Expr }
-  deriving (Show)
+  deriving (Show, Generic)
 
 data NodeDefinition = NodeDefinition Variable
-    deriving (Show)
+    deriving (Show, Generic)
 
-newtype NewType = IsNewType Variable deriving (Show, Eq)
+newtype NewType = IsNewType Variable deriving (Show, Eq, Generic)
 
 data Variable = Variable
     { varName :: Name
     , varType :: Type
-    } deriving ( Show, Eq, Ord )
+    } deriving ( Show, Eq, Ord, Generic )
 
 data Expr
     = Var Variable
@@ -57,22 +65,22 @@ data Expr
     | Case Expr Variable (Maybe Expr) [Alt]
     | Convert Expr Type
     | Cast
-    deriving ( Show, Eq )
+    deriving ( Show, Eq, Generic )
 
 data LetBind
     = NonRec Variable Expr
     | Rec [(Variable, Expr)]
-    deriving ( Show, Eq )
+    deriving ( Show, Eq, Generic )
 
 data Alt = Alt Pattern Expr
-    deriving ( Show, Eq )
+    deriving ( Show, Eq, Generic )
 
 data Pattern
     = ConPat Variable [Variable]
     | LitPat Literal
     | UnboxedPat [Variable]
     -- VarPat Variable
-    deriving ( Show, Eq )
+    deriving ( Show, Eq, Generic )
 
 -- All unlifted.
 data Literal
@@ -83,7 +91,7 @@ data Literal
     | LitFloat Rational
     | LitDouble Rational
     | LitVoid
-    deriving ( Show, Eq )
+    deriving ( Show, Eq, Generic )
 
 
 --------------------------------------------------------------
@@ -243,3 +251,31 @@ ppSyntax = Doc.green . text
 
 ppList :: [Doc] -> Doc
 ppList = Doc.hsep . Doc.punctuate (Doc.char ',')
+
+
+instance Serialise Module
+instance Serialise Foreign
+instance Serialise Declaration
+instance Serialise Type
+instance Serialise Name
+instance Serialise Expr
+instance Serialise LetBind
+instance Serialise Alt
+instance Serialise Variable
+instance Serialise Literal
+instance Serialise Pattern
+instance Serialise NodeDefinition
+instance Serialise NewType
+instance Serialise TC.Predicate
+instance Serialise TC.TcVar
+instance Serialise Scope.Entity
+instance Serialise SrcSpanInfo
+instance Serialise SrcSpan
+instance Serialise Scope.QualifiedName
+instance Serialise Scope.EntityKind
+instance Serialise a => Serialise (TC.Qualified a)
+
+instance Serialise LLVM.Type
+instance Serialise LLVM.AddrSpace
+instance Serialise LLVM.FloatingPointType
+instance Serialise LLVM.Name

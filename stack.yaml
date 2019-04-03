@@ -41,4 +41,4 @@ extra-deps:
 - llvm-hs-pure-6.0.0
 - cabal-helper-0.7.3.0
 - hse-cpp-0.2
-- compact-0.1.0.1
+- serialise-0.2.1.0

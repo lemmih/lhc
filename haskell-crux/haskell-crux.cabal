@@ -27,16 +27,16 @@ library
   -- other-modules:
   other-extensions:    GeneralizedNewtypeDeriving,
                        LambdaCase
-  build-depends:       base >=4.9,
-                       haskell-src-exts >=1.20 && <1.21,
+  build-depends:       base >=4.11,
+                       haskell-src-exts >=1.21 && <1.22,
                        haskell-scope >=0.1 && <0.2,
                        haskell-tc >=0.1 && <0.2,
                        containers >=0.5 && <0.6,
                        mtl >=2.2 && <2.3,
                        array >=0.5 && <0.6,
-                       compact,
                        llvm-hs-pure,
-                       ansi-wl-pprint
+                       ansi-wl-pprint,
+                       serialise
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:        -fwarn-unused-imports -fwarn-unused-binds
@@ -50,14 +50,13 @@ test-suite spec
   main-is: runtests.hs
   hs-source-dirs: tests
   build-depends:
-                         base >=4.10 && <4.11,
-                         haskell-src-exts >=1.20 && <1.21,
+                         base >=4.11 && <5,
+                         haskell-src-exts >=1.21 && <1.22,
                          haskell-scope >=0.1 && <0.2,
                          haskell-tc >=0.1 && <0.2,
                          containers >=0.5 && <0.6,
                          mtl >=2.2 && <2.3,
                          array >=0.5 && <0.6,
-                         compact,
                          haskell-crux,
                          llvm-hs-pure,
                          ansi-wl-pprint,

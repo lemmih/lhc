@@ -44,7 +44,7 @@ Executable lhc
                      binary,
                      directory,
                      llvm-hs-pure,
-                     compact,
+                     serialise,
 
                      bedrock,
                      haskell-crux,

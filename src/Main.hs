@@ -26,7 +26,7 @@ import qualified Language.Haskell.Crux              as Core
 import qualified Language.Haskell.Crux.DCE          as Core
 import qualified Language.Haskell.Crux.FromHaskell  as Haskell
 import           Language.Haskell.Crux.Interface
-import qualified Language.Haskell.Crux.NewTypes      as NewType
+import qualified Language.Haskell.Crux.NewTypes     as NewType
 import qualified Language.Haskell.Crux.SimpleEta    as Core
 import qualified Language.Haskell.Crux.SimpleInline as Core
 import qualified Language.Haskell.Crux.Simplify     as Core
@@ -35,6 +35,7 @@ import           Options.Applicative
 import           RTS                                (linkRTS)
 import           System.Directory
 
+import           Codec.Serialise
 import qualified Distribution.HaskellSuite.Compiler as Compiler
 import           Distribution.HaskellSuite.Packages
 import           Distribution.InstalledPackageInfo  (ExposedModule (..),
@@ -42,8 +43,6 @@ import           Distribution.InstalledPackageInfo  (ExposedModule (..),
                                                      exposedModules,
                                                      libraryDirs)
 import           Distribution.Version
-import           Data.Compact
-import           Data.Compact.Serialize
 
 
 import           Paths_lhc
@@ -141,7 +140,7 @@ compileLibrary buildDir mbLang exts cppOpts pkgName pkgdbs deps files = do
                 coreFile = buildDir </> moduleFile m' <.> "core"
                 complete = Core.simplify $ Core.simplify $ NewType.lowerNewTypes $ Core.simplify $ Core.simplify core
                 (_,etaAbs) = Core.simpleEta Core.emptySimpleEtaAnnotation complete
-            writeCompact coreFile =<< compact etaAbs
+            writeFileSerialise coreFile etaAbs
             writeFile (coreFile <.> "pretty") (show $ pretty etaAbs)
             writeIORef resolveEnvRef resolveEnv'
             writeIORef tiEnvRef tiEnv'
@@ -153,11 +152,8 @@ loadLibrary pkgInfo =
     Just hiFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath (exposedName exposedModule) <.> "hi")
     Just coreFile <- findFile (libraryDirs pkgInfo) (Dist.toFilePath (exposedName exposedModule) <.> "core")
     iface <- readInterface hiFile
-    ret <- unsafeReadCompact coreFile
-    case ret of
-      Left msg   -> error msg
-      Right core ->
-        return (intercalate "." (Dist.components $ exposedName exposedModule), (iface, getCompact core))
+    core <- readFileDeserialise coreFile
+    return (intercalate "." (Dist.components $ exposedName exposedModule), (iface, core))
 
 -- Load dependencies interface files
 -- convert to scope interfaces
