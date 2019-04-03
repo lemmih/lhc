@@ -39,7 +39,6 @@ packages:
 extra-deps:
 - haskell-src-exts-1.21.0
 - llvm-hs-pure-6.0.0
-- resolv-0.1.1.1
 - cabal-helper-0.7.3.0
 - hse-cpp-0.2
 - compact-0.1.0.1
