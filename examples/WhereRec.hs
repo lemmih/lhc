@@ -4,10 +4,12 @@ import LHC.Prim
 import LHC.Prelude
 
 main :: IO ()
-main = putStrLn (showInt (last (reverse (reverse longList))))
-
-longList :: [Int]
-longList = replicate 2000 0
+main = do
+    putStr "head ones = "
+    putStrLn (showInt (head ones))
+  where
+    ones :: [Int]
+    ones = 1 : ones
 
 entrypoint :: ()
 entrypoint = unsafePerformIO main

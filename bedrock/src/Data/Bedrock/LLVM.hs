@@ -109,11 +109,16 @@ toLLVM bedrock = LLVM.Module
               , parameters = ([ Parameter (LLVM.ptr wordTy) (UnName 0) []
                               , Parameter wordTy (UnName 1) []], False)
               }
+      newDefinition $ GlobalDefinition functionDefaults
+              { name = LLVM.Name "_lhc_checkNode"
+              , returnType = VoidType
+              , parameters = ([ Parameter (LLVM.ptr wordTy) (UnName 0) []], False)
+              }
       getLayoutDef
 
       mainDef
       forM_ (functions bedrock) $ \Bedrock.Function{..} -> do
-        blocks <- genBlocks $ blockToLLVM fnBody
+        blocks <- genBlocks $ checkArguments fnArguments >> blockToLLVM fnBody
         mbPrefix <- attributesToPrefix fnAttributes
         newDefinition $ GlobalDefinition functionDefaults
             { name = nameToLLVM fnName
@@ -301,6 +306,21 @@ toLocalReference :: Variable -> Operand
 toLocalReference var =
   LocalReference (typeToLLVM $ variableType var) (nameToLLVM $ variableName var)
 
+checkArguments :: [Variable] -> GenBlocks ()
+checkArguments args = forM_ (drop 2 args) $ \arg ->
+  when (variableType arg == NodePtr) $
+    doInst $ Call
+      { tailCallKind = Nothing
+      , callingConvention = C
+      , returnAttributes = []
+      , function = Right (ConstantOperand $ Constant.GlobalReference
+                              (FunctionType VoidType [LLVM.ptr wordTy] False)
+                              (LLVM.Name "_lhc_checkNode"))
+      , arguments =
+          [ (toLocalReference arg, []) ]
+      , functionAttributes = []
+      , metadata = [] }
+
 blockToLLVM :: Block -> GenBlocks Terminator
 blockToLLVM = worker
   where
@@ -345,11 +365,11 @@ blockToLLVM = worker
               , metadata' = [] }
         Bind [Variable{..}] expr next -> do
             let name = nameToLLVM variableName
-            inst <- mkInst (typeToLLVM variableType) expr
+            inst <- mkInst variableType (typeToLLVM variableType) expr
             pushInst (name := inst)
             worker next
         Bind [] expr next -> do
-            doInst =<< mkInst VoidType expr
+            doInst =<< mkInst (Primitive VoidType) VoidType expr
             worker next
         TailCall fName args -> do
             -- traceLLVM $ "TailCall: " ++ show fName
@@ -448,21 +468,21 @@ blockToLLVM = worker
     -- mkInst retTy expr | trace ("Expr: " ++ show expr) False = undefined
 
     -- Prim-ops
-    mkInst _retTy (CCall "indexI8#" [addr]) =
+    mkInst _ _retTy (CCall "indexI8#" [addr]) =
         return LLVM.Load
             { volatile = False
             , address = toLocalReference addr
             , maybeAtomicity = Nothing
             , alignment = 1
             , metadata = [] }
-    mkInst _retTy (CCall "addrAdd#" [ptr, offset]) =
+    mkInst _ _retTy (CCall "addrAdd#" [ptr, offset]) =
         return $ GetElementPtr
             { inBounds = True
             , address = toLocalReference ptr
             , indices = [toLocalReference offset]
             , metadata = []
             }
-    mkInst _retTy (CCall "-#" [a, b]) =
+    mkInst _ _retTy (CCall "-#" [a, b]) =
         return $ Sub
             { nsw = False
             , nuw = False
@@ -470,7 +490,7 @@ blockToLLVM = worker
             , operand1 = toLocalReference b
             , metadata = []
             }
-    mkInst _retTy (CCall "+#" [a, b]) =
+    mkInst _ _retTy (CCall "+#" [a, b]) =
         return $ Add
             { nsw = False
             , nuw = False
@@ -478,7 +498,7 @@ blockToLLVM = worker
             , operand1 = toLocalReference b
             , metadata = []
             }
-    mkInst _retTy (CCall "*#" [a, b]) =
+    mkInst _ _retTy (CCall "*#" [a, b]) =
         return $ Mul
             { nsw = False
             , nuw = False
@@ -486,7 +506,7 @@ blockToLLVM = worker
             , operand1 = toLocalReference b
             , metadata = []
             }
-    mkInst _retTy (CCall "shl#" [a, b]) =
+    mkInst _ _retTy (CCall "shl#" [a, b]) =
         return $ Shl
             { nsw = False
             , nuw = False
@@ -494,21 +514,21 @@ blockToLLVM = worker
             , operand1 = toLocalReference b
             , metadata = []
             }
-    mkInst _retTy (CCall "sdiv#" [a, b]) =
+    mkInst _ _retTy (CCall "sdiv#" [a, b]) =
         return $ SDiv
             { exact = False
             , operand0 = toLocalReference a
             , operand1 = toLocalReference b
             , metadata = []
             }
-    mkInst _retTy (CCall "srem#" [a, b]) =
+    mkInst _ _retTy (CCall "srem#" [a, b]) =
         return $ SRem
             { operand0 = toLocalReference a
             , operand1 = toLocalReference b
             , metadata = []
             }
 
-    mkInst retTy (CCall fName args) = do
+    mkInst _ retTy (CCall fName args) = do
         return Call
             { tailCallKind = Nothing
             , callingConvention = C
@@ -521,7 +541,7 @@ blockToLLVM = worker
                 | arg <- args ]
             , functionAttributes = []
             , metadata = [] }
-    mkInst retTy (Application fName args) = do
+    mkInst _ retTy (Application fName args) = do
         return Call
             { tailCallKind = Nothing
             , callingConvention = lhcCC
@@ -534,7 +554,7 @@ blockToLLVM = worker
                 | arg <- args ]
             , functionAttributes = []
             , metadata = [] }
-    mkInst retTy (InvokeReturn var args) = do
+    mkInst _ retTy (InvokeReturn var args) = do
       -- traceLLVM $ "InvokeReturn"
       -- fnPtr <- anonInst $ castReference
       --             (typeToLLVM $ variableType cont)
@@ -581,11 +601,11 @@ blockToLLVM = worker
       -- cast var to fn ptr ptr
       -- peek at negative nth index
       -- call
-    mkInst retTy Undefined = return BitCast
+    mkInst _ retTy Undefined = return BitCast
         { operand0 = ConstantOperand $ Constant.Undef retTy
         , type' = retTy
         , metadata = [] }
-    mkInst _retTy (WriteGlobal reg Variable{..}) = return LLVM.Store
+    mkInst _ _retTy (WriteGlobal reg Variable{..}) = return LLVM.Store
             { volatile = False
             , address = ConstantOperand $ Constant.GlobalReference
                             (PointerType (typeToLLVM variableType) (AddrSpace 0))
@@ -595,7 +615,7 @@ blockToLLVM = worker
             , alignment = 1
             , metadata = []
             }
-    mkInst retTy (ReadGlobal reg) = return LLVM.Load
+    mkInst _ retTy (ReadGlobal reg) = return LLVM.Load
             { volatile = False
             , address = ConstantOperand $ Constant.GlobalReference
                             (PointerType retTy (AddrSpace 0))
@@ -603,7 +623,7 @@ blockToLLVM = worker
             , maybeAtomicity = Nothing
             , alignment = 1
             , metadata = [] }
-    mkInst retTy (Bedrock.Load Variable{..} offset) = do
+    mkInst origRetTy retTy (Bedrock.Load Variable{..} offset) = do
         offsetPtr <- anonInst $ GetElementPtr
             { inBounds = True
             , address = LocalReference
@@ -620,6 +640,19 @@ blockToLLVM = worker
             , maybeAtomicity = Nothing
             , alignment = 1
             , metadata = [] }
+        when (origRetTy == NodePtr) $ do
+          hp <- anonInst $ castReference wordTy word retTy
+          doInst $ Call
+              { tailCallKind = Nothing
+              , callingConvention = C
+              , returnAttributes = []
+              , function = Right (ConstantOperand $ Constant.GlobalReference
+                                      (FunctionType VoidType [LLVM.ptr wordTy] False)
+                                      (LLVM.Name "_lhc_checkNode"))
+              , arguments =
+                  [ (LocalReference (LLVM.ptr wordTy) hp, []) ]
+              , functionAttributes = []
+              , metadata = [] }
         if variableType == NodePtr && offset == 0
           then return Call
               { tailCallKind = Nothing
@@ -633,7 +666,7 @@ blockToLLVM = worker
               , functionAttributes = []
               , metadata = [] }
           else return $ castReference wordTy word retTy
-    mkInst retTy (Bedrock.LoadLastPtr ptr tag offset) = do
+    mkInst _ retTy (Bedrock.LoadLastPtr ptr tag offset) = do
       return Call
           { tailCallKind = Nothing
           , callingConvention = C
@@ -646,7 +679,7 @@ blockToLLVM = worker
               , (ConstantOperand $ Constant.Int 64 (fromIntegral offset), []) ]
           , functionAttributes = []
           , metadata = [] }
-    mkInst _retTy (Write dst offset var) = do
+    mkInst _ _retTy (Write dst offset var) = do
         casted <- anonInst $ castReference
                     (typeToLLVM $ variableType var)
                     (nameToLLVM $ variableName var)
@@ -669,7 +702,7 @@ blockToLLVM = worker
             , maybeAtomicity = Nothing
             , alignment = 1
             , metadata = [] }
-    mkInst _retTy (Address ptr offset) =
+    mkInst _ _retTy (Address ptr offset) =
         return $ GetElementPtr
             { inBounds = True
             , address = LocalReference
@@ -677,13 +710,13 @@ blockToLLVM = worker
                             (nameToLLVM $ variableName ptr)
             , indices = [ConstantOperand $ Constant.Int 64 (fromIntegral offset)]
             , metadata = [] }
-    mkInst retTy (FunctionPointer fnName) = do
+    mkInst _ retTy (FunctionPointer fnName) = do
       fnTy <- getFunctionType fnName
       return BitCast
           { operand0 = ConstantOperand $ Constant.GlobalReference (PointerType fnTy (AddrSpace 0)) (nameToLLVM fnName)
           , type' = retTy
           , metadata = [] }
-    mkInst retTy (MkNode nodeName []) = do
+    mkInst _ retTy (MkNode nodeName []) = do
       ident <- resolveNodeName nodeName
       header <- anonInst $ Call
           { tailCallKind = Nothing
@@ -701,11 +734,11 @@ blockToLLVM = worker
           { operand0 = LocalReference wordTy header
           , type' = retTy
           , metadata = [] }
-    mkInst retTy (Literal (LiteralInt i)) = return BitCast
+    mkInst _ retTy (Literal (LiteralInt i)) = return BitCast
         { operand0 = ConstantOperand $ Constant.Int (bitSize retTy) i
         , type' = retTy
         , metadata = [] }
-    mkInst _retTy (Literal (LiteralString str)) = do
+    mkInst _ _retTy (Literal (LiteralString str)) = do
         strGlobal <- globalString str
         return GetElementPtr
             { inBounds = True
@@ -718,9 +751,9 @@ blockToLLVM = worker
                 , ConstantOperand $ Constant.Int 64 0]
             , metadata = [] }
 
-    mkInst retTy (TypeCast Variable{..}) = return $
+    mkInst _ retTy (TypeCast Variable{..}) = return $
         castReference (typeToLLVM variableType) (nameToLLVM variableName) retTy
-    mkInst _retTy (Bedrock.Builtin "isIndirection" [PVariable arg]) = do
+    mkInst _ _retTy (Bedrock.Builtin "isIndirection" [PVariable arg]) = do
       pure Call
           { tailCallKind = Nothing
           , callingConvention = C
@@ -734,7 +767,7 @@ blockToLLVM = worker
                               (nameToLLVM $ variableName arg), []) ]
           , functionAttributes = []
           , metadata = [] }
-    mkInst _retTy (Bedrock.Builtin "getIndirection" [PVariable arg]) = do
+    mkInst _ _retTy (Bedrock.Builtin "getIndirection" [PVariable arg]) = do
       pure Call
           { tailCallKind = Nothing
           , callingConvention = C
@@ -748,7 +781,7 @@ blockToLLVM = worker
                               (nameToLLVM $ variableName arg), []) ]
           , functionAttributes = []
           , metadata = [] }
-    mkInst _retTy (Bedrock.Builtin "setIndirection" [PVariable ptr, PVariable newVal]) = do
+    mkInst _ _retTy (Bedrock.Builtin "setIndirection" [PVariable ptr, PVariable newVal]) = do
       pure Call
           { tailCallKind = Nothing
           , callingConvention = C
@@ -766,7 +799,7 @@ blockToLLVM = worker
           , functionAttributes = []
           , metadata = [] }
 
-    mkInst _retTy expr = error $ "Data.Bedrock.LLVM: Unhandled expression: " ++ show expr
+    mkInst _ _retTy expr = error $ "Data.Bedrock.LLVM: Unhandled expression: " ++ show expr
         -- return BitCast
         -- { operand0 = ConstantOperand $ Constant.Undef retTy
         -- , type' = retTy
