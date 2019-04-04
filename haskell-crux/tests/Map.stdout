@@ -1,0 +1,11 @@
+Map.map : ∀ sk_0_a sk_1_b. (sk_0_a →  sk_1_b) →  [sk_0_a] →  [sk_1_b]
+Map.map =
+  λ @.sk_0_a^1:* @.sk_1_b^2:* Map.f^3:(sk_0_a →  sk_1_b) Map.lst^4:[sk_0_a] → 
+  case Map.lst^4 of
+    scrut^5:[sk_0_a]
+    LHC.Prim.Nil  → 
+      LHC.Prim.Nil
+    LHC.Prim.Cons Map.x^6:sk_0_a Map.xs^7:[sk_0_a] → 
+      LHC.Prim.Cons (Map.f^3
+            Map.x^6) (Map.map @.sk_0_a^1
+              @.sk_1_b^2 Map.f^3 Map.xs^7)

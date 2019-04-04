@@ -16,12 +16,12 @@ import LHC.Prim
 
 reverse :: [a] -> [a]
 reverse lst = reverse_go [] lst
-
-reverse_go :: [a] -> [a] -> [a]
-reverse_go acc lst =
-  case lst of
-    []   -> acc
-    x:xs -> reverse_go (x : acc) xs
+  where
+    reverse_go :: [a] -> [a] -> [a]
+    reverse_go acc lst =
+      case lst of
+        []   -> acc
+        x:xs -> reverse_go (x : acc) xs
 
 append :: [a] -> [a] -> [a]
 append [] b     = b

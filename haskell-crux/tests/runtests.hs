@@ -54,6 +54,8 @@ unitTests =
   , sugarTest "Do"
   , sugarTest "List"
   , sugarTest "Shadow"
+  , sugarTest "Map"
+  , sugarTest "Fold"
   , testGroup "Haskell2010"
     [
     ]
