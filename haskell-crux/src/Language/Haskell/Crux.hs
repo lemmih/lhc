@@ -267,7 +267,7 @@ instance Serialise Pattern
 instance Serialise NodeDefinition
 instance Serialise NewType
 instance Serialise TC.Predicate
-instance Serialise TC.TcVar
+instance Serialise TC.TyVar
 instance Serialise Scope.Entity
 instance Serialise SrcSpanInfo
 instance Serialise SrcSpan

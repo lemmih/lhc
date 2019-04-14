@@ -1,7 +1,7 @@
-Case2.x : ∀ v0. v0
+Case2.x : ∀ a. a
 Case2.x =
-  λ @.v0^1:* → 
-  Case2.x @.v0^1
+  λ @.a^1:* → 
+  Case2.x @.a^1
 Case2.y : ()
 Case2.y =
   Case2.y

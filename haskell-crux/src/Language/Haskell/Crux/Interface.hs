@@ -61,4 +61,4 @@ instance Serialise Scope.EntityKind
 instance Serialise Type
 instance Serialise a => Serialise (Qualified a)
 instance Serialise Predicate
-instance Serialise TcVar
+instance Serialise TyVar

@@ -21,7 +21,7 @@ import           Language.Haskell.Scope     (Entity (..), NameInfo (..),
                                              QualifiedName (..))
 import qualified Language.Haskell.Scope     as Scope
 import           Language.Haskell.TypeCheck (Qualified (..), TcEnv (..),
-                                             TcVar (..), Typed)
+                                             Typed)
 import qualified Language.Haskell.TypeCheck as TC
 import qualified LLVM.AST                   as LLVM
 import qualified LLVM.AST.AddrSpace         as LLVM
@@ -250,7 +250,7 @@ convertDecl decl =
     mapM_ pushDecl =<< convertDecl' decl
 
 reifyTypeVariables :: TC.Type -> Expr -> Expr
-reifyTypeVariables (TC.TyForall tvs _) = Lam (map tcVarToVariable tvs)
+reifyTypeVariables (TC.TyForall tvs _) = Lam (map tyVarToVariable tvs)
 reifyTypeVariables _                   = id
 
 convertNewTypes :: HS.Decl Typed -> M (Maybe Variable)
@@ -539,8 +539,8 @@ primThenIO = Var (Variable name ty)
   where
     name = Name ["LHC.Prim"] "thenIO" 0
     ty = TC.TyForall [aRef, bRef] ([] :=> (ioA `TC.TyFun` ioB `TC.TyFun` ioB))
-    aRef = TcVar "a" []
-    bRef = TcVar "b" []
+    aRef = TC.TyVar "a"
+    bRef = TC.TyVar "b"
     ioA = io `TC.TyApp` TC.TyRef aRef
     ioB = io `TC.TyApp` TC.TyRef bRef
 
@@ -549,8 +549,8 @@ primBindIO = Var (Variable name ty)
   where
     name = Name ["LHC.Prim"] "bindIO" 0
     ty = TC.TyForall [aRef, bRef] ([] :=> (ioA `TC.TyFun` ioAB `TC.TyFun` ioB))
-    aRef = TcVar "a" []
-    bRef = TcVar "b" []
+    aRef = TC.TyVar "a"
+    bRef = TC.TyVar "b"
     ioA = io `TC.TyApp` TC.TyRef aRef
     ioB = io `TC.TyApp` TC.TyRef bRef
     ioAB = TC.TyRef aRef `TC.TyFun` ioB
@@ -577,19 +577,19 @@ findProof name =
         HS.UnQual _ qname -> HS.ann qname
         _                 -> HS.ann name
 
-tcVarToVariable :: TC.TcVar -> Variable
-tcVarToVariable (TC.TcVar name _loc) =
+tyVarToVariable :: TC.TyVar -> Variable
+tyVarToVariable (TC.TyVar name) =
   Variable (Name ["@"] name 0) TC.TyStar
 
 convertProof :: TC.Proof -> Expr -> Expr
-convertProof (TC.ProofAbs tvs p) = Lam (map tcVarToVariable tvs) . convertProof p
+convertProof (TC.ProofAbs tvs p) = Lam (map tyVarToVariable tvs) . convertProof p
 convertProof TC.ProofSrc{} = id
 convertProof (TC.ProofAp p args) =
   \e -> foldl App (convertProof p e) (map tyToExpr args)
 convertProof p = error $ "Weird proof: " ++ show p
 
 tyToExpr :: TC.Type -> Expr
-tyToExpr (TC.TyRef ref) = Var (tcVarToVariable ref)
+tyToExpr (TC.TyRef ref) = Var (tyVarToVariable ref)
 tyToExpr (TC.TyList elt) = App (Con listCon) (tyToExpr elt)
 tyToExpr (TC.TyCon (QualifiedName m ident)) = Con (Variable (Name ["@",m] ident 0) TC.TyStar)
 tyToExpr (TC.TyTuple []) = Con unitTCon
@@ -777,22 +777,24 @@ convertLiteral lit =
 
 exprType :: Expr -> M TC.Type
 exprType expr =
-    case expr of
-        Var v -> return (varType v)
-        Con c -> return (varType c)
-        App a _b -> do
-            aType <- exprType a
-            case aType of
-                TC.TyFun _ ret                       -> return ret
-                TC.TyForall [] (_ :=> TC.TyFun _ ret) -> return ret
-                TC.TyForall (_:tvs) (_ :=> ty) -> return $ TC.TyForall tvs ([] :=> ty)
-                -- _ -> error $ "Unknown type: " ++ show (aType, _b)
-                _                                    -> return TC.TyUndefined
-        Let _ e -> exprType e
-        LetStrict _ _ e -> exprType e
-        Case _ _ (Just e) _ -> exprType e
-        Case _ _ Nothing (Alt _ e:_) -> exprType e
-        _ -> return TC.TyUndefined
+  case expr of
+    Var v -> return (varType v)
+    Con c -> return (varType c)
+    App a _b -> do
+      aType <- exprType a
+      case aType of
+        TC.TyFun _ ret                       -> return ret
+        TC.TyForall [] (_ :=> TC.TyFun _ ret) -> return ret
+        TC.TyForall (_:tvs) (_ :=> ty) -> return $ TC.TyForall tvs ([] :=> ty)
+        _ -> error $ "Unknown type: " ++ show (aType, _b)
+        -- _                                    -> return TC.TyUndefined
+    Let _ e -> exprType e
+    LetStrict _ _ e -> exprType e
+    Case _ _ (Just e) _ -> exprType e
+    Case _ _ Nothing (Alt _ e:_) -> exprType e
+    UnboxedTuple exprs -> TC.TyUnboxedTuple <$> mapM exprType exprs
+    _ -> error (show expr)
+    -- _ -> return TC.TyUndefined
 
 
 
@@ -837,14 +839,14 @@ nilCon :: Variable
 nilCon = Variable (Name ["LHC.Prim"] "Nil" 0)
     (TC.TyForall [a] ([] :=> TC.TyList (TC.TyRef a)))
   where
-    a = TcVar "a" []
+    a = TC.TyVar "a"
 
 -- data List a = Nil | Cons a (List a)
 consCon :: Variable
 consCon = Variable (Name ["LHC.Prim"] "Cons" 0)
     (TC.TyForall [a] ([] :=> (TC.TyRef a `TC.TyFun` TC.TyList (TC.TyRef a) `TC.TyFun` TC.TyList (TC.TyRef a))))
   where
-    a = TcVar "a" []
+    a = TC.TyVar "a"
 
 unitTCon :: Variable
 unitTCon = Variable (Name ["@","LHC.Prim"] "Unit" 0)
@@ -860,7 +862,7 @@ _ioCon :: Variable
 _ioCon = Variable (Name ["LHC.Prim"] "IO" 0)
     $ TC.TyForall [a] ([] :=> ((realWorld `TC.TyFun` TC.TyUnboxedTuple [realWorld, TC.TyRef a]) `TC.TyFun` TC.TyApp io (TC.TyRef a)))
   where
-    a = TcVar "a" []
+    a = TC.TyVar "a"
   -- (RealWorld# -> (# RealWorld#, retType #)) -> IO retType
 
 int32Con, i32toi64, i64toi32 :: Variable
@@ -875,7 +877,7 @@ ptrCon :: Variable
 ptrCon = Variable (Name ["LHC.Prim"] "Ptr" 0) $
     TC.TyForall [a] ([] :=> (TC.TyApp addrTy aTy `TC.TyFun` TC.TyApp ptrTy aTy))
   where
-    a = TcVar "a" []
+    a = TC.TyVar "a"
     aTy = TC.TyRef a
 
 

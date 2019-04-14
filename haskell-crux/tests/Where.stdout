@@ -1,9 +1,8 @@
-Basic1.x : ∀ v18. v18
+Basic1.x : ∀ a. a
 Basic1.x =
-  λ @.v18^1:* → 
+  λ @.a^1:* → 
   let
-    Basic1.y^2:v18 = Basic1.x
-                       @.v18^1
+    Basic1.y^2:a = Basic1.x @.a^1
   in
     Basic1.y^2
 Basic1.fn1 : LHC.Prim.Int →  LHC.Prim.Int
@@ -18,17 +17,17 @@ Basic1.fn1 =
     i64^7 ← LHC.Prim.i32toi64 i^6
     0 ← i64^7:LHC.Prim.I64
     Basic1.y^4
-Basic1.fn2 : ∀ v11 v10. v11 →  v10
+Basic1.fn2 : ∀ a b. a →  b
 Basic1.fn2 =
-  λ @.v11^8:* @.v10^9:* Basic1.n^10:v11 → 
+  λ @.a^8:* @.b^9:* Basic1.n^10:a → 
   let
-    Basic1.y^11:v10 = Basic1.fn2
-                            @.v11^8 @.v10^9 Basic1.n^10
+    Basic1.y^11:b = Basic1.fn2
+                          @.a^8 @.b^9 Basic1.n^10
   in
     Basic1.y^11
-Basic1.fn3 : ∀ v1. v1 →  [LHC.Prim.Int]
+Basic1.fn3 : ∀ a. a →  [LHC.Prim.Int]
 Basic1.fn3 =
-  λ @.v1^12:* Basic1.n^13:v1 → 
+  λ @.a^12:* Basic1.n^13:a → 
   let
     Basic1.even^14:[LHC.Prim.Int] = LHC.Prim.Cons
                                         (LHC.Prim.I# (LHC.Prim.i64toi32

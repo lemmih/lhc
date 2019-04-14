@@ -60,12 +60,10 @@ test-suite spec
                          haskell-crux,
                          llvm-hs-pure,
                          ansi-wl-pprint,
-                         hspec,
-                         hspec-contrib,
-                         HUnit,
-                         directory,
+                         directory,text,bytestring,
                          filepath,
-                         test-framework,
-                         test-framework-hunit
+                         tasty,
+                         tasty-golden,
+                         tasty-expected-failure
   default-language: Haskell2010
   ghc-options: -Wall -Werror

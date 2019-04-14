@@ -200,7 +200,7 @@ convertTcType tcTy =
     TC.TyRef{} -> NodePtr
     TC.TyCon{} -> NodePtr
     TC.TyApp{} -> NodePtr
-    TC.TyUndefined -> NodePtr
+    -- TC.TyUndefined -> NodePtr
     _ -> NodePtr
     -- _ -> error $ "CoreToBedrock: Unknown type: " ++ show tcTy
 

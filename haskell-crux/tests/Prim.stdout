@@ -22,36 +22,35 @@ newtype LHC.Prim.IO:(∀ a. (LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a 
 LHC.Prim.realworld# : LHC.Prim.RealWorld#
 LHC.Prim.realworld# =
   void
-LHC.Prim.unIO : ∀ sk_0_a. LHC.Prim.IO sk_0_a →  LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, sk_0_a #)
+LHC.Prim.unIO : ∀ a. LHC.Prim.IO a →  LHC.Prim.RealWorld# →  (# LHC.Prim.RealWorld#, a #)
 LHC.Prim.unIO =
-  λ @.sk_0_a^1:* LHC.Prim.action^2:(LHC.Prim.IO sk_0_a) → 
+  λ @.a^1:* LHC.Prim.action^2:(LHC.Prim.IO a) → 
   LHC.Prim.action^2
-LHC.Prim.bindIO : ∀ sk_5_a sk_6_b. LHC.Prim.IO sk_5_a →  (sk_5_a →  LHC.Prim.IO sk_6_b) →  LHC.Prim.IO sk_6_b
+LHC.Prim.bindIO : ∀ a b. LHC.Prim.IO a →  (a →  LHC.Prim.IO b) →  LHC.Prim.IO b
 LHC.Prim.bindIO =
-  λ @.sk_5_a^3:* @.sk_6_b^4:* LHC.Prim.f^5:(LHC.Prim.IO sk_5_a) LHC.Prim.g^6:(sk_5_a →  LHC.Prim.IO sk_6_b) LHC.Prim.s^7:LHC.Prim.RealWorld# → 
-  scrut^8 ← LHC.Prim.unIO
-                  @.sk_5_a^3 LHC.Prim.f^5
-              LHC.Prim.s^7
+  λ @.a^3:* @.b^4:* LHC.Prim.f^5:(LHC.Prim.IO a) LHC.Prim.g^6:(a →  LHC.Prim.IO b) LHC.Prim.s^7:LHC.Prim.RealWorld# → 
+  scrut^8 ← LHC.Prim.unIO @.a^3
+                LHC.Prim.f^5 LHC.Prim.s^7
   (# LHC.Prim.s'^9, LHC.Prim.a^10 #) ← scrut^8:(# LHC.Prim.RealWorld#, a #)
-  LHC.Prim.unIO @.sk_6_b^4
+  LHC.Prim.unIO @.b^4
       (LHC.Prim.g^6 LHC.Prim.a^10)
     LHC.Prim.s'^9
-LHC.Prim.thenIO : ∀ sk_13_a sk_14_b. LHC.Prim.IO sk_13_a →  LHC.Prim.IO sk_14_b →  LHC.Prim.IO sk_14_b
+LHC.Prim.thenIO : ∀ a b. LHC.Prim.IO a →  LHC.Prim.IO b →  LHC.Prim.IO b
 LHC.Prim.thenIO =
-  λ @.sk_13_a^11:* @.sk_14_b^12:* LHC.Prim.a^13:(LHC.Prim.IO sk_13_a) LHC.Prim.b^14:(LHC.Prim.IO sk_14_b) → 
-  LHC.Prim.bindIO @.sk_13_a^11
-        @.sk_14_b^12 LHC.Prim.a^13
-    (λ LHC.Prim.c^15:sk_13_a → 
+  λ @.a^11:* @.b^12:* LHC.Prim.a^13:(LHC.Prim.IO a) LHC.Prim.b^14:(LHC.Prim.IO b) → 
+  LHC.Prim.bindIO @.a^11 @.b^12
+      LHC.Prim.a^13
+    (λ LHC.Prim.c^15:a → 
     LHC.Prim.b^14)
-LHC.Prim.return : ∀ sk_20_a. sk_20_a →  LHC.Prim.IO sk_20_a
+LHC.Prim.return : ∀ a. a →  LHC.Prim.IO a
 LHC.Prim.return =
-  λ @.sk_20_a^16:* LHC.Prim.a^17:sk_20_a LHC.Prim.s^18:LHC.Prim.RealWorld# → 
+  λ @.a^16:* LHC.Prim.a^17:a LHC.Prim.s^18:LHC.Prim.RealWorld# → 
   (# LHC.Prim.s^18, LHC.Prim.a^17 #)
-LHC.Prim.unsafePerformIO : ∀ sk_24_a. LHC.Prim.IO sk_24_a →  sk_24_a
+LHC.Prim.unsafePerformIO : ∀ a. LHC.Prim.IO a →  a
 LHC.Prim.unsafePerformIO =
-  λ @.sk_24_a^19:* LHC.Prim.action^20:(LHC.Prim.IO sk_24_a) → 
-  scrut^21 ← LHC.Prim.unIO
-                   @.sk_24_a^19 LHC.Prim.action^20
+  λ @.a^19:* LHC.Prim.action^20:(LHC.Prim.IO a) → 
+  scrut^21 ← LHC.Prim.unIO @.a^19
+                 LHC.Prim.action^20
                LHC.Prim.realworld#
   (# LHC.Prim.st^22, LHC.Prim.val^23 #) ← scrut^21:(# LHC.Prim.RealWorld#, a #)
   LHC.Prim.val^23
@@ -263,19 +262,19 @@ LHC.Prim.srem =
   LHC.Prim.I# LHC.Prim.b#^110:LHC.Prim.I32 ← scrut^109:LHC.Prim.Int
   LHC.Prim.I# (LHC.Prim.srem#
         LHC.Prim.a#^108 LHC.Prim.b#^110)
-LHC.Prim.mapM_ : ∀ sk_62_a. (sk_62_a →  LHC.Prim.IO ()) →  [sk_62_a] →  LHC.Prim.IO ()
+LHC.Prim.mapM_ : ∀ a. (a →  LHC.Prim.IO ()) →  [a] →  LHC.Prim.IO ()
 LHC.Prim.mapM_ =
-  λ @.sk_62_a^111:* LHC.Prim.fn^112:(sk_62_a →  LHC.Prim.IO ()) LHC.Prim.lst^113:[sk_62_a] → 
+  λ @.a^111:* LHC.Prim.fn^112:(a →  LHC.Prim.IO ()) LHC.Prim.lst^113:[a] → 
   case LHC.Prim.lst^113 of
-    scrut^114:[sk_62_a]
+    scrut^114:[a]
     LHC.Prim.Nil  → 
       LHC.Prim.return
           @.LHC.Prim.Unit LHC.Prim.Unit
-    LHC.Prim.Cons LHC.Prim.x^115:sk_62_a LHC.Prim.xs^116:[sk_62_a] → 
+    LHC.Prim.Cons LHC.Prim.x^115:a LHC.Prim.xs^116:[a] → 
       LHC.Prim.thenIO
               @.LHC.Prim.Unit @.LHC.Prim.Unit
           (LHC.Prim.fn^112 LHC.Prim.x^115)
-        (LHC.Prim.mapM_ @.sk_62_a^111
+        (LHC.Prim.mapM_ @.a^111
             LHC.Prim.fn^112 LHC.Prim.xs^116)
 LHC.Prim.le# : LHC.Prim.I32 →  LHC.Prim.I32 →  LHC.Prim.I32
 LHC.Prim.le# =
@@ -307,25 +306,25 @@ LHC.Prim.max =
       LHC.Prim.b^128
     LHC.Prim.False  → 
       LHC.Prim.a^127
-LHC.Prim.length : ∀ sk_76_a. [sk_76_a] →  LHC.Prim.Int
+LHC.Prim.length : ∀ a. [a] →  LHC.Prim.Int
 LHC.Prim.length =
-  λ @.sk_76_a^130:* LHC.Prim.lst^131:[sk_76_a] → 
-  LHC.Prim.length_go @.sk_76_a^130
+  λ @.a^130:* LHC.Prim.lst^131:[a] → 
+  LHC.Prim.length_go @.a^130
       (LHC.Prim.I# (LHC.Prim.i64toi32
           0)) LHC.Prim.lst^131
-LHC.Prim.length_go : ∀ sk_79_a. LHC.Prim.Int →  [sk_79_a] →  LHC.Prim.Int
+LHC.Prim.length_go : ∀ a. LHC.Prim.Int →  [a] →  LHC.Prim.Int
 LHC.Prim.length_go =
-  λ @.sk_79_a^132:* LHC.Prim.n^133:LHC.Prim.Int arg^134:[sk_79_a] → 
+  λ @.a^132:* LHC.Prim.n^133:LHC.Prim.Int arg^134:[a] → 
   case arg^134 of
-    scrut^135:[sk_79_a]
+    scrut^135:[a]
     LHC.Prim.Nil  → 
       LHC.Prim.n^133
     DEFAULT → 
       scrut^136 ← LHC.Prim.n^133
       LHC.Prim.I# LHC.Prim.n^137:LHC.Prim.I32 ← scrut^136:LHC.Prim.Int
       scrut^138 ← arg^134
-      LHC.Prim.Cons LHC.Prim.x^139:sk_79_a LHC.Prim.xs^140:[sk_79_a] ← scrut^138:[sk_79_a]
-      LHC.Prim.length_go @.sk_79_a^132
+      LHC.Prim.Cons LHC.Prim.x^139:a LHC.Prim.xs^140:[a] ← scrut^138:[a]
+      LHC.Prim.length_go @.a^132
           (LHC.Prim.+ (LHC.Prim.I#
                 LHC.Prim.n^137) (LHC.Prim.I#
               (LHC.Prim.i64toi32 1)))
@@ -333,7 +332,7 @@ LHC.Prim.length_go =
 LHC.Prim.emptyString : [LHC.Prim.Char]
 LHC.Prim.emptyString =
   LHC.Prim.Nil
-LHC.Prim.id : ∀ sk_84_a. sk_84_a →  sk_84_a
+LHC.Prim.id : ∀ a. a →  a
 LHC.Prim.id =
-  λ @.sk_84_a^141:* LHC.Prim.x^142:sk_84_a → 
+  λ @.a^141:* LHC.Prim.x^142:a → 
   LHC.Prim.x^142

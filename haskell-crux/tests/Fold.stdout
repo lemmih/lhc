@@ -1,23 +1,23 @@
-Fold.foldr : ∀ sk_0_a sk_1_b. (sk_0_a →  sk_1_b →  sk_1_b) →  sk_1_b →  [sk_0_a] →  sk_1_b
+Fold.foldr : ∀ a b. (a →  b →  b) →  b →  [a] →  b
 Fold.foldr =
-  λ @.sk_0_a^1:* @.sk_1_b^2:* Fold.fn^3:(sk_0_a →  sk_1_b →  sk_1_b) Fold.acc^4:sk_1_b arg^5:[sk_0_a] → 
+  λ @.a^1:* @.b^2:* Fold.fn^3:(a →  b →  b) Fold.acc^4:b arg^5:[a] → 
   case arg^5 of
-    scrut^6:[sk_0_a]
+    scrut^6:[a]
     LHC.Prim.Nil  → 
       Fold.acc^4
-    LHC.Prim.Cons Fold.x^7:sk_0_a Fold.xs^8:[sk_0_a] → 
+    LHC.Prim.Cons Fold.x^7:a Fold.xs^8:[a] → 
       Fold.fn^3 Fold.x^7 (Fold.foldr
-                  @.sk_0_a^1 @.sk_1_b^2 Fold.fn^3
-            Fold.acc^4 Fold.xs^8)
-Fold.foldl : ∀ sk_12_a sk_13_b. (sk_13_b →  sk_12_a →  sk_13_b) →  sk_13_b →  [sk_12_a] →  sk_13_b
+                  @.a^1 @.b^2 Fold.fn^3 Fold.acc^4
+          Fold.xs^8)
+Fold.foldl : ∀ a b. (b →  a →  b) →  b →  [a] →  b
 Fold.foldl =
-  λ @.sk_12_a^9:* @.sk_13_b^10:* Fold.fn^11:(sk_13_b →  sk_12_a →  sk_13_b) Fold.acc^12:sk_13_b arg^13:[sk_12_a] → 
+  λ @.a^9:* @.b^10:* Fold.fn^11:(b →  a →  b) Fold.acc^12:b arg^13:[a] → 
   case arg^13 of
-    scrut^14:[sk_12_a]
+    scrut^14:[a]
     LHC.Prim.Nil  → 
       Fold.acc^12
-    LHC.Prim.Cons Fold.x^15:sk_12_a Fold.xs^16:[sk_12_a] → 
-      Fold.foldl @.sk_12_a^9
-              @.sk_13_b^10 Fold.fn^11
-          (Fold.fn^11 Fold.acc^12
-            Fold.x^15) Fold.xs^16
+    LHC.Prim.Cons Fold.x^15:a Fold.xs^16:[a] → 
+      Fold.foldl @.a^9 @.b^10
+            Fold.fn^11 (Fold.fn^11
+              Fold.acc^12 Fold.x^15)
+        Fold.xs^16

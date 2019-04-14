@@ -1,7 +1,15 @@
 {-# LANGUAGE LambdaCase #-}
 module Main (main) where
 
-import           Control.Monad                     (fmap, mplus, unless, when)
+import           Control.Exception
+import           Control.Monad                     (fmap, unless, when)
+import           Control.Monad
+import qualified Data.ByteString.Lazy              as BL
+import           Data.Graph                        (SCC (..), stronglyConnComp)
+import           Data.IORef
+import           Data.List                         (sort)
+import qualified Data.Text                         as T
+import qualified Data.Text.Encoding                as T
 import           Language.Haskell.Crux.FromHaskell as Haskell
 import           Language.Haskell.Crux.NewTypes    as Haskell
 import           Language.Haskell.Crux.Simplify    as Haskell
@@ -15,65 +23,49 @@ import           Language.Haskell.Exts             (ImportDecl (..),
 import           Language.Haskell.Scope            hiding (Interface)
 import           Language.Haskell.TypeCheck
 import           Language.Haskell.TypeCheck.Pretty (pretty)
-
-import           Control.Exception
-import           Control.Monad
-import           Data.Graph                        (SCC (..), stronglyConnComp)
-import           Data.IORef
 import           System.Environment                (getArgs)
+import           System.Directory                  (doesFileExist)
 import           System.Exit                       (exitFailure, exitSuccess)
 import           System.FilePath                   (replaceExtension,
-                                                    takeBaseName, (<.>), (</>))
+                                                    takeBaseName)
 import           System.IO                         (hPutStrLn, stderr)
-import           Test.Framework                    (Test, defaultMain,
-                                                    testGroup)
-import           Test.Framework.Providers.HUnit
+
+import           Test.Tasty
+import           Test.Tasty.ExpectedFailure
+import           Test.Tasty.Golden
 
 main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [] -> defaultMain unitTests
-    files -> do
-      info <- desugar files
-      case info of
-        Left err -> do
-          hPutStrLn stderr err
-          exitFailure
-        Right msg -> do
-          putStr msg
-          exitSuccess
-
-unitTests :: [Test]
-unitTests =
-  [ sugarTest "Prim"
-  , sugarTest "Basic1"
-  , sugarTest "Where"
-  , sugarTest "Case1"
-  , sugarTest "Case2"
-  , sugarTest "Do"
-  , sugarTest "List"
-  , sugarTest "Shadow"
-  , sugarTest "Map"
-  , sugarTest "Fold"
-  , testGroup "Haskell2010"
-    [
+    [path] -> do
+      exist <- doesFileExist path
+      when exist $ do
+        info <- desugar [path]
+        case info of
+          Left err -> do
+            putStr err
+            hPutStrLn stderr ""
+            exitFailure
+          Right msg -> do
+            putStr msg
+            exitSuccess
+    _ -> return ()
+  goldenFiles <- sort <$> findByExtension [".stdout"] "tests"
+  defaultMain $ testGroup "Tests"
+    [ (if testName `elem` ignoreList
+        then ignoreTest
+        else id)
+      (goldenVsText testName goldenFile (desugar' testFile))
+    | goldenFile <- goldenFiles
+    , let testFile = replaceExtension goldenFile "hs"
+    , let testName = takeBaseName goldenFile
     ]
-  , testGroup "Extensions"
-    [ ]
-  , testGroup "Known issues"
-    [ ]
-  ]
+  where
+    ignoreList = []
 
-sugarTest :: String -> Test
-sugarTest name = testCase (takeBaseName name) $ do
-  let testFile = "tests" </> name <.> "hs"
-  expectedOutput <- readFile (replaceExtension testFile "stdout") `mplus` return ""
-  output <- either id id `fmap` desugar [testFile]
-  let isFailure = expectedOutput /= output
-  when isFailure $ fail "Diff Error"
-
-
+desugar' :: FilePath -> IO String
+desugar' path = fmap (either id id) (desugar [path])
 
 desugar :: [FilePath] -> IO (Either String String)
 desugar files = handleErrors $ do
@@ -129,3 +121,10 @@ moduleDependencies (Module _ mbHead _pragma imports _decls) =
     | importDecl <- imports
     , let ModuleName _ modName = importModule importDecl ])
 moduleDependencies _ = error "Main: moduleDependencies: undefined"
+
+
+goldenVsText :: TestName -> FilePath -> IO String -> TestTree
+goldenVsText name path gen =
+    goldenVsStringDiff name (\ref new -> ["diff", ref, new]) path gen'
+  where
+    gen' = BL.fromStrict . T.encodeUtf8 . T.pack <$> gen

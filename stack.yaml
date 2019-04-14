@@ -9,12 +9,12 @@ packages:
 
 - location:
     git: https://github.com/haskell-suite/haskell-tc.git
-    commit: e91127b4bddce0f660d36c53cef887a2142b5721
+    commit: e47d66ceef3c737611c94ba8987c2b90c0244078
   extra-dep: true
 
 - location:
     git: https://github.com/haskell-suite/haskell-scope.git
-    commit: 6a149be78c62248ca4b76fc5279b55c01d548010
+    commit: 6f0082be2d906927372c1279e730dcf04a0765fc
   extra-dep: true
 
 - location:

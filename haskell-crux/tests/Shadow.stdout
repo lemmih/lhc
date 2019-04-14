@@ -1,4 +1,4 @@
-Shadow.x : ∀ v1 v3 v5 v8. v1 →  v3 →  v5 →  v8 →  v8
+Shadow.x : ∀ a b c d. a →  b →  c →  d →  d
 Shadow.x =
-  λ @.v1^1:* @.v3^2:* @.v5^3:* @.v8^4:* Shadow.x^5:v1 Shadow.x^6:v3 Shadow.x^7:v5 Shadow.x^8:v8 → 
+  λ @.a^1:* @.b^2:* @.c^3:* @.d^4:* Shadow.x^5:a Shadow.x^6:b Shadow.x^7:c Shadow.x^8:d → 
   Shadow.x^8
