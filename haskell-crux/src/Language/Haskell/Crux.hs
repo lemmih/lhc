@@ -21,6 +21,7 @@ data Module = Module
     , cruxDecls    :: [Declaration]
     , cruxNodes    :: [NodeDefinition]
     , cruxNewTypes :: [NewType]
+    , cruxMethods  :: [(Name, Type, Declaration)]
     } deriving (Show, Generic)
 
 data Foreign = Foreign
@@ -103,9 +104,11 @@ instance Semigroup.Semigroup Module where
     { cruxForeigns = cruxForeigns a ++ cruxForeigns b
     , cruxDecls = cruxDecls a ++ cruxDecls b
     , cruxNodes = cruxNodes a ++ cruxNodes b
-    , cruxNewTypes = cruxNewTypes a ++ cruxNewTypes b }
+    , cruxNewTypes = cruxNewTypes a ++ cruxNewTypes b
+    , cruxMethods = cruxMethods a ++ cruxMethods b
+    }
 instance Monoid Module where
-    mempty = Module [] [] [] []
+    mempty = Module [] [] [] [] []
     mappend = (Semigroup.<>)
 
 instance Pretty Module where

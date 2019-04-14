@@ -199,7 +199,8 @@ convert tcEnv (HS.Module _ _ _ _ decls) = Module
     { cruxForeigns  = envForeigns env
     , cruxDecls     = envDecls env
     , cruxNodes     = envNodes env
-    , cruxNewTypes  = envNewTypes env }
+    , cruxNewTypes  = envNewTypes env
+    , cruxMethods   = [] }
   where
     (_ns, env) = runM tcEnv $ do
         nts <- catMaybes <$> mapM convertNewTypes decls
@@ -317,6 +318,23 @@ convertDecl' decl =
     HS.DataDecl _ HS.NewType{} _ctx _dhead _qualCons _deriving -> return []
     HS.TypeSig{} -> return []
     HS.InlineSig{} -> return []
+    HS.ClassDecl{} -> return []
+    HS.InstDecl _ _mbOverlap instRule mbDecls -> do
+      let ty =
+            case HS.ann instRule of
+              TC.Coerced _ _ p -> TC.reifyProof p
+              TC.Scoped{}      -> error "missing proof"
+          getInstType (TC.TyForall _ (_ TC.:=> t)) = getInstType t
+          getInstType (TC.TyApp t x) = getInstType t ++ [x]
+          getInstType t = [t]
+      error (show $ getInstType ty !! 1)
+      forM_ (fromMaybe [] mbDecls) $ \instDecl ->
+        case instDecl of
+          HS.InsDecl _ decl -> do
+            fns <- convertDecl' decl
+            return ()
+          _ -> undefined
+      return []
     _ -> unhandledSyntax decl
 
 isPrimitive :: String -> Bool
