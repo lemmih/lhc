@@ -658,7 +658,7 @@ convertExp expr =
     HS.Lit _ (HS.Char _ c _) ->
       pure $ Con charCon `App` Lit (LitChar c)
     HS.Lit _ (HS.Int _ i _) ->
-      pure $ Con intCon `App` (Var i64toi32 `App` Lit (LitInt i))
+      pure $ Con intCon `App` (Lit (LitI32 $ fromIntegral i))
     HS.Lit _ lit -> pure $ convertLiteralToExpr lit
     HS.Tuple  _ HS.Unboxed exprs -> do
       args <- mapM convertExp exprs
@@ -737,8 +737,8 @@ convertAltPat scrut failBranch pat successBranch =
       intVar <- Variable <$> newName "i" <*> pure i32
       intVar64 <- Variable <$> newName "i64" <*> pure i64
       let alt = Alt (ConPat intCon [intVar]) $
-                Case (Var i32toi64 `App` Var intVar) intVar64 failBranch
-                [Alt (LitPat (LitInt int)) successBranch]
+                Case (Var intVar) intVar64 failBranch
+                [Alt (LitPat (LitI32 $ fromIntegral int)) successBranch]
       return $ Case scrut scrut' Nothing [alt]
     HS.PLit _ _sign lit -> do
       scrut' <- Variable <$> newName "scrut" <*> exprType scrut
@@ -778,7 +778,7 @@ convertLiteralToExpr :: HS.Literal Typed -> Expr
 convertLiteralToExpr lit =
     case lit of
         HS.PrimString _ str _ -> Lit $ LitString str
-        HS.PrimInt _ int _    -> Lit $ LitInt int
+        HS.PrimInt _ int _    -> Lit $ LitI64 $ fromIntegral int
         HS.PrimChar _ char _  -> Lit $ LitChar char
         HS.String _ str _     -> App unpackString (Lit $ LitString str)
         HS.Char _ char _      -> error "Unhandled Char"
@@ -788,7 +788,7 @@ convertLiteral :: HS.Literal Typed -> Literal
 convertLiteral lit =
     case lit of
         HS.PrimString _ str _ -> LitString str
-        HS.PrimInt _ int _    -> LitInt int
+        HS.PrimInt _ int _    -> LitI64 $ fromIntegral int
         HS.PrimChar _ char _  -> LitChar char
         HS.Char _ char _      -> error "Unhandled Lit Char"
         _                     -> unhandledSyntax lit
@@ -883,13 +883,13 @@ _ioCon = Variable (Name ["LHC.Prim"] "IO" 0)
     a = TC.TyVar "a"
   -- (RealWorld# -> (# RealWorld#, retType #)) -> IO retType
 
-int32Con, i32toi64, i64toi32 :: Variable
+int32Con :: Variable
 -- data Int32 = Int32 I32
 int32Con = Variable (Name ["LHC.Prim"] "Int32" 0)
   (i32 `TC.TyFun` int32)
 
-i32toi64 = Variable (Name ["LHC.Prim"] "i32toi64" 0) (TC.TyFun i32 i64)
-i64toi32 = Variable (Name ["LHC.Prim"] "i64toi32" 0) (TC.TyFun i64 i32)
+-- i32toi64 = Variable (Name ["LHC.Prim"] "i32toi64" 0) (TC.TyFun i32 i64)
+-- i64toi32 = Variable (Name ["LHC.Prim"] "i64toi32" 0) (TC.TyFun i64 i32)
 
 ptrCon :: Variable
 ptrCon = Variable (Name ["LHC.Prim"] "Ptr" 0) $

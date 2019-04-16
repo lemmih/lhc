@@ -5,6 +5,7 @@ module Language.Haskell.Crux where
 import           Codec.Serialise
 import           Data.List
 import qualified Data.Semigroup                    as Semigroup
+import           Data.Word
 import           GHC.Generics
 import           Language.Haskell.Exts             (SrcSpan, SrcSpanInfo)
 import qualified Language.Haskell.Scope            as Scope
@@ -87,8 +88,10 @@ data Pattern
 data Literal
     = LitChar Char
     | LitString String
-    | LitInt Integer
-    | LitWord Integer
+    | LitI8 Word8
+    | LitI16 Word16
+    | LitI32 Word32
+    | LitI64 Word64
     | LitFloat Rational
     | LitDouble Rational
     | LitVoid
@@ -244,10 +247,13 @@ instance Pretty Literal where
     pretty lit =
         case lit of
             LitChar c     -> text $ show c
-            LitInt i      -> integer i
+            -- LitInt i      -> integer i
             LitString str -> text $ show str
             LitVoid       -> text "void"
-            LitWord i     -> integer i
+            LitI8 i       -> integer (fromIntegral i)
+            LitI16 i      -> integer (fromIntegral i)
+            LitI32 i      -> integer (fromIntegral i)
+            LitI64 i      -> integer (fromIntegral i)
             _             -> text "{literal}"
 
 ppSyntax :: String -> Doc

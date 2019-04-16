@@ -459,9 +459,21 @@ convertExpr lazy expr rest =
         tmp <- newVariable [] "lit" (Primitive $ LLVM.ptr LLVM.i8)
         Bind [tmp] (Bedrock.Literal (LiteralString str))
             <$> rest [tmp]
-    Core.Lit (Core.LitInt int) -> do
+    Core.Lit (Core.LitI64 int) -> do
         tmp <- newVariable [] "int" (Primitive LLVM.i64)
-        Bind [tmp] (Bedrock.Literal (LiteralInt int))
+        Bind [tmp] (Bedrock.Literal (LiteralInt $ fromIntegral int))
+            <$> rest [tmp]
+    Core.Lit (Core.LitI32 int) -> do
+        tmp <- newVariable [] "int" (Primitive LLVM.i32)
+        Bind [tmp] (Bedrock.Literal (LiteralInt $ fromIntegral int))
+            <$> rest [tmp]
+    Core.Lit (Core.LitI16 int) -> do
+        tmp <- newVariable [] "int" (Primitive LLVM.i16)
+        Bind [tmp] (Bedrock.Literal (LiteralInt $ fromIntegral int))
+            <$> rest [tmp]
+    Core.Lit (Core.LitI8 int) -> do
+        tmp <- newVariable [] "int" (Primitive LLVM.i8)
+        Bind [tmp] (Bedrock.Literal (LiteralInt $ fromIntegral int))
             <$> rest [tmp]
     Core.Lit (Core.LitChar c) -> do
         tmp <- newVariable [] "char" (Primitive LLVM.i32)
@@ -605,9 +617,13 @@ convertExprLazy expr rest =
         tmp <- newVariable [] "lit" (Primitive $ LLVM.ptr LLVM.i8)
         Bind [tmp] (Bedrock.Literal (LiteralString str))
             <$> rest (Literal (LiteralInt 0)) tmp
-    Core.Lit (Core.LitInt int) -> do
+    Core.Lit (Core.LitI64 int) -> do
         tmp <- newVariable [] "int" (Primitive LLVM.i64)
-        Bind [tmp] (Bedrock.Literal (LiteralInt int))
+        Bind [tmp] (Bedrock.Literal (LiteralInt $ fromIntegral int))
+            <$> rest (Literal (LiteralInt 0)) tmp
+    Core.Lit (Core.LitI32 int) -> do
+        tmp <- newVariable [] "int" (Primitive LLVM.i32)
+        Bind [tmp] (Bedrock.Literal (LiteralInt $ fromIntegral int))
             <$> rest (Literal (LiteralInt 0)) tmp
     Core.Lit (Core.LitChar c) -> do
         tmp <- newVariable [] "char" (Primitive LLVM.i32)
@@ -707,7 +723,10 @@ convertLiteral lit = pure $
     case lit of
         LitChar c   -> LiteralInt (fromIntegral $ ord c)
         LitString s -> LiteralString s
-        LitInt i    -> LiteralInt i
+        LitI8 i     -> LiteralInt (fromIntegral i)
+        LitI16 i    -> LiteralInt (fromIntegral i)
+        LitI32 i    -> LiteralInt (fromIntegral i)
+        LitI64 i    -> LiteralInt (fromIntegral i)
         LitVoid     -> LiteralInt 0
         _           -> error "Urk: literals"
         -- LitWord Integer

@@ -1,7 +1,7 @@
 Case1.x : LHC.Prim.Int
 Case1.x =
   let Case1.a^1:LHC.Prim.Int = LHC.Prim.I#
-                                 (LHC.Prim.i64toi32 10)
+                                 10
   let Case1.b^2:LHC.Prim.Int = LHC.Prim.I#
-                                 (LHC.Prim.i64toi32 20)
+                                 20
   Case1.a^1

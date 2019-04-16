@@ -310,8 +310,7 @@ LHC.Prim.length : ∀ a. [a] →  LHC.Prim.Int
 LHC.Prim.length =
   λ @.a^130:* LHC.Prim.lst^131:[a] → 
   LHC.Prim.length_go @.a^130
-      (LHC.Prim.I# (LHC.Prim.i64toi32
-          0)) LHC.Prim.lst^131
+      (LHC.Prim.I# 0) LHC.Prim.lst^131
 LHC.Prim.length_go : ∀ a. LHC.Prim.Int →  [a] →  LHC.Prim.Int
 LHC.Prim.length_go =
   λ @.a^132:* LHC.Prim.n^133:LHC.Prim.Int arg^134:[a] → 
@@ -326,8 +325,7 @@ LHC.Prim.length_go =
       LHC.Prim.Cons LHC.Prim.x^139:a LHC.Prim.xs^140:[a] ← scrut^138:[a]
       LHC.Prim.length_go @.a^132
           (LHC.Prim.+ (LHC.Prim.I#
-                LHC.Prim.n^137) (LHC.Prim.I#
-              (LHC.Prim.i64toi32 1)))
+                LHC.Prim.n^137) (LHC.Prim.I# 1))
         LHC.Prim.xs^140
 LHC.Prim.emptyString : [LHC.Prim.Char]
 LHC.Prim.emptyString =

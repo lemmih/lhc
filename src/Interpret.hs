@@ -142,14 +142,14 @@ eval e = do
       Lit (LitString str) <- eval ptr
       case str of
         [] ->
-          bind ret (Lit $ LitWord 0) $
+          bind ret (Lit $ LitI32 0) $
             eval body
         (c:_) ->
-          bind ret (Lit $ LitWord $ fromIntegral $ ord c) $
+          bind ret (Lit $ LitI32 $ fromIntegral $ ord c) $
             eval body
     ExternalPure ret "addrAdd#" [ptr, n] body -> do
       Lit (LitString str) <- eval ptr
-      Lit (LitInt offset) <- eval n
+      Lit (LitI64 offset) <- eval n
       bind ret (Lit $ LitString $ drop (fromIntegral offset) str) $
         eval body
     Lam [] body -> eval body
@@ -183,25 +183,27 @@ matchAlts mbDef val alts = go alts
             bindMany (zip vars args) $ eval body
         LitPat lit1
           | Lit lit2 <- val
-          , lit1 `litEq` lit2 ->
+          , lowerLit lit1 == lowerLit lit2 ->
             eval body
         _ -> go alts
     splitApp (App a b) args = splitApp a (b:args)
     splitApp e args         = (e, args)
 
-    litEq (LitInt a) (LitWord b) = a==b
-    litEq (LitWord a) (LitInt b) = a==b
-    litEq (LitChar c) b = litEq (LitInt $ fromIntegral $ ord c) b
-    litEq a (LitChar c) = litEq a (LitInt $ fromIntegral $ ord c)
-    litEq a b = a==b
+    lowerLit (LitChar c) = LitI64 (fromIntegral $ ord c)
+    lowerLit (LitI8 w) = LitI64 (fromIntegral w)
+    lowerLit (LitI16 w) = LitI64 (fromIntegral w)
+    lowerLit (LitI32 w) = LitI64 (fromIntegral w)
+    lowerLit (LitI64 w) = LitI64 (fromIntegral w)
+    lowerLit (LitFloat r) = LitDouble r
+    lowerLit (LitDouble r) = LitDouble r
+    lowerLit (LitVoid) = LitI64 0
 
 toFFIRet :: Type -> RetType Expr
 toFFIRet (TyCon (QualifiedName "LHC.Prim" "I32")) =
-  fmap (\w -> Lit $ LitWord $ fromIntegral w) retWord32
+  fmap (\w -> Lit $ LitI32 w) retWord32
 
 toFFIArg :: Expr -> Arg
-toFFIArg (Lit (LitWord n)) = argWord (fromIntegral n)
-toFFIArg (Lit (LitInt n)) = argInt (fromIntegral n)
+toFFIArg (Lit (LitI32 n)) = argWord32 n
 
 blackhole (Variable n t) =
   Variable (Name [] "Blackhole" 0) t
