@@ -27,6 +27,24 @@ append :: [a] -> [a] -> [a]
 append [] b     = b
 append (x:xs) b = x : append xs b
 
+-- digitToInt :: Char -> Int
+-- digitToInt '0' = 0
+-- digitToInt '1' = 1
+-- digitToInt '2' = 2
+-- digitToInt '3' = 3
+-- digitToInt '4' = 4
+-- digitToInt '5' = 5
+-- digitToInt '6' = 6
+-- digitToInt '7' = 7
+-- digitToInt '8' = 8
+-- digitToInt '9' = 9
+--
+-- readInt :: [Char] -> Int
+-- readInt str = readInt_go (reverse str)
+--
+-- readInt_go [] = 0
+-- readInt_go (x:xs) = digitToInt x + (readInt_go xs * 10)
+
 intToDigit :: Int -> Char
 intToDigit 0 = '0'
 intToDigit 1 = '1'

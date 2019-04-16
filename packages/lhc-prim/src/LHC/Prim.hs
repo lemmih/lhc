@@ -37,6 +37,7 @@ module LHC.Prim
     , i64toi32
     , length
     , emptyString
+    , id
     ) where
 
 -- XXX: These have kind # but it is not checked anywhere.
