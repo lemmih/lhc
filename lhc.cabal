@@ -24,6 +24,7 @@ Executable lhc
  main-is:            Main.hs
  other-modules:
    RTS
+   Interpret
    Compiler.CoreToBedrock
    Paths_lhc
  Hs-Source-Dirs:     src
@@ -45,6 +46,7 @@ Executable lhc
                      directory,
                      llvm-hs-pure,
                      serialise,
+                     unix, libffi,
 
                      bedrock,
                      haskell-crux,

@@ -22,6 +22,7 @@ import           Data.IORef
 import           Data.List                          (intercalate)
 import           Data.Monoid                        (mconcat, (<>))
 import qualified Distribution.ModuleName            as Dist
+import           Interpret
 import qualified Language.Haskell.Crux              as Core
 import qualified Language.Haskell.Crux.DCE          as Core
 import qualified Language.Haskell.Crux.FromHaskell  as Haskell
@@ -51,8 +52,13 @@ main :: IO ()
 main = Compiler.customMain customCommands lhcCompiler
 
 customCommands :: Parser (IO ())
-customCommands = hsubparser buildCommand
+customCommands = hsubparser (buildCommand <> interpretCommand)
   where
+    interpretCommand = command "interpret" (info int idm)
+    int =
+      runInterpreter
+      <$> switch (long "verbose")
+      <*> argument str (metavar "MODULE")
     buildCommand = command "build" (info build idm)
     build =
         compileExecutable
@@ -219,3 +225,49 @@ compileExecutable verbose keepIntermediateFiles gcStrategy file = do
   let target = replaceExtension file "ll"
   Bedrock.compileModule keepIntermediateFiles verbose gc bedrock target
   linkRTS target
+
+runInterpreter :: Bool -> FilePath -> IO ()
+runInterpreter verbose file = do
+  -- putStrLn $ "Loading deps: " ++ show deps
+  db <- userDB
+  pkgs <- readPackageDB Don'tInitDB (db :: StandardDB LHC)
+  -- pkgs <- readPackagesInfo
+  --             (Proxy :: Proxy (StandardDB LHC))
+  --             [GlobalPackageDB, UserPackageDB] deps
+  ifaces <- concat <$> mapM loadLibrary pkgs
+  let scope =
+          [ (modName, toScopeInterface iface)
+          | (modName, (iface, _core)) <- ifaces ]
+      scopeEnv = fromInterfaces scope
+
+  when verbose $ putStrLn "Parsing file..."
+  ParseOk m <- parseFile file
+  when verbose $ putStrLn "Origin analysis..."
+  let (resolveEnv, errs, m') = resolve scopeEnv m
+      Just _scopeIface = lookupInterface (getModuleName m) resolveEnv
+  unless (null errs) $ do
+    mapM_ print errs
+    exitWith (ExitFailure 1)
+  when verbose $ putStrLn "Typechecking..."
+  let env = addAllToTcEnv (map (fst . snd) ifaces) emptyTcEnv
+  let Right (typedModule, env') = typecheck env m'
+  when verbose $ putStrLn "Converting to core..."
+  let core = Haskell.convert env' typedModule
+      libraryCore = mconcat (map (snd . snd) ifaces)
+      entrypoint = Core.Name ["Main"] "entrypoint" 0
+      base = Core.deadCodeElimination entrypoint $
+             NewType.lowerNewTypes $ mappend libraryCore core
+      complete =
+          Core.deadCodeElimination entrypoint $
+          Core.unique $
+          Core.simplify $ Core.simplify $ Core.simplify $ Core.simpleInline $ Core.unique $
+          Core.simplify $ Core.simplify $ Core.simplify $ Core.simpleInline $ Core.unique $
+          Core.simplify $ Core.simplify $ Core.simplify $ Core.simpleInline $ Core.unique $
+          snd $ Core.simpleEta Core.emptySimpleEtaAnnotation $
+          Core.simplify $ Core.simplify $ Core.simplify $
+          snd $ Core.simpleEta Core.emptySimpleEtaAnnotation
+          base
+  when verbose $ do
+    displayIO stdout (renderPretty 1 100 (pretty complete))
+
+  interpret complete
