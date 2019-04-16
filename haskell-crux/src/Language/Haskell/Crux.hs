@@ -247,6 +247,7 @@ instance Pretty Literal where
             LitInt i      -> integer i
             LitString str -> text $ show str
             LitVoid       -> text "void"
+            LitWord i     -> integer i
             _             -> text "{literal}"
 
 ppSyntax :: String -> Doc

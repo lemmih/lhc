@@ -269,5 +269,6 @@ runInterpreter verbose file = do
           base
   when verbose $ do
     displayIO stdout (renderPretty 1 100 (pretty complete))
+    putStr "\n"
 
   interpret complete
