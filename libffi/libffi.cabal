@@ -1,0 +1,25 @@
+Name:               libffi
+Version:            0.2
+Description:        A binding to libffi, allowing C functions of types only known at runtime to be called from Haskell.
+License:            BSD3
+License-file:       LICENSE
+Copyright:          Remi Turk 2008-2009
+Author:             Remi Turk
+Maintainer:         lemmih@gmail.com
+Stability:          alpha
+Synopsis:           A binding to libffi
+Tested-With:        GHC == 6.10.1
+Build-Depends:      base, bytestring
+Build-Type:         Simple
+Category:           Foreign
+
+exposed-modules:    Foreign.LibFFI,
+                    Foreign.LibFFI.Base,
+                    Foreign.LibFFI.Types,
+                    Foreign.LibFFI.FFITypes,
+                    Foreign.LibFFI.Internal
+-- 2019-4-16: This is an ugly hack. GHC statically links binaries against their own copy of
+--            libffi so we cannot link to the one installed system-wide.
+-- pkgconfig-depends: libffi
+-- extra-libraries: ffi
+includes:           ffi.h ffitarget.h

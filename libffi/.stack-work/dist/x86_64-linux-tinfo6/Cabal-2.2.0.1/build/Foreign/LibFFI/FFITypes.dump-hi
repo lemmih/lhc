@@ -1,0 +1,217 @@
+
+==================== FINAL INTERFACE ====================
+2019-04-16 14:03:33.526173112 UTC
+
+interface libffi-0.2-LFHFrVpfC6KAgELjP9tfdc:Foreign.LibFFI.FFITypes 8044
+  interface hash: 01f1fb5c0395d957cacf9527ab139c79
+  ABI hash: 8f5ba54f59cb2b2ca06b937edd4d0025
+  export-list hash: 6151dedb0b947157a81183181e471bc0
+  orphan hash: 693e9af84d3dfcc71e640e005bdc5e2e
+  flag hash: 51db20bb1ea1ff6e4eda464d0743fccf
+  opt_hash: 14e536840aca4e889cad654e6f9b79c1
+  hpc_hash: 93b885adfe0da089cdf634904fd59f71
+  sig of: Nothing
+  used TH splices: False
+  where
+exports:
+  Foreign.LibFFI.FFITypes.ffi_type_double
+  Foreign.LibFFI.FFITypes.ffi_type_float
+  Foreign.LibFFI.FFITypes.ffi_type_hs_int
+  Foreign.LibFFI.FFITypes.ffi_type_hs_word
+  Foreign.LibFFI.FFITypes.ffi_type_pointer
+  Foreign.LibFFI.FFITypes.ffi_type_schar
+  Foreign.LibFFI.FFITypes.ffi_type_sint
+  Foreign.LibFFI.FFITypes.ffi_type_sint16
+  Foreign.LibFFI.FFITypes.ffi_type_sint32
+  Foreign.LibFFI.FFITypes.ffi_type_sint64
+  Foreign.LibFFI.FFITypes.ffi_type_sint8
+  Foreign.LibFFI.FFITypes.ffi_type_size
+  Foreign.LibFFI.FFITypes.ffi_type_slong
+  Foreign.LibFFI.FFITypes.ffi_type_time
+  Foreign.LibFFI.FFITypes.ffi_type_uchar
+  Foreign.LibFFI.FFITypes.ffi_type_uint
+  Foreign.LibFFI.FFITypes.ffi_type_uint16
+  Foreign.LibFFI.FFITypes.ffi_type_uint32
+  Foreign.LibFFI.FFITypes.ffi_type_uint64
+  Foreign.LibFFI.FFITypes.ffi_type_uint8
+  Foreign.LibFFI.FFITypes.ffi_type_ulong
+  Foreign.LibFFI.FFITypes.ffi_type_void
+  Foreign.LibFFI.FFITypes.ffi_type_wchar
+module dependencies: Foreign.LibFFI.Internal
+package dependencies: base-4.11.1.0* ghc-prim-0.5.2.0
+                      integer-gmp-1.0.2.0
+orphans: base-4.11.1.0:GHC.Float base-4.11.1.0:GHC.Base
+family instance modules: base-4.11.1.0:Control.Applicative
+                         base-4.11.1.0:Data.Functor.Const
+                         base-4.11.1.0:Data.Functor.Identity base-4.11.1.0:Data.Monoid
+                         base-4.11.1.0:Data.Semigroup.Internal base-4.11.1.0:GHC.Generics
+                         base-4.11.1.0:GHC.IO.Exception
+import  -/  base-4.11.1.0:Data.Int f5d427cd3860d8572d1a4d519e117c0b
+import  -/  base-4.11.1.0:Data.Word 22a60783baa8ba4f33c4588b366fade3
+import  -/  base-4.11.1.0:Foreign.C.Types b72e4995dddb9558097430731ae85171
+import  -/  base-4.11.1.0:Foreign.Ptr c8668b19406059736efd90040d8cbb22
+import  -/  base-4.11.1.0:Foreign.Storable 8aafc1312c1c9357689d3e467747cdbb
+import  -/  base-4.11.1.0:GHC.Err 5e26aa744981f14e0f1e4d29c44ac52e
+import  -/  base-4.11.1.0:GHC.Ptr 53f4b9e63620bcb0535962e5a0a52cf8
+import  -/  base-4.11.1.0:Prelude 0750c25585e2b797cd78291d423d39dd
+import  -/  Foreign.LibFFI.Internal 5a50e49b49a82e0d2af44e5386e9b589
+  exports: dd4af2205a005f636dab3da5f5387e0b
+  CType 7358696d5ed5a0a1b006ff123e28ca6e
+d7d310184ed1d00c1db407e6a6a15df7
+  $trModule :: GHC.Types.Module
+  {- HasNoCafRefs, Strictness: m,
+     Unfolding: (GHC.Types.Module
+                   Foreign.LibFFI.FFITypes.$trModule3
+                   Foreign.LibFFI.FFITypes.$trModule1) -}
+3722ddd009b197bf23e119c1bfe2cd4e
+  $trModule1 :: GHC.Types.TrName
+  {- HasNoCafRefs, Strictness: m1,
+     Unfolding: (GHC.Types.TrNameS
+                   Foreign.LibFFI.FFITypes.$trModule2) -}
+0e163c23d79214f88206edccdf11a68e
+  $trModule2 :: GHC.Prim.Addr#
+  {- HasNoCafRefs, Unfolding: ("Foreign.LibFFI.FFITypes"#) -}
+0e017dbf9bc75ec42c2e698994f0982f
+  $trModule3 :: GHC.Types.TrName
+  {- HasNoCafRefs, Strictness: m1,
+     Unfolding: (GHC.Types.TrNameS
+                   Foreign.LibFFI.FFITypes.$trModule4) -}
+fbad339896cb4be9fb1b80ab90833b89
+  $trModule4 :: GHC.Prim.Addr#
+  {- HasNoCafRefs,
+     Unfolding: ("libffi-0.2-LFHFrVpfC6KAgELjP9tfdc"#) -}
+074e95b1fa73f1119773002d151c15cb
+  ffi_type_double :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_double" (data)) -}
+bf9059feb84a03dc443ecd9c60307144
+  ffi_type_float :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_float" (data)) -}
+d2e576417861f8031a621762467de24a
+  ffi_type_hs_int :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.FFITypes.ffi_type_sint64 -}
+eacdcc53d812edcfa07c4d728454ee2e
+  ffi_type_hs_word :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.FFITypes.ffi_type_uint64 -}
+37f3da642eb479dfc2fdc1efbaf1a40d
+  ffi_type_pointer :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_pointer" (data)) -}
+0403424a41d4ccd4e1c24c484a5c71df
+  ffi_type_schar :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.FFITypes.ffi_type_sint8 -}
+ebda80002f2f50f97a77a987c7bde546
+  ffi_type_sint :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.FFITypes.ffi_type_sint32 -}
+a3dce1d21446997f0250a76ac59294a9
+  ffi_type_sint16 :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_sint16" (data)) -}
+eaedfe79836e96fdcdd8b13e8068c76c
+  ffi_type_sint32 :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_sint32" (data)) -}
+76a0a6d3f4b442c3f65b31aee8a3ad7b
+  ffi_type_sint64 :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_sint64" (data)) -}
+31c7f923af043f00010e75e35cda97d7
+  ffi_type_sint8 :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_sint8" (data)) -}
+c0ce57d88d434ed3f564f524a7bb902f
+  ffi_type_size :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.FFITypes.ffi_type_uint64 -}
+fce05c7774a48808ee2c73f244192be3
+  ffi_type_slong :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.FFITypes.ffi_type_sint64 -}
+fdbf31096628d77998519bb7647a63a9
+  ffi_type_time :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.FFITypes.ffi_type_sint64 -}
+50cff2dc50fdb90b32c94614295e5862
+  ffi_type_uchar :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.FFITypes.ffi_type_uint8 -}
+c68a885d632bc856b72411fd6aef02d0
+  ffi_type_uint :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.FFITypes.ffi_type_uint32 -}
+b8b0a7406936fce93411023fba9eea88
+  ffi_type_uint16 :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_uint16" (data)) -}
+b110c521d15251e332756c9bf6632e30
+  ffi_type_uint32 :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_uint32" (data)) -}
+2366f2f21baa1056d099e72e7b0e4aad
+  ffi_type_uint64 :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_uint64" (data)) -}
+d3e54cefcf387448adc1cd7a2700a4dd
+  ffi_type_uint8 :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_uint8" (data)) -}
+e6fa089c25fd7796d686d207e2c6b7cb
+  ffi_type_ulong :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.FFITypes.ffi_type_uint64 -}
+c5e9221c0226fa72fce4f98c1132265f
+  ffi_type_void :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: (GHC.Ptr.Ptr
+                   @ Foreign.LibFFI.Internal.CType
+                   __label "ffi_type_void" (data)) -}
+99e2ed2e7812c9cd3c5827f93c722cfa
+  ffi_type_wchar :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+  {- Strictness: m,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.FFITypes.ffi_type_sint32 -}
+vectorised variables:
+vectorised tycons:
+vectorised reused tycons:
+parallel variables:
+parallel tycons:
+trusted: safe
+require own pkg trusted: False
+

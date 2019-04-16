@@ -1,0 +1,3116 @@
+
+==================== FINAL INTERFACE ====================
+2019-04-16 14:03:33.907082139 UTC
+
+interface libffi-0.2-LFHFrVpfC6KAgELjP9tfdc:Foreign.LibFFI.Types 8044
+  interface hash: 610465feed1d8f93f4d8cfcb28f7795c
+  ABI hash: 726d005a59deb77b39d1c4a5afe03b55
+  export-list hash: 0cb1d41aa8b04f1cba107667dc889999
+  orphan hash: 693e9af84d3dfcc71e640e005bdc5e2e
+  flag hash: ddcd75ebef7563f8897c55d630f97ac8
+  opt_hash: 14e536840aca4e889cad654e6f9b79c1
+  hpc_hash: 93b885adfe0da089cdf634904fd59f71
+  sig of: Nothing
+  used TH splices: False
+  where
+exports:
+  Foreign.LibFFI.Types.argByteString
+  Foreign.LibFFI.Types.argCChar
+  Foreign.LibFFI.Types.argCDouble
+  Foreign.LibFFI.Types.argCFloat
+  Foreign.LibFFI.Types.argCInt
+  Foreign.LibFFI.Types.argCLong
+  Foreign.LibFFI.Types.argCSize
+  Foreign.LibFFI.Types.argCTime
+  Foreign.LibFFI.Types.argCUChar
+  Foreign.LibFFI.Types.argCUInt
+  Foreign.LibFFI.Types.argCULong
+  Foreign.LibFFI.Types.argCWchar
+  Foreign.LibFFI.Types.argConstByteString
+  Foreign.LibFFI.Types.argFunPtr
+  Foreign.LibFFI.Types.argInt
+  Foreign.LibFFI.Types.argInt16
+  Foreign.LibFFI.Types.argInt32
+  Foreign.LibFFI.Types.argInt64
+  Foreign.LibFFI.Types.argInt8
+  Foreign.LibFFI.Types.argPtr
+  Foreign.LibFFI.Types.argString
+  Foreign.LibFFI.Types.argWord
+  Foreign.LibFFI.Types.argWord16
+  Foreign.LibFFI.Types.argWord32
+  Foreign.LibFFI.Types.argWord64
+  Foreign.LibFFI.Types.argWord8
+  Foreign.LibFFI.Types.retByteString
+  Foreign.LibFFI.Types.retCChar
+  Foreign.LibFFI.Types.retCDouble
+  Foreign.LibFFI.Types.retCFloat
+  Foreign.LibFFI.Types.retCInt
+  Foreign.LibFFI.Types.retCLong
+  Foreign.LibFFI.Types.retCSize
+  Foreign.LibFFI.Types.retCString
+  Foreign.LibFFI.Types.retCTime
+  Foreign.LibFFI.Types.retCUChar
+  Foreign.LibFFI.Types.retCUInt
+  Foreign.LibFFI.Types.retCULong
+  Foreign.LibFFI.Types.retCWchar
+  Foreign.LibFFI.Types.retFunPtr
+  Foreign.LibFFI.Types.retInt
+  Foreign.LibFFI.Types.retInt16
+  Foreign.LibFFI.Types.retInt32
+  Foreign.LibFFI.Types.retInt64
+  Foreign.LibFFI.Types.retInt8
+  Foreign.LibFFI.Types.retMallocByteString
+  Foreign.LibFFI.Types.retPtr
+  Foreign.LibFFI.Types.retString
+  Foreign.LibFFI.Types.retVoid
+  Foreign.LibFFI.Types.retWord
+  Foreign.LibFFI.Types.retWord16
+  Foreign.LibFFI.Types.retWord32
+  Foreign.LibFFI.Types.retWord64
+  Foreign.LibFFI.Types.retWord8
+module dependencies: Foreign.LibFFI.Base Foreign.LibFFI.FFITypes
+                     Foreign.LibFFI.Internal
+package dependencies: array-0.5.2.0 base-4.11.1.0
+                      bytestring-0.10.8.2 deepseq-1.4.3.0 ghc-prim-0.5.2.0
+                      integer-gmp-1.0.2.0
+orphans: base-4.11.1.0:GHC.Float base-4.11.1.0:GHC.Base
+family instance modules: base-4.11.1.0:Control.Applicative
+                         base-4.11.1.0:Data.Complex base-4.11.1.0:Data.Functor.Compose
+                         base-4.11.1.0:Data.Functor.Const
+                         base-4.11.1.0:Data.Functor.Identity
+                         base-4.11.1.0:Data.Functor.Product base-4.11.1.0:Data.Functor.Sum
+                         base-4.11.1.0:Data.Monoid base-4.11.1.0:Data.Semigroup
+                         base-4.11.1.0:Data.Semigroup.Internal base-4.11.1.0:Data.Version
+                         base-4.11.1.0:Data.Void base-4.11.1.0:GHC.Generics
+                         base-4.11.1.0:GHC.IO.Exception
+import  -/  base-4.11.1.0:Control.Monad c5f960c67d822497578bffbd3e4c01cf
+import  -/  base-4.11.1.0:Data.Char 3e89818e2b8ef1a2cc5393163484da72
+import  -/  base-4.11.1.0:Data.Int f5d427cd3860d8572d1a4d519e117c0b
+import  -/  base-4.11.1.0:Data.List 83dc843e47bfc0c5af51e19c6f3476d5
+import  -/  base-4.11.1.0:Data.Word 22a60783baa8ba4f33c4588b366fade3
+import  -/  base-4.11.1.0:Foreign.C.String bc0c33b688857475b132d04a915e82ac
+import  -/  base-4.11.1.0:Foreign.C.Types b72e4995dddb9558097430731ae85171
+import  -/  base-4.11.1.0:Foreign.Marshal 27a717218fdb8fa22df295956cb7ad15
+import  -/  base-4.11.1.0:Foreign.Marshal.Alloc 4a3fe72a9af6027670590d68a84f2442
+import  -/  base-4.11.1.0:Foreign.Ptr c8668b19406059736efd90040d8cbb22
+import  -/  base-4.11.1.0:Foreign.Storable 8aafc1312c1c9357689d3e467747cdbb
+import  -/  base-4.11.1.0:GHC.Base 604111500e81281298777e721c75643b
+import  -/  base-4.11.1.0:GHC.Int dbb9fa419302fe275e335328af678cb6
+import  -/  base-4.11.1.0:GHC.Ptr 53f4b9e63620bcb0535962e5a0a52cf8
+import  -/  base-4.11.1.0:GHC.Word bc9bdf9b61a0f9352e5a1baeee5690a5
+import  -/  base-4.11.1.0:Prelude 0750c25585e2b797cd78291d423d39dd
+import  -/  bytestring-0.10.8.2:Data.ByteString 2b4288f7e6f19304c6573c69b0ec9578
+import  -/  bytestring-0.10.8.2:Data.ByteString.Internal 0b7b83fbf9714d7fb832fbb905af4a0b
+import  -/  bytestring-0.10.8.2:Data.ByteString.Unsafe eb282bb1713fe1d1146a234346ed7c7f
+import  -/  Foreign.LibFFI.Base d826f6e1164b8b617f0c0242cd58f9b9
+  exports: 8f8b53c7088f0b60bbc022ea4e57dfc3
+  Arg 44d35bf74ae86831b5c53c0084aa8176
+  RetType 0b0a672c9b144b7211aad32c70c8b899
+  RetType 4a3a8eccf1d3991687660c19454a3a0a
+  customPointerArg 7fde38859df1ef41c039a2c945082e79
+  mkStorableArg ae145203592c6163294f67f7e03e82d5
+  mkStorableRetType a0557fdc4cfc05eda07a27c6afd0f0c0
+  withRetType 8c7941c6e41cc36028a5092e11cdb212
+import  -/  Foreign.LibFFI.FFITypes 8f5ba54f59cb2b2ca06b937edd4d0025
+  exports: 6151dedb0b947157a81183181e471bc0
+  ffi_type_double 074e95b1fa73f1119773002d151c15cb
+  ffi_type_float bf9059feb84a03dc443ecd9c60307144
+  ffi_type_hs_int d2e576417861f8031a621762467de24a
+  ffi_type_hs_word eacdcc53d812edcfa07c4d728454ee2e
+  ffi_type_pointer 37f3da642eb479dfc2fdc1efbaf1a40d
+  ffi_type_schar 0403424a41d4ccd4e1c24c484a5c71df
+  ffi_type_sint ebda80002f2f50f97a77a987c7bde546
+  ffi_type_sint16 a3dce1d21446997f0250a76ac59294a9
+  ffi_type_sint32 eaedfe79836e96fdcdd8b13e8068c76c
+  ffi_type_sint64 76a0a6d3f4b442c3f65b31aee8a3ad7b
+  ffi_type_sint8 31c7f923af043f00010e75e35cda97d7
+  ffi_type_size c0ce57d88d434ed3f564f524a7bb902f
+  ffi_type_slong fce05c7774a48808ee2c73f244192be3
+  ffi_type_time fdbf31096628d77998519bb7647a63a9
+  ffi_type_uchar 50cff2dc50fdb90b32c94614295e5862
+  ffi_type_uint c68a885d632bc856b72411fd6aef02d0
+  ffi_type_uint16 b8b0a7406936fce93411023fba9eea88
+  ffi_type_uint32 b110c521d15251e332756c9bf6632e30
+  ffi_type_uint64 2366f2f21baa1056d099e72e7b0e4aad
+  ffi_type_uint8 d3e54cefcf387448adc1cd7a2700a4dd
+  ffi_type_ulong e6fa089c25fd7796d686d207e2c6b7cb
+  ffi_type_void c5e9221c0226fa72fce4f98c1132265f
+bb3151f616053cb069135538c7962284
+  $trModule :: GHC.Types.Module
+  {- HasNoCafRefs, Strictness: m,
+     Unfolding: (GHC.Types.Module
+                   Foreign.LibFFI.Types.$trModule3
+                   Foreign.LibFFI.Types.$trModule1) -}
+a0a9c25cb012bf7aafe6c58823d7c9d6
+  $trModule1 :: GHC.Types.TrName
+  {- HasNoCafRefs, Strictness: m1,
+     Unfolding: (GHC.Types.TrNameS Foreign.LibFFI.Types.$trModule2) -}
+d4e388444bf912cc2b480f8b9468aab7
+  $trModule2 :: GHC.Prim.Addr#
+  {- HasNoCafRefs, Unfolding: ("Foreign.LibFFI.Types"#) -}
+7fb39b5b00729c898b51a300949e40d3
+  $trModule3 :: GHC.Types.TrName
+  {- HasNoCafRefs, Strictness: m1,
+     Unfolding: (GHC.Types.TrNameS Foreign.LibFFI.Types.$trModule4) -}
+f4ff983b494a7285a3b84de266a6584d
+  $trModule4 :: GHC.Prim.Addr#
+  {- HasNoCafRefs,
+     Unfolding: ("libffi-0.2-LFHFrVpfC6KAgELjP9tfdc"#) -}
+8f371637df3b373d6fbfb5475ee5962e
+  $wargByteString ::
+    GHC.Prim.Addr#
+    -> GHC.ForeignPtr.ForeignPtrContents
+    -> GHC.Prim.Int#
+    -> GHC.Prim.Int#
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 5, Strictness: <S,U><L,U><S,U><S,U><S,U>, Inline: [0],
+     Unfolding: (\ (ww :: GHC.Prim.Addr#)
+                   (ww1 :: GHC.ForeignPtr.ForeignPtrContents)
+                   (ww2 :: GHC.Prim.Int#)
+                   (ww3 :: GHC.Prim.Int#)
+                   (w :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case (Foreign.Marshal.Alloc.allocaBytes
+                         @ GHC.Word.Word8
+                         @ Foreign.C.String.CString
+                         (GHC.Types.I# (GHC.Prim.+# ww3 1#))
+                         (\ (buf :: GHC.Ptr.Ptr GHC.Word.Word8)[OneShot]
+                            (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                          case buf of ds { GHC.Ptr.Ptr ds1 ->
+                          case {__pkg_ccall bytestring-0.10.8.2 GHC.Prim.Addr#
+                                                                -> GHC.Prim.Addr#
+                                                                -> GHC.Prim.Word#
+                                                                -> GHC.Prim.State#
+                                                                     GHC.Prim.RealWorld
+                                                                -> (# GHC.Prim.State#
+                                                                        GHC.Prim.RealWorld,
+                                                                      GHC.Prim.Addr# #)}
+                                 ds1
+                                 (GHC.Prim.plusAddr# ww ww2)
+                                 (GHC.Prim.int2Word# ww3)
+                                 s of wild1 { (#,#) ds4 ds5 ->
+                          case GHC.Prim.writeWord8OffAddr#
+                                 @ GHC.Prim.RealWorld
+                                 (GHC.Prim.plusAddr# ds1 ww3)
+                                 0#
+                                 0##
+                                 ds4 of s2 { DEFAULT ->
+                          case GHC.Prim.touch#
+                                 @ 'GHC.Types.LiftedRep
+                                 @ GHC.ForeignPtr.ForeignPtrContents
+                                 ww1
+                                 s2 of s' { DEFAULT ->
+                          (# s',
+                             ds
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Word.Word8, Foreign.C.Types.CChar>)_R #) } } } })
+                           `cast`
+                         (<GHC.Ptr.Ptr GHC.Word.Word8>_R
+                          ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.String.CString>_R)))
+                        `cast`
+                      (GHC.Types.N:IO[0] <Foreign.C.String.CString>_R)
+                        w of ds1 { (#,#) ipv ipv1 ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        ipv of wild1 { (#,#) ds ds2 ->
+                 case GHC.Prim.eqAddr# ds2 __NULL of lwild {
+                   DEFAULT
+                   -> case ipv1 of wild2 { GHC.Ptr.Ptr x ->
+                      case GHC.Prim.writeAddrOffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds2
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_pointer,
+                          (GHC.Ptr.Ptr @ (GHC.Ptr.Ptr Foreign.C.Types.CChar) ds2)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <GHC.Ptr.Ptr
+                                Foreign.C.Types.CChar, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (s1 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds2
+                                  s1 of wild { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.C.Types.CChar))
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } } }) -}
+98a22e1ab2d4c1ea441becfd1222b5bd
+  $wargConstByteString ::
+    GHC.Prim.Addr#
+    -> GHC.ForeignPtr.ForeignPtrContents
+    -> GHC.Prim.Int#
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 4, Strictness: <L,U><L,U><L,U><S,U>, Inline: [0],
+     Unfolding: (\ (ww :: GHC.Prim.Addr#)
+                   (ww1 :: GHC.ForeignPtr.ForeignPtrContents)
+                   (ww2 :: GHC.Prim.Int#)
+                   (w :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case GHC.Prim.touch#
+                        @ 'GHC.Types.LiftedRep
+                        @ GHC.ForeignPtr.ForeignPtrContents
+                        ww1
+                        w of s' { DEFAULT ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s' of wild1 { (#,#) ds ds2 ->
+                 case GHC.Prim.eqAddr# ds2 __NULL of lwild {
+                   DEFAULT
+                   -> case GHC.Prim.writeAddrOffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds2
+                             0#
+                             (GHC.Prim.plusAddr# ww ww2)
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_pointer,
+                          (GHC.Ptr.Ptr @ (GHC.Ptr.Ptr Foreign.C.Types.CChar) ds2)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <GHC.Ptr.Ptr
+                                Foreign.C.Types.CChar, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (s1 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds2
+                                  s1 of wild { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.C.Types.CChar))
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } } }) -}
+f526c94e788debfeb8805a16354fe9b2
+  argByteString ::
+    Data.ByteString.Internal.ByteString -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <S(SLSS),1*U(U,U,U,U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argByteString1
+                  `cast`
+                (<Data.ByteString.Internal.ByteString>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+02dcad4454d3f0e24057bc2db3e28bc5
+  argByteString1 ::
+    Data.ByteString.Internal.ByteString
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <S(SLSS),1*U(U,U,U,U)><S,U>, Inline: [0],
+     Unfolding: InlineRule (2, True, False)
+                (\ (w :: Data.ByteString.Internal.ByteString)
+                   (w1 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case w of ww { Data.ByteString.Internal.PS ww1 ww2 ww3 ww4 ->
+                 Foreign.LibFFI.Types.$wargByteString ww1 ww2 ww3 ww4 w1 }) -}
+f03c81b58384521af9c66ac8a239e81a
+  argCChar :: Foreign.C.Types.CChar -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argCChar1
+                  `cast`
+                (<Foreign.C.Types.CChar>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+2d09eb41d047709d98239f4388db1c78
+  argCChar1 ::
+    Foreign.C.Types.CChar
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: Foreign.C.Types.CChar)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        1##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1
+                             `cast`
+                           (Foreign.C.Types.N:CChar[0]) of wild2 { GHC.Int.I8# x ->
+                      case GHC.Prim.writeInt8OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_sint8,
+                          (GHC.Ptr.Ptr @ Foreign.C.Types.CChar ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <Foreign.C.Types.CChar, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr Foreign.C.Types.CChar)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+bb61d238d95e5e9e29a7a708575e3ad2
+  argCDouble :: Foreign.C.Types.CDouble -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argCDouble1
+                  `cast`
+                (<Foreign.C.Types.CDouble>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+13834053d749088171d79cd493e854cb
+  argCDouble1 ::
+    Foreign.C.Types.CDouble
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: Foreign.C.Types.CDouble)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1
+                             `cast`
+                           (Foreign.C.Types.N:CDouble[0]) of wild2 { GHC.Types.D# x ->
+                      case GHC.Prim.writeDoubleOffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_double,
+                          (GHC.Ptr.Ptr @ Foreign.C.Types.CDouble ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <Foreign.C.Types.CDouble, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr Foreign.C.Types.CDouble)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+0b79eb6a2e482145e683d14d16367033
+  argCFloat :: Foreign.C.Types.CFloat -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argCFloat1
+                  `cast`
+                (<Foreign.C.Types.CFloat>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+303f16e324a16fc294d1d5d05a3042f3
+  argCFloat1 ::
+    Foreign.C.Types.CFloat
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: Foreign.C.Types.CFloat)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        4##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1
+                             `cast`
+                           (Foreign.C.Types.N:CFloat[0]) of wild2 { GHC.Types.F# x ->
+                      case GHC.Prim.writeFloatOffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_float,
+                          (GHC.Ptr.Ptr @ Foreign.C.Types.CFloat ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <Foreign.C.Types.CFloat, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr Foreign.C.Types.CFloat)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+6487d37f68486f314b66199d999f07d1
+  argCInt :: Foreign.C.Types.CInt -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argCInt1
+                  `cast`
+                (<Foreign.C.Types.CInt>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+b23f227d148e996b2b832db8b10bd296
+  argCInt1 ::
+    Foreign.C.Types.CInt
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: Foreign.C.Types.CInt)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        4##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1
+                             `cast`
+                           (Foreign.C.Types.N:CInt[0]) of wild2 { GHC.Int.I32# x ->
+                      case GHC.Prim.writeInt32OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_sint32,
+                          (GHC.Ptr.Ptr @ Foreign.C.Types.CInt ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <Foreign.C.Types.CInt, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr Foreign.C.Types.CInt)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+f74db3a56f86e700466e3d309025ef94
+  argCLong :: Foreign.C.Types.CLong -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argCLong1
+                  `cast`
+                (<Foreign.C.Types.CLong>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+81477d3ec5fa286d81fc1b571e7d3585
+  argCLong1 ::
+    Foreign.C.Types.CLong
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: Foreign.C.Types.CLong)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1
+                             `cast`
+                           (Foreign.C.Types.N:CLong[0]) of wild2 { GHC.Int.I64# x ->
+                      case GHC.Prim.writeInt64OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_sint64,
+                          (GHC.Ptr.Ptr @ Foreign.C.Types.CLong ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <Foreign.C.Types.CLong, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr Foreign.C.Types.CLong)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+98d1619c15a76f4031619c5d033f3e73
+  argCSize :: Foreign.C.Types.CSize -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argCSize1
+                  `cast`
+                (<Foreign.C.Types.CSize>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+334ed167b1073bd0262539a4c63a6861
+  argCSize1 ::
+    Foreign.C.Types.CSize
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: Foreign.C.Types.CSize)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1
+                             `cast`
+                           (Foreign.C.Types.N:CSize[0]) of wild2 { GHC.Word.W64# x ->
+                      case GHC.Prim.writeWord64OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_uint64,
+                          (GHC.Ptr.Ptr @ Foreign.C.Types.CSize ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <Foreign.C.Types.CSize, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr Foreign.C.Types.CSize)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+c3ed743f6ac0ed47e7bef37442cf7c45
+  argCTime :: Foreign.C.Types.CTime -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argCTime1
+                  `cast`
+                (<Foreign.C.Types.CTime>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+9685cca9650e3f689439ebbc0825f86e
+  argCTime1 ::
+    Foreign.C.Types.CTime
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: Foreign.C.Types.CTime)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1
+                             `cast`
+                           (Foreign.C.Types.N:CTime[0]) of wild2 { GHC.Int.I64# x ->
+                      case GHC.Prim.writeInt64OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_uint64,
+                          (GHC.Ptr.Ptr @ Foreign.C.Types.CTime ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <Foreign.C.Types.CTime, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr Foreign.C.Types.CTime)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+5fc7af5557ef96d70a077b5912460a1e
+  argCUChar :: Foreign.C.Types.CUChar -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argCUChar1
+                  `cast`
+                (<Foreign.C.Types.CUChar>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+d948563962cfc8d563fe0b9c74839a72
+  argCUChar1 ::
+    Foreign.C.Types.CUChar
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: Foreign.C.Types.CUChar)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        1##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1
+                             `cast`
+                           (Foreign.C.Types.N:CUChar[0]) of wild2 { GHC.Word.W8# x ->
+                      case GHC.Prim.writeWord8OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_uint8,
+                          (GHC.Ptr.Ptr @ Foreign.C.Types.CUChar ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <Foreign.C.Types.CUChar, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr Foreign.C.Types.CUChar)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+80e58829698dc65d4148626dbce99f51
+  argCUInt :: Foreign.C.Types.CUInt -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argCUInt1
+                  `cast`
+                (<Foreign.C.Types.CUInt>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+b46b76e5c4db27e2b002c40ececdeb98
+  argCUInt1 ::
+    Foreign.C.Types.CUInt
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: Foreign.C.Types.CUInt)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        4##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1
+                             `cast`
+                           (Foreign.C.Types.N:CUInt[0]) of wild2 { GHC.Word.W32# x ->
+                      case GHC.Prim.writeWord32OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_uint32,
+                          (GHC.Ptr.Ptr @ Foreign.C.Types.CUInt ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <Foreign.C.Types.CUInt, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr Foreign.C.Types.CUInt)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+21f6e37b7e1b287696dcd1ee6e49a5c9
+  argCULong :: Foreign.C.Types.CULong -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argCULong1
+                  `cast`
+                (<Foreign.C.Types.CULong>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+54cb0750b23cd62767ae9d6f0ff650de
+  argCULong1 ::
+    Foreign.C.Types.CULong
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: Foreign.C.Types.CULong)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1
+                             `cast`
+                           (Foreign.C.Types.N:CULong[0]) of wild2 { GHC.Word.W64# x ->
+                      case GHC.Prim.writeWord64OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_uint64,
+                          (GHC.Ptr.Ptr @ Foreign.C.Types.CULong ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <Foreign.C.Types.CULong, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr Foreign.C.Types.CULong)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+0d1644bb1967f6684d5d0c26eb503a6b
+  argCWchar :: Foreign.C.Types.CWchar -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argCWchar1
+                  `cast`
+                (<Foreign.C.Types.CWchar>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+9f7838fd40ffece94322fe6d493c242d
+  argCWchar1 ::
+    Foreign.C.Types.CWchar
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: Foreign.C.Types.CWchar)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        4##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1
+                             `cast`
+                           (Foreign.C.Types.N:CWchar[0]) of wild2 { GHC.Int.I32# x ->
+                      case GHC.Prim.writeInt32OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_sint8,
+                          (GHC.Ptr.Ptr @ Foreign.C.Types.CWchar ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <Foreign.C.Types.CWchar, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr Foreign.C.Types.CWchar)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+ab839c799d681eab409817212318cbff
+  argConstByteString ::
+    Data.ByteString.Internal.ByteString -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <S(SLSL),1*U(U,U,U,A)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argConstByteString1
+                  `cast`
+                (<Data.ByteString.Internal.ByteString>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+aa282fe063d9f6cb0796576251c6b85e
+  argConstByteString1 ::
+    Data.ByteString.Internal.ByteString
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <S(SLSL),1*U(U,U,U,A)><S,U>, Inline: [0],
+     Unfolding: InlineRule (2, True, False)
+                (\ (w :: Data.ByteString.Internal.ByteString)
+                   (w1 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case w of ww { Data.ByteString.Internal.PS ww1 ww2 ww3 ww4 ->
+                 Foreign.LibFFI.Types.$wargConstByteString ww1 ww2 ww3 w1 }) -}
+74e684bbcb4a94f4e28c388156d55548
+  argFunPtr :: GHC.Ptr.FunPtr a -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argFunPtr1
+                  `cast`
+                (forall (a :: <*>_N).
+                 <GHC.Ptr.FunPtr a>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+bcf090390bbb9166bcc28985af6babd8
+  argFunPtr1 ::
+    GHC.Ptr.FunPtr a
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ @ a
+                   (a1 :: GHC.Ptr.FunPtr a)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Ptr.FunPtr x ->
+                      case GHC.Prim.writeAddrOffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_pointer,
+                          (GHC.Ptr.Ptr @ (GHC.Ptr.FunPtr a) ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Ptr.FunPtr a, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr (GHC.Ptr.FunPtr a))
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+3a796963847e39fc5c3d32fda8d6ae25
+  argInt :: GHC.Types.Int -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argInt1
+                  `cast`
+                (<GHC.Types.Int>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+802704250df400baaf6702cd8194564e
+  argInt1 ::
+    GHC.Types.Int
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: GHC.Types.Int)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Types.I# x ->
+                      case GHC.Prim.writeIntOffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_sint64,
+                          (GHC.Ptr.Ptr @ GHC.Types.Int ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Types.Int, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr GHC.Types.Int)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+980d1633d8dce384da052e3cbb4081f3
+  argInt16 :: GHC.Int.Int16 -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argInt2
+                  `cast`
+                (<GHC.Int.Int16>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+659b9b6ced5ce754765b9cf394866502
+  argInt2 ::
+    GHC.Int.Int16
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: GHC.Int.Int16)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        2##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Int.I16# x ->
+                      case GHC.Prim.writeInt16OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_sint16,
+                          (GHC.Ptr.Ptr @ GHC.Int.Int16 ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Int.Int16, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr GHC.Int.Int16)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+977aefb40e56d00314b4e74f784538a0
+  argInt3 ::
+    GHC.Int.Int32
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: GHC.Int.Int32)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        4##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Int.I32# x ->
+                      case GHC.Prim.writeInt32OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_sint32,
+                          (GHC.Ptr.Ptr @ GHC.Int.Int32 ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Int.Int32, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr GHC.Int.Int32)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+8eada9377fb699dcde2462a33c9f74a9
+  argInt32 :: GHC.Int.Int32 -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argInt3
+                  `cast`
+                (<GHC.Int.Int32>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+6c67508ad2095db4da767bfe3dc3e7f5
+  argInt4 ::
+    GHC.Int.Int64
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: GHC.Int.Int64)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Int.I64# x ->
+                      case GHC.Prim.writeInt64OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_sint64,
+                          (GHC.Ptr.Ptr @ GHC.Int.Int64 ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Int.Int64, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr GHC.Int.Int64)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+123083798ca9c5f83a9c35d1bd665383
+  argInt5 ::
+    GHC.Int.Int8
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: GHC.Int.Int8)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        1##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Int.I8# x ->
+                      case GHC.Prim.writeInt8OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_sint8,
+                          (GHC.Ptr.Ptr @ GHC.Int.Int8 ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Int.Int8, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr GHC.Int.Int8)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+46070a3a0cc92f7501f9772c8254556b
+  argInt64 :: GHC.Int.Int64 -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argInt4
+                  `cast`
+                (<GHC.Int.Int64>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+f6335a802e354cc4a95071ba84f21fcc
+  argInt8 :: GHC.Int.Int8 -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argInt5
+                  `cast`
+                (<GHC.Int.Int8>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+1793d5a8267bdc3032d816e5bc13d586
+  argPtr :: GHC.Ptr.Ptr a -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argPtr1
+                  `cast`
+                (forall (a :: <*>_N).
+                 <GHC.Ptr.Ptr a>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+dde647f76f4ee6321c117d7af0ddd802
+  argPtr1 ::
+    GHC.Ptr.Ptr a
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ @ a
+                   (a1 :: GHC.Ptr.Ptr a)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Ptr.Ptr x ->
+                      case GHC.Prim.writeAddrOffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_pointer,
+                          (GHC.Ptr.Ptr @ (GHC.Ptr.Ptr a) ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Ptr.Ptr a, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr (GHC.Ptr.Ptr a))
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+e477a2664f39e271f8bb542ae5a6a576
+  argString :: GHC.Base.String -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,U><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argString1
+                  `cast`
+                (<GHC.Base.String>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+224c8364526211347f61104ebdddb368
+  argString1 ::
+    GHC.Base.String
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,U><S,U>,
+     Unfolding: (\ (a1 :: GHC.Base.String)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case (GHC.Magic.noinline
+                         @ (GHC.Types.IO GHC.IO.Encoding.Types.TextEncoding)
+                         GHC.IO.Encoding.getForeignEncoding)
+                        `cast`
+                      (GHC.Types.N:IO[0] <GHC.IO.Encoding.Types.TextEncoding>_R)
+                        s of ds1 { (#,#) ipv ipv1 ->
+                 case GHC.Foreign.newCString1
+                        ipv1
+                        a1
+                        ipv of ds2 { (#,#) ipv2 ipv3 ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        ipv2 of wild1 { (#,#) ds ds3 ->
+                 case GHC.Prim.eqAddr# ds3 __NULL of lwild {
+                   DEFAULT
+                   -> case ipv3 of wild2 { GHC.Ptr.Ptr x ->
+                      case GHC.Prim.writeAddrOffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds3
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_pointer,
+                          (GHC.Ptr.Ptr @ (GHC.Ptr.Ptr Foreign.C.Types.CChar) ds3)
+                            `cast`
+                          (GHC.Ptr.Ptr
+                             <GHC.Ptr.Ptr
+                                Foreign.C.Types.CChar, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (s1 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds3
+                                  s1 of wild { Unit# ds4 ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  x
+                                  ds4 of wild4 { Unit# ds5 ->
+                           (# ds5, GHC.Tuple.() #) } })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.C.Types.CChar))
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } } } }) -}
+840f6e5f2ad881eec2a4ee40a88cc5ab
+  argWord :: GHC.Types.Word -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argWord1
+                  `cast`
+                (<GHC.Types.Word>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+d94423f76eb9958d43496799d87c3614
+  argWord1 ::
+    GHC.Types.Word
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: GHC.Types.Word)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Types.W# x ->
+                      case GHC.Prim.writeWordOffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_uint64,
+                          (GHC.Ptr.Ptr @ GHC.Types.Word ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Types.Word, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr GHC.Types.Word)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+1cfb76217dcafc7b7da96aaa26f77e63
+  argWord16 :: GHC.Word.Word16 -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argWord2
+                  `cast`
+                (<GHC.Word.Word16>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+48d410b449184c44a4919d0ec776cb44
+  argWord2 ::
+    GHC.Word.Word16
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: GHC.Word.Word16)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        2##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Word.W16# x ->
+                      case GHC.Prim.writeWord16OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_uint16,
+                          (GHC.Ptr.Ptr @ GHC.Word.Word16 ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Word.Word16, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr GHC.Word.Word16)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+36ad6f1f65a9b41f0bbabb0e391c1142
+  argWord3 ::
+    GHC.Word.Word32
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: GHC.Word.Word32)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        4##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Word.W32# x ->
+                      case GHC.Prim.writeWord32OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_uint32,
+                          (GHC.Ptr.Ptr @ GHC.Word.Word32 ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Word.Word32, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr GHC.Word.Word32)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+c1bb627dc229965b3c96c03dd34a38aa
+  argWord32 :: GHC.Word.Word32 -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argWord3
+                  `cast`
+                (<GHC.Word.Word32>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+fb1e667568b23e5e9192871b02da0127
+  argWord4 ::
+    GHC.Word.Word64
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: GHC.Word.Word64)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        8##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Word.W64# x ->
+                      case GHC.Prim.writeWord64OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_uint64,
+                          (GHC.Ptr.Ptr @ GHC.Word.Word64 ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Word.Word64, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr GHC.Word.Word64)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+3c709714b033d752280e694e4b4ada45
+  argWord5 ::
+    GHC.Word.Word8
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+           GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: (\ (a1 :: GHC.Word.Word8)
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case {__pkg_ccall base-4.11.1.0 GHC.Prim.Word#
+                                                 -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                 -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                                       GHC.Prim.Addr# #)}
+                        1##
+                        s of wild1 { (#,#) ds ds1 ->
+                 case GHC.Prim.eqAddr# ds1 __NULL of lwild {
+                   DEFAULT
+                   -> case a1 of wild2 { GHC.Word.W8# x ->
+                      case GHC.Prim.writeWord8OffAddr#
+                             @ GHC.Prim.RealWorld
+                             ds1
+                             0#
+                             x
+                             ds of s2 { DEFAULT ->
+                      (# s2,
+                         (Foreign.LibFFI.FFITypes.ffi_type_uint8,
+                          (GHC.Ptr.Ptr @ GHC.Word.Word8 ds1)
+                            `cast`
+                          (GHC.Ptr.Ptr <GHC.Word.Word8, Foreign.LibFFI.Internal.CValue>)_R,
+                          (\ (ds3 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                           case {__pkg_ccall base-4.11.1.0 GHC.Prim.Addr#
+                                                           -> GHC.Prim.State# GHC.Prim.RealWorld
+                                                           -> (# GHC.Prim.State#
+                                                                   GHC.Prim.RealWorld #)}
+                                  ds1
+                                  ds3 of wild4 { Unit# ds4 ->
+                           (# ds4, GHC.Tuple.() #) })
+                            `cast`
+                          (Sym (GHC.Types.N:IO[0] <()>_R))) #) } }
+                   1#
+                   -> case GHC.Prim.raiseIO#
+                             @ GHC.Exception.SomeException
+                             @ (GHC.Ptr.Ptr GHC.Word.Word8)
+                             Foreign.Marshal.Alloc.malloc1
+                             ds
+                      ret_ty (# GHC.Prim.State# GHC.Prim.RealWorld,
+                                (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue, GHC.Types.IO ()) #)
+                      of {} } }) -}
+81d557fe70f18ae1d692e2c0e4d19c79
+  argWord64 :: GHC.Word.Word64 -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argWord4
+                  `cast`
+                (<GHC.Word.Word64>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+f0765d5b7ce3000c21f0ec5a3634405b
+  argWord8 :: GHC.Word.Word8 -> Foreign.LibFFI.Base.Arg
+  {- Arity: 2, Strictness: <L,1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Types.argWord5
+                  `cast`
+                (<GHC.Word.Word8>_R
+                 ->_R Sym (GHC.Types.N:IO[0]
+                               <(GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType,
+                                 GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue,
+                                 GHC.Types.IO ())>_R) ; Sym (Foreign.LibFFI.Base.N:Arg[0])) -}
+94512767a899c2ad9ae9d1275ae323ee
+  retByteString ::
+    Foreign.LibFFI.Base.RetType Data.ByteString.Internal.ByteString
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Data.ByteString.Internal.ByteString
+                   Foreign.LibFFI.FFITypes.ffi_type_pointer
+                   Foreign.LibFFI.Types.retByteString1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0]
+                                  <Data.ByteString.Internal.ByteString>_R))) -}
+ae9baffe5a0a30dc6cc7b861b7152a21
+  retByteString1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          Data.ByteString.Internal.ByteString #)
+  {- Arity: 2, Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: InlineRule (2, True, False)
+                (\ (x :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                         -> GHC.Types.IO ())
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case Foreign.LibFFI.Types.retByteString2
+                        @ Foreign.C.Types.CChar
+                        x
+                        s of ds1 { (#,#) ipv ipv1 ->
+                 Data.ByteString.packCString1 ipv1 ipv }) -}
+65e74de8821a538978f681c91b935263
+  retByteString2 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Ptr.Ptr a #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ @ a
+                   (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ (GHC.Ptr.Ptr a)
+                    @ (GHC.Ptr.Ptr a)
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr (GHC.Ptr.Ptr a))[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Ptr.Ptr a, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorablePtr2 @ a ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr (GHC.Ptr.Ptr a)>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Ptr.Ptr a>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Ptr.Ptr a>_R)
+                   eta) -}
+21eb391a7a716f0eb4aadc71be883b33
+  retCChar :: Foreign.LibFFI.Base.RetType Foreign.C.Types.CChar
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Foreign.C.Types.CChar
+                   Foreign.LibFFI.FFITypes.ffi_type_sint8
+                   Foreign.LibFFI.Types.retCChar1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CChar>_R))) -}
+009acc3ef2d27ea890de83a06a204325
+  retCChar1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, Foreign.C.Types.CChar #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ Foreign.C.Types.CChar
+                    @ Foreign.C.Types.CChar
+                    Foreign.Storable.$fStorable()7
+                    Foreign.Storable.$fStorable()7
+                    (\ (ptr :: GHC.Ptr.Ptr Foreign.C.Types.CChar)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <Foreign.C.Types.CChar, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     (Foreign.Storable.$fStorableInt21
+                        ptr `cast` (GHC.Ptr.Ptr <Foreign.C.Types.CChar, GHC.Int.Int8>)_R
+                        ipv)
+                       `cast`
+                     ((#,#)
+                        <'GHC.Types.TupleRep '[]>_R
+                        <'GHC.Types.LiftedRep>_R
+                        <GHC.Prim.State# GHC.Prim.RealWorld>_R
+                        (Sym (Foreign.C.Types.N:CChar[0])))_R })
+                      `cast`
+                    (<GHC.Ptr.Ptr Foreign.C.Types.CChar>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CChar>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <Foreign.C.Types.CChar>_R)
+                   eta) -}
+8334aab5aa84be2c9a8ef0b7a0cd8121
+  retCDouble :: Foreign.LibFFI.Base.RetType Foreign.C.Types.CDouble
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Foreign.C.Types.CDouble
+                   Foreign.LibFFI.FFITypes.ffi_type_double
+                   Foreign.LibFFI.Types.retCDouble1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CDouble>_R))) -}
+e6d2c6550230f32ee1fd1c6630cd393a
+  retCDouble1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          Foreign.C.Types.CDouble #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ Foreign.C.Types.CDouble
+                    @ Foreign.C.Types.CDouble
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr Foreign.C.Types.CDouble)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <Foreign.C.Types.CDouble, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     (Foreign.Storable.$fStorableDouble2
+                        ptr
+                          `cast`
+                        (GHC.Ptr.Ptr <Foreign.C.Types.CDouble, GHC.Types.Double>)_R
+                        ipv)
+                       `cast`
+                     ((#,#)
+                        <'GHC.Types.TupleRep '[]>_R
+                        <'GHC.Types.LiftedRep>_R
+                        <GHC.Prim.State# GHC.Prim.RealWorld>_R
+                        (Sym (Foreign.C.Types.N:CDouble[0])))_R })
+                      `cast`
+                    (<GHC.Ptr.Ptr Foreign.C.Types.CDouble>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CDouble>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <Foreign.C.Types.CDouble>_R)
+                   eta) -}
+fa9b3cce410bcbd8727a0d234ce2c809
+  retCFloat :: Foreign.LibFFI.Base.RetType Foreign.C.Types.CFloat
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Foreign.C.Types.CFloat
+                   Foreign.LibFFI.FFITypes.ffi_type_float
+                   Foreign.LibFFI.Types.retCFloat1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CFloat>_R))) -}
+77929b20cc0907fba768156f315efa11
+  retCFloat1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, Foreign.C.Types.CFloat #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ Foreign.C.Types.CFloat
+                    @ Foreign.C.Types.CFloat
+                    Foreign.Storable.$fStorableBool7
+                    Foreign.Storable.$fStorableBool7
+                    (\ (ptr :: GHC.Ptr.Ptr Foreign.C.Types.CFloat)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <Foreign.C.Types.CFloat, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     (Foreign.Storable.$fStorableFloat2
+                        ptr
+                          `cast`
+                        (GHC.Ptr.Ptr <Foreign.C.Types.CFloat, GHC.Types.Float>)_R
+                        ipv)
+                       `cast`
+                     ((#,#)
+                        <'GHC.Types.TupleRep '[]>_R
+                        <'GHC.Types.LiftedRep>_R
+                        <GHC.Prim.State# GHC.Prim.RealWorld>_R
+                        (Sym (Foreign.C.Types.N:CFloat[0])))_R })
+                      `cast`
+                    (<GHC.Ptr.Ptr Foreign.C.Types.CFloat>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CFloat>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <Foreign.C.Types.CFloat>_R)
+                   eta) -}
+67e749f0e4005a97e2eb0f4f19ce3c22
+  retCInt :: Foreign.LibFFI.Base.RetType Foreign.C.Types.CInt
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Foreign.C.Types.CInt
+                   Foreign.LibFFI.FFITypes.ffi_type_sint32
+                   Foreign.LibFFI.Types.retCInt1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CInt>_R))) -}
+1688564ee0b4c6656ff9f59347df829b
+  retCInt1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, Foreign.C.Types.CInt #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ Foreign.C.Types.CInt
+                    @ Foreign.C.Types.CInt
+                    Foreign.Storable.$fStorableBool7
+                    Foreign.Storable.$fStorableBool7
+                    (\ (ptr :: GHC.Ptr.Ptr Foreign.C.Types.CInt)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <Foreign.C.Types.CInt, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     (Foreign.Storable.$fStorableInt12
+                        ptr `cast` (GHC.Ptr.Ptr <Foreign.C.Types.CInt, GHC.Int.Int32>)_R
+                        ipv)
+                       `cast`
+                     ((#,#)
+                        <'GHC.Types.TupleRep '[]>_R
+                        <'GHC.Types.LiftedRep>_R
+                        <GHC.Prim.State# GHC.Prim.RealWorld>_R
+                        (Sym (Foreign.C.Types.N:CInt[0])))_R })
+                      `cast`
+                    (<GHC.Ptr.Ptr Foreign.C.Types.CInt>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CInt>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <Foreign.C.Types.CInt>_R)
+                   eta) -}
+c8f277b663d64c2888e738c7bbcc711a
+  retCLong :: Foreign.LibFFI.Base.RetType Foreign.C.Types.CLong
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Foreign.C.Types.CLong
+                   Foreign.LibFFI.FFITypes.ffi_type_sint64
+                   Foreign.LibFFI.Types.retCLong1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CLong>_R))) -}
+4b71971e486910d1ab63aea283171f46
+  retCLong1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, Foreign.C.Types.CLong #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ Foreign.C.Types.CLong
+                    @ Foreign.C.Types.CLong
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr Foreign.C.Types.CLong)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <Foreign.C.Types.CLong, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     (Foreign.Storable.$fStorableInt17
+                        ptr `cast` (GHC.Ptr.Ptr <Foreign.C.Types.CLong, GHC.Int.Int64>)_R
+                        ipv)
+                       `cast`
+                     ((#,#)
+                        <'GHC.Types.TupleRep '[]>_R
+                        <'GHC.Types.LiftedRep>_R
+                        <GHC.Prim.State# GHC.Prim.RealWorld>_R
+                        (Sym (Foreign.C.Types.N:CLong[0])))_R })
+                      `cast`
+                    (<GHC.Ptr.Ptr Foreign.C.Types.CLong>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CLong>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <Foreign.C.Types.CLong>_R)
+                   eta) -}
+9e01171c2d381574a7ec41e471140ba3
+  retCSize :: Foreign.LibFFI.Base.RetType Foreign.C.Types.CSize
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Foreign.C.Types.CSize
+                   Foreign.LibFFI.FFITypes.ffi_type_uint64
+                   Foreign.LibFFI.Types.retCSize1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CSize>_R))) -}
+8fb12667662dad93e832b35df9c92f8f
+  retCSize1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, Foreign.C.Types.CSize #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ Foreign.C.Types.CSize
+                    @ Foreign.C.Types.CSize
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr Foreign.C.Types.CSize)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <Foreign.C.Types.CSize, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     (Foreign.Storable.$fStorableWord15
+                        ptr `cast` (GHC.Ptr.Ptr <Foreign.C.Types.CSize, GHC.Word.Word64>)_R
+                        ipv)
+                       `cast`
+                     ((#,#)
+                        <'GHC.Types.TupleRep '[]>_R
+                        <'GHC.Types.LiftedRep>_R
+                        <GHC.Prim.State# GHC.Prim.RealWorld>_R
+                        (Sym (Foreign.C.Types.N:CSize[0])))_R })
+                      `cast`
+                    (<GHC.Ptr.Ptr Foreign.C.Types.CSize>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CSize>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <Foreign.C.Types.CSize>_R)
+                   eta) -}
+af2930b63b70b1f66b271d95380ee15e
+  retCString :: Foreign.LibFFI.Base.RetType Foreign.C.String.CString
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ (GHC.Ptr.Ptr Foreign.C.Types.CChar)
+                   Foreign.LibFFI.FFITypes.ffi_type_pointer
+                   Foreign.LibFFI.Types.retCString1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0]
+                                  <GHC.Ptr.Ptr Foreign.C.Types.CChar>_R))) -}
+33666fa1efdfc3ef5fc4fd0340f85e52
+  retCString1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          GHC.Ptr.Ptr Foreign.C.Types.CChar #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ (GHC.Ptr.Ptr Foreign.C.Types.CChar)
+                    @ (GHC.Ptr.Ptr Foreign.C.Types.CChar)
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr
+                                 (GHC.Ptr.Ptr Foreign.C.Types.CChar))[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <GHC.Ptr.Ptr
+                                   Foreign.C.Types.CChar, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorablePtr2 @ Foreign.C.Types.CChar ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.C.Types.CChar)>_R
+                     ->_R Sym (GHC.Types.N:IO[0]
+                                   <GHC.Ptr.Ptr Foreign.C.Types.CChar>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Ptr.Ptr Foreign.C.Types.CChar>_R)
+                   eta) -}
+a31c663e9a83751c432afd57f9c6aeba
+  retCTime :: Foreign.LibFFI.Base.RetType Foreign.C.Types.CTime
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Foreign.C.Types.CTime
+                   Foreign.LibFFI.FFITypes.ffi_type_sint64
+                   Foreign.LibFFI.Types.retCTime1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CTime>_R))) -}
+231a6f7e85078c97c63ab49842fd55b8
+  retCTime1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, Foreign.C.Types.CTime #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ Foreign.C.Types.CTime
+                    @ Foreign.C.Types.CTime
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr Foreign.C.Types.CTime)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <Foreign.C.Types.CTime, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     (Foreign.Storable.$fStorableInt17
+                        ptr `cast` (GHC.Ptr.Ptr <Foreign.C.Types.CTime, GHC.Int.Int64>)_R
+                        ipv)
+                       `cast`
+                     ((#,#)
+                        <'GHC.Types.TupleRep '[]>_R
+                        <'GHC.Types.LiftedRep>_R
+                        <GHC.Prim.State# GHC.Prim.RealWorld>_R
+                        (Sym (Foreign.C.Types.N:CTime[0])))_R })
+                      `cast`
+                    (<GHC.Ptr.Ptr Foreign.C.Types.CTime>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CTime>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <Foreign.C.Types.CTime>_R)
+                   eta) -}
+1b9f027ba75b66242c7334e630a83896
+  retCUChar :: Foreign.LibFFI.Base.RetType Foreign.C.Types.CUChar
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Foreign.C.Types.CUChar
+                   Foreign.LibFFI.FFITypes.ffi_type_uint8
+                   Foreign.LibFFI.Types.retCUChar1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CUChar>_R))) -}
+2894711c9a355a0f7415798008550a65
+  retCUChar1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, Foreign.C.Types.CUChar #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ Foreign.C.Types.CUChar
+                    @ Foreign.C.Types.CUChar
+                    Foreign.Storable.$fStorable()7
+                    Foreign.Storable.$fStorable()7
+                    (\ (ptr :: GHC.Ptr.Ptr Foreign.C.Types.CUChar)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <Foreign.C.Types.CUChar, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     (Foreign.Storable.$fStorableWord20
+                        ptr `cast` (GHC.Ptr.Ptr <Foreign.C.Types.CUChar, GHC.Word.Word8>)_R
+                        ipv)
+                       `cast`
+                     ((#,#)
+                        <'GHC.Types.TupleRep '[]>_R
+                        <'GHC.Types.LiftedRep>_R
+                        <GHC.Prim.State# GHC.Prim.RealWorld>_R
+                        (Sym (Foreign.C.Types.N:CUChar[0])))_R })
+                      `cast`
+                    (<GHC.Ptr.Ptr Foreign.C.Types.CUChar>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CUChar>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <Foreign.C.Types.CUChar>_R)
+                   eta) -}
+2950b519da4493db8f07ca9784d8048f
+  retCUInt :: Foreign.LibFFI.Base.RetType Foreign.C.Types.CUInt
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Foreign.C.Types.CUInt
+                   Foreign.LibFFI.FFITypes.ffi_type_uint32
+                   Foreign.LibFFI.Types.retCUInt1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CUInt>_R))) -}
+05f59307718fb78c8c5daf971b1b9cfb
+  retCUInt1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, Foreign.C.Types.CUInt #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ Foreign.C.Types.CUInt
+                    @ Foreign.C.Types.CUInt
+                    Foreign.Storable.$fStorableBool7
+                    Foreign.Storable.$fStorableBool7
+                    (\ (ptr :: GHC.Ptr.Ptr Foreign.C.Types.CUInt)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <Foreign.C.Types.CUInt, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     (Foreign.Storable.$fStorableWord11
+                        ptr `cast` (GHC.Ptr.Ptr <Foreign.C.Types.CUInt, GHC.Word.Word32>)_R
+                        ipv)
+                       `cast`
+                     ((#,#)
+                        <'GHC.Types.TupleRep '[]>_R
+                        <'GHC.Types.LiftedRep>_R
+                        <GHC.Prim.State# GHC.Prim.RealWorld>_R
+                        (Sym (Foreign.C.Types.N:CUInt[0])))_R })
+                      `cast`
+                    (<GHC.Ptr.Ptr Foreign.C.Types.CUInt>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CUInt>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <Foreign.C.Types.CUInt>_R)
+                   eta) -}
+2093228b2e1f688411db77750e434a67
+  retCULong :: Foreign.LibFFI.Base.RetType Foreign.C.Types.CULong
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Foreign.C.Types.CULong
+                   Foreign.LibFFI.FFITypes.ffi_type_uint64
+                   Foreign.LibFFI.Types.retCULong1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CULong>_R))) -}
+3d960ffef6234517dd7ef147f45fc28d
+  retCULong1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, Foreign.C.Types.CULong #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ Foreign.C.Types.CULong
+                    @ Foreign.C.Types.CULong
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr Foreign.C.Types.CULong)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <Foreign.C.Types.CULong, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     (Foreign.Storable.$fStorableWord15
+                        ptr
+                          `cast`
+                        (GHC.Ptr.Ptr <Foreign.C.Types.CULong, GHC.Word.Word64>)_R
+                        ipv)
+                       `cast`
+                     ((#,#)
+                        <'GHC.Types.TupleRep '[]>_R
+                        <'GHC.Types.LiftedRep>_R
+                        <GHC.Prim.State# GHC.Prim.RealWorld>_R
+                        (Sym (Foreign.C.Types.N:CULong[0])))_R })
+                      `cast`
+                    (<GHC.Ptr.Ptr Foreign.C.Types.CULong>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CULong>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <Foreign.C.Types.CULong>_R)
+                   eta) -}
+098a283f5183725f362c076da8258c80
+  retCWchar :: Foreign.LibFFI.Base.RetType Foreign.C.Types.CWchar
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Foreign.C.Types.CWchar
+                   Foreign.LibFFI.FFITypes.ffi_type_sint8
+                   Foreign.LibFFI.Types.retCWchar1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CWchar>_R))) -}
+dabeee9fe7f273258a3138276f4ef3ec
+  retCWchar1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, Foreign.C.Types.CWchar #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ Foreign.C.Types.CWchar
+                    @ Foreign.C.Types.CWchar
+                    Foreign.Storable.$fStorableBool7
+                    Foreign.Storable.$fStorableBool7
+                    (\ (ptr :: GHC.Ptr.Ptr Foreign.C.Types.CWchar)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr
+                                <Foreign.C.Types.CWchar, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     (Foreign.Storable.$fStorableInt12
+                        ptr `cast` (GHC.Ptr.Ptr <Foreign.C.Types.CWchar, GHC.Int.Int32>)_R
+                        ipv)
+                       `cast`
+                     ((#,#)
+                        <'GHC.Types.TupleRep '[]>_R
+                        <'GHC.Types.LiftedRep>_R
+                        <GHC.Prim.State# GHC.Prim.RealWorld>_R
+                        (Sym (Foreign.C.Types.N:CWchar[0])))_R })
+                      `cast`
+                    (<GHC.Ptr.Ptr Foreign.C.Types.CWchar>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <Foreign.C.Types.CWchar>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <Foreign.C.Types.CWchar>_R)
+                   eta) -}
+99d339c1b95f5e70fe767706e97e688e
+  retFunPtr ::
+    Foreign.LibFFI.Base.RetType a
+    -> Foreign.LibFFI.Base.RetType (GHC.Ptr.FunPtr a)
+  {- Arity: 1, Strictness: <L,A>m,
+     Unfolding: InlineRule (1, True, True)
+                (\ @ a (ds :: Foreign.LibFFI.Base.RetType a) ->
+                 Foreign.LibFFI.Types.retFunPtr1 @ a) -}
+9f00315af0eb3be796376378f4d1f38a
+  retFunPtr1 :: Foreign.LibFFI.Base.RetType (GHC.Ptr.FunPtr a)
+  {- Strictness: m,
+     Unfolding: (\ @ a ->
+                 Foreign.LibFFI.Base.RetType
+                   @ (GHC.Ptr.FunPtr a)
+                   Foreign.LibFFI.FFITypes.ffi_type_pointer
+                   (Foreign.LibFFI.Types.retFunPtr2 @ a)
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Ptr.FunPtr a>_R))) -}
+30796907bffcf8e1ec91374347b087c2
+  retFunPtr2 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Ptr.FunPtr a #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ @ a
+                   (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ (GHC.Ptr.FunPtr a)
+                    @ (GHC.Ptr.FunPtr a)
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr (GHC.Ptr.FunPtr a))[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Ptr.FunPtr a, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorableFunPtr2 @ a ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr (GHC.Ptr.FunPtr a)>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Ptr.FunPtr a>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Ptr.FunPtr a>_R)
+                   eta) -}
+a24edfeb0e2af12bdc7cd949b740c186
+  retInt :: Foreign.LibFFI.Base.RetType GHC.Types.Int
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ GHC.Types.Int
+                   Foreign.LibFFI.FFITypes.ffi_type_sint64
+                   Foreign.LibFFI.Types.retInt1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Types.Int>_R))) -}
+77e70253950e59e191717fafdf84a40a
+  retInt1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Types.Int #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ GHC.Types.Int
+                    @ GHC.Types.Int
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr GHC.Types.Int)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Types.Int, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorableInt2 ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr GHC.Types.Int>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Types.Int>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Types.Int>_R)
+                   eta) -}
+16489276647e1f93332a9a7301429c16
+  retInt16 :: Foreign.LibFFI.Base.RetType GHC.Int.Int16
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ GHC.Int.Int16
+                   Foreign.LibFFI.FFITypes.ffi_type_sint16
+                   Foreign.LibFFI.Types.retInt2
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Int.Int16>_R))) -}
+48b7c198ea20edf3c07c5abd17676ca3
+  retInt2 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Int.Int16 #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ GHC.Int.Int16
+                    @ GHC.Int.Int16
+                    Foreign.Storable.$fStorableInt10
+                    Foreign.Storable.$fStorableInt10
+                    (\ (ptr :: GHC.Ptr.Ptr GHC.Int.Int16)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Int.Int16, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorableInt6 ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr GHC.Int.Int16>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Int.Int16>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Int.Int16>_R)
+                   eta) -}
+2ff326edc243ed2be5ce0fcb7860fc99
+  retInt3 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Int.Int32 #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ GHC.Int.Int32
+                    @ GHC.Int.Int32
+                    Foreign.Storable.$fStorableBool7
+                    Foreign.Storable.$fStorableBool7
+                    (\ (ptr :: GHC.Ptr.Ptr GHC.Int.Int32)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Int.Int32, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorableInt12 ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr GHC.Int.Int32>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Int.Int32>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Int.Int32>_R)
+                   eta) -}
+a2867863c05b1767f2b30f272c36d7f4
+  retInt32 :: Foreign.LibFFI.Base.RetType GHC.Int.Int32
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ GHC.Int.Int32
+                   Foreign.LibFFI.FFITypes.ffi_type_sint32
+                   Foreign.LibFFI.Types.retInt3
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Int.Int32>_R))) -}
+a8fa4982594e7ad918963fb777eaf30b
+  retInt4 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Int.Int64 #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ GHC.Int.Int64
+                    @ GHC.Int.Int64
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr GHC.Int.Int64)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Int.Int64, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorableInt17 ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr GHC.Int.Int64>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Int.Int64>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Int.Int64>_R)
+                   eta) -}
+7abd321d07c0b6df574135d1d6bce70a
+  retInt5 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Int.Int8 #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ GHC.Int.Int8
+                    @ GHC.Int.Int8
+                    Foreign.Storable.$fStorable()7
+                    Foreign.Storable.$fStorable()7
+                    (\ (ptr :: GHC.Ptr.Ptr GHC.Int.Int8)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Int.Int8, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorableInt21 ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr GHC.Int.Int8>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Int.Int8>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Int.Int8>_R)
+                   eta) -}
+975ca51b1712835b142556d9d71127c3
+  retInt64 :: Foreign.LibFFI.Base.RetType GHC.Int.Int64
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ GHC.Int.Int64
+                   Foreign.LibFFI.FFITypes.ffi_type_sint64
+                   Foreign.LibFFI.Types.retInt4
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Int.Int64>_R))) -}
+c7d498e65f493e9b782d4eaab5dd4e4f
+  retInt8 :: Foreign.LibFFI.Base.RetType GHC.Int.Int8
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ GHC.Int.Int8
+                   Foreign.LibFFI.FFITypes.ffi_type_sint8
+                   Foreign.LibFFI.Types.retInt5
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Int.Int8>_R))) -}
+4c3c39e6bb0db6bb03b640763aad475c
+  retMallocByteString ::
+    Foreign.LibFFI.Base.RetType Data.ByteString.Internal.ByteString
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ Data.ByteString.Internal.ByteString
+                   Foreign.LibFFI.FFITypes.ffi_type_pointer
+                   Foreign.LibFFI.Types.retMallocByteString1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0]
+                                  <Data.ByteString.Internal.ByteString>_R))) -}
+c1999302cd89106c53339c7390bf5657
+  retMallocByteString1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld,
+          Data.ByteString.Internal.ByteString #)
+  {- Arity: 2, Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: InlineRule (2, True, False)
+                (\ (x :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                         -> GHC.Types.IO ())
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case Foreign.LibFFI.Types.retByteString2
+                        @ Foreign.C.Types.CChar
+                        x
+                        s of ds1 { (#,#) ipv ipv1 ->
+                 Data.ByteString.Unsafe.unsafePackMallocCString1 ipv1 ipv }) -}
+b4e4dee068f72e6fcd1ad10a6371c87d
+  retPtr ::
+    Foreign.LibFFI.Base.RetType a
+    -> Foreign.LibFFI.Base.RetType (GHC.Ptr.Ptr a)
+  {- Arity: 1, Strictness: <L,A>m,
+     Unfolding: InlineRule (1, True, True)
+                (\ @ a (ds :: Foreign.LibFFI.Base.RetType a) ->
+                 Foreign.LibFFI.Types.retPtr1 @ a) -}
+bebbb968140abcf91ca41395b392079e
+  retPtr1 :: Foreign.LibFFI.Base.RetType (GHC.Ptr.Ptr a)
+  {- Strictness: m,
+     Unfolding: (\ @ a ->
+                 Foreign.LibFFI.Base.RetType
+                   @ (GHC.Ptr.Ptr a)
+                   Foreign.LibFFI.FFITypes.ffi_type_pointer
+                   (Foreign.LibFFI.Types.retByteString2 @ a)
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Ptr.Ptr a>_R))) -}
+b5e98e140b3dbe305140b837485bb708
+  retString :: Foreign.LibFFI.Base.RetType GHC.Base.String
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ GHC.Base.String
+                   Foreign.LibFFI.FFITypes.ffi_type_pointer
+                   Foreign.LibFFI.Types.retString1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Base.String>_R))) -}
+0cd2579a9cb10588a08d76ae6585d6b6
+  retString1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Base.String #)
+  {- Arity: 2, Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: InlineRule (2, True, False)
+                (\ (x :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                         -> GHC.Types.IO ())
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case Foreign.LibFFI.Types.retByteString2
+                        @ Foreign.C.Types.CChar
+                        x
+                        s of ds1 { (#,#) ipv ipv1 ->
+                 Foreign.C.String.peekCString1 ipv1 ipv }) -}
+fc8430037818821915f20db4125c55a8
+  retVoid :: Foreign.LibFFI.Base.RetType ()
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ ()
+                   Foreign.LibFFI.FFITypes.ffi_type_void
+                   Foreign.LibFFI.Types.retVoid1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <()>_R))) -}
+374a87967421051d404647cdecd4aa43
+  retVoid1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: InlineRule (2, True, False)
+                (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case (write (GHC.Ptr.nullPtr @ Foreign.LibFFI.Internal.CValue))
+                        `cast`
+                      (GHC.Types.N:IO[0] <()>_R)
+                        s of ds1 { (#,#) ipv ipv1 ->
+                 (# ipv, GHC.Tuple.() #) }) -}
+7dc04f44dba15d1050acb021b98e5717
+  retWord :: Foreign.LibFFI.Base.RetType GHC.Types.Word
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ GHC.Types.Word
+                   Foreign.LibFFI.FFITypes.ffi_type_uint64
+                   Foreign.LibFFI.Types.retWord1
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Types.Word>_R))) -}
+3e8f2e7887a1f486aee5bc379fd4f042
+  retWord1 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Types.Word #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ GHC.Types.Word
+                    @ GHC.Types.Word
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr GHC.Types.Word)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Types.Word, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorableWord2 ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr GHC.Types.Word>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Types.Word>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Types.Word>_R)
+                   eta) -}
+c91a3b40934e72c97c2469c36fe4b3b7
+  retWord16 :: Foreign.LibFFI.Base.RetType GHC.Word.Word16
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ GHC.Word.Word16
+                   Foreign.LibFFI.FFITypes.ffi_type_uint16
+                   Foreign.LibFFI.Types.retWord2
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Word.Word16>_R))) -}
+ba80c4e92b588169f840d73f02d61245
+  retWord2 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Word.Word16 #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ GHC.Word.Word16
+                    @ GHC.Word.Word16
+                    Foreign.Storable.$fStorableInt10
+                    Foreign.Storable.$fStorableInt10
+                    (\ (ptr :: GHC.Ptr.Ptr GHC.Word.Word16)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Word.Word16, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorableWord6 ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr GHC.Word.Word16>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Word.Word16>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Word.Word16>_R)
+                   eta) -}
+5915c456bd70a0f9e4b40479d8f191e5
+  retWord3 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Word.Word32 #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ GHC.Word.Word32
+                    @ GHC.Word.Word32
+                    Foreign.Storable.$fStorableBool7
+                    Foreign.Storable.$fStorableBool7
+                    (\ (ptr :: GHC.Ptr.Ptr GHC.Word.Word32)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Word.Word32, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorableWord11 ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr GHC.Word.Word32>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Word.Word32>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Word.Word32>_R)
+                   eta) -}
+ac2b055618798c9b5831bb66bfbf9978
+  retWord32 :: Foreign.LibFFI.Base.RetType GHC.Word.Word32
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ GHC.Word.Word32
+                   Foreign.LibFFI.FFITypes.ffi_type_uint32
+                   Foreign.LibFFI.Types.retWord3
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Word.Word32>_R))) -}
+8a319168546d12507b12c7929edc21d0
+  retWord4 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Word.Word64 #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ GHC.Word.Word64
+                    @ GHC.Word.Word64
+                    Foreign.Storable.$fStorableDouble5
+                    Foreign.Storable.$fStorableDouble5
+                    (\ (ptr :: GHC.Ptr.Ptr GHC.Word.Word64)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Word.Word64, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorableWord15 ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr GHC.Word.Word64>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Word.Word64>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Word.Word64>_R)
+                   eta) -}
+1528115a85fe4ab7842fdc3fb4f0f6b5
+  retWord5 ::
+    (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ())
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Word.Word8 #)
+  {- Arity: 2, HasNoCafRefs,
+     Strictness: <C(C(S(SL))),1*C1(C1(U(U,A)))><S,U>,
+     Unfolding: (\ (write :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+                             -> GHC.Types.IO ())
+                   (eta :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 (Foreign.Marshal.Alloc.allocaBytesAligned
+                    @ GHC.Word.Word8
+                    @ GHC.Word.Word8
+                    Foreign.Storable.$fStorable()7
+                    Foreign.Storable.$fStorable()7
+                    (\ (ptr :: GHC.Ptr.Ptr GHC.Word.Word8)[OneShot]
+                       (s :: GHC.Prim.State# GHC.Prim.RealWorld)[OneShot] ->
+                     case (write
+                             ptr
+                               `cast`
+                             (GHC.Ptr.Ptr <GHC.Word.Word8, Foreign.LibFFI.Internal.CValue>)_R)
+                            `cast`
+                          (GHC.Types.N:IO[0] <()>_R)
+                            s of ds1 { (#,#) ipv ipv1 ->
+                     Foreign.Storable.$fStorableWord20 ptr ipv })
+                      `cast`
+                    (<GHC.Ptr.Ptr GHC.Word.Word8>_R
+                     ->_R Sym (GHC.Types.N:IO[0] <GHC.Word.Word8>_R)))
+                   `cast`
+                 (GHC.Types.N:IO[0] <GHC.Word.Word8>_R)
+                   eta) -}
+de2fab64b08c67c89ab3cc1e4a97b53c
+  retWord64 :: Foreign.LibFFI.Base.RetType GHC.Word.Word64
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ GHC.Word.Word64
+                   Foreign.LibFFI.FFITypes.ffi_type_uint64
+                   Foreign.LibFFI.Types.retWord4
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Word.Word64>_R))) -}
+ea38e192505765004d93572f30513ed8
+  retWord8 :: Foreign.LibFFI.Base.RetType GHC.Word.Word8
+  {- Strictness: m,
+     Unfolding: (Foreign.LibFFI.Base.RetType
+                   @ GHC.Word.Word8
+                   Foreign.LibFFI.FFITypes.ffi_type_uint8
+                   Foreign.LibFFI.Types.retWord5
+                     `cast`
+                   (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue -> GHC.Types.IO ()>_R
+                    ->_R Sym (GHC.Types.N:IO[0] <GHC.Word.Word8>_R))) -}
+vectorised variables:
+vectorised tycons:
+vectorised reused tycons:
+parallel variables:
+parallel tycons:
+trusted: none
+require own pkg trusted: False
+

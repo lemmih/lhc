@@ -1,0 +1,289 @@
+
+==================== FINAL INTERFACE ====================
+2019-04-16 14:03:33.481897714 UTC
+
+interface libffi-0.2-LFHFrVpfC6KAgELjP9tfdc:Foreign.LibFFI.Internal 8044
+  interface hash: 4448c94540326765eeda022961cffae4
+  ABI hash: 5a50e49b49a82e0d2af44e5386e9b589
+  export-list hash: dd4af2205a005f636dab3da5f5387e0b
+  orphan hash: 693e9af84d3dfcc71e640e005bdc5e2e
+  flag hash: 3065c8ce0aeb65217154182b18f579ae
+  opt_hash: 14e536840aca4e889cad654e6f9b79c1
+  hpc_hash: 93b885adfe0da089cdf634904fd59f71
+  sig of: Nothing
+  used TH splices: False
+  where
+exports:
+  Foreign.LibFFI.Internal.ffi_call
+  Foreign.LibFFI.Internal.ffi_default_abi
+  Foreign.LibFFI.Internal.ffi_ok
+  Foreign.LibFFI.Internal.ffi_prep_cif
+  Foreign.LibFFI.Internal.init_ffi_type
+  Foreign.LibFFI.Internal.sizeOf_cif
+  Foreign.LibFFI.Internal.sizeOf_ffi_type
+  Foreign.LibFFI.Internal.CIF
+  Foreign.LibFFI.Internal.CType
+  Foreign.LibFFI.Internal.CValue
+  Foreign.LibFFI.Internal.C_ffi_abi
+  Foreign.LibFFI.Internal.C_ffi_status
+module dependencies:
+package dependencies: base-4.11.1.0* ghc-prim-0.5.2.0
+                      integer-gmp-1.0.2.0
+orphans: base-4.11.1.0:GHC.Float base-4.11.1.0:GHC.Base
+family instance modules: base-4.11.1.0:Control.Applicative
+                         base-4.11.1.0:Data.Functor.Const
+                         base-4.11.1.0:Data.Functor.Identity base-4.11.1.0:Data.Monoid
+                         base-4.11.1.0:Data.Semigroup.Internal base-4.11.1.0:GHC.Generics
+                         base-4.11.1.0:GHC.IO.Exception
+import  -/  base-4.11.1.0:Data.Int f5d427cd3860d8572d1a4d519e117c0b
+import  -/  base-4.11.1.0:Data.Word 22a60783baa8ba4f33c4588b366fade3
+import  -/  base-4.11.1.0:Foreign.C.Types b72e4995dddb9558097430731ae85171
+import  -/  base-4.11.1.0:Foreign.Ptr c8668b19406059736efd90040d8cbb22
+import  -/  base-4.11.1.0:Foreign.Storable 8aafc1312c1c9357689d3e467747cdbb
+import  -/  base-4.11.1.0:GHC.Ptr 53f4b9e63620bcb0535962e5a0a52cf8
+import  -/  base-4.11.1.0:GHC.Word bc9bdf9b61a0f9352e5a1baeee5690a5
+import  -/  base-4.11.1.0:Prelude 0750c25585e2b797cd78291d423d39dd
+import  -/  ghc-prim-0.5.2.0:GHC.Types d9b3023de7feae4a5308d643da5543f7
+addDependentFile "Foreign/LibFFI/Internal.hsc" 796fc5adeb2adf72b67ebc94058261dd
+bce09667abdfc5251b0d649c1d143216
+  $tcCIF :: GHC.Types.TyCon
+  {- HasNoCafRefs, Strictness: m,
+     Unfolding: (GHC.Types.TyCon
+                   12170436053209472379##
+                   9445135750145531296##
+                   Foreign.LibFFI.Internal.$trModule
+                   Foreign.LibFFI.Internal.$tcCIF1
+                   0#
+                   GHC.Types.krep$*) -}
+460dc55f4efd6787aeb656c69b4f6e6b
+  $tcCIF1 :: GHC.Types.TrName
+  {- HasNoCafRefs, Strictness: m1,
+     Unfolding: (GHC.Types.TrNameS Foreign.LibFFI.Internal.$tcCIF2) -}
+5f19597b240abb0e2ed6fc6ec64996de
+  $tcCIF2 :: GHC.Prim.Addr#
+  {- HasNoCafRefs, Unfolding: ("CIF"#) -}
+94dbb7ad07032f1bc00d513bab612f7c
+  $tcCType :: GHC.Types.TyCon
+  {- HasNoCafRefs, Strictness: m,
+     Unfolding: (GHC.Types.TyCon
+                   8389005670263043145##
+                   11283072541697075118##
+                   Foreign.LibFFI.Internal.$trModule
+                   Foreign.LibFFI.Internal.$tcCType1
+                   0#
+                   GHC.Types.krep$*) -}
+abaab2f0d1570e5efdc8d570fee636dc
+  $tcCType1 :: GHC.Types.TrName
+  {- HasNoCafRefs, Strictness: m1,
+     Unfolding: (GHC.Types.TrNameS Foreign.LibFFI.Internal.$tcCType2) -}
+6d0caca8b82701ba29709a1700b300d9
+  $tcCType2 :: GHC.Prim.Addr#
+  {- HasNoCafRefs, Unfolding: ("CType"#) -}
+7b4f5bdf346a7f981bd08016fdc39449
+  $tcCValue :: GHC.Types.TyCon
+  {- HasNoCafRefs, Strictness: m,
+     Unfolding: (GHC.Types.TyCon
+                   10009337333186630504##
+                   4702942510375838893##
+                   Foreign.LibFFI.Internal.$trModule
+                   Foreign.LibFFI.Internal.$tcCValue1
+                   0#
+                   GHC.Types.krep$*) -}
+a2dc8664de23865ff328825e6475a217
+  $tcCValue1 :: GHC.Types.TrName
+  {- HasNoCafRefs, Strictness: m1,
+     Unfolding: (GHC.Types.TrNameS
+                   Foreign.LibFFI.Internal.$tcCValue2) -}
+915fd7d7b7e0efd52c42f438b08bd355
+  $tcCValue2 :: GHC.Prim.Addr#
+  {- HasNoCafRefs, Unfolding: ("CValue"#) -}
+ecdf6f1ffc6e31fdfc9c3f30563b81a5
+  $trModule :: GHC.Types.Module
+  {- HasNoCafRefs, Strictness: m,
+     Unfolding: (GHC.Types.Module
+                   Foreign.LibFFI.Internal.$trModule3
+                   Foreign.LibFFI.Internal.$trModule1) -}
+7e308122dbab8b434271666c163c7e1f
+  $trModule1 :: GHC.Types.TrName
+  {- HasNoCafRefs, Strictness: m1,
+     Unfolding: (GHC.Types.TrNameS
+                   Foreign.LibFFI.Internal.$trModule2) -}
+5655d8d5f2d92c15843ab1b08e403361
+  $trModule2 :: GHC.Prim.Addr#
+  {- HasNoCafRefs, Unfolding: ("Foreign.LibFFI.Internal"#) -}
+db84d8500b6c7fac49a07a9d9efb43b9
+  $trModule3 :: GHC.Types.TrName
+  {- HasNoCafRefs, Strictness: m1,
+     Unfolding: (GHC.Types.TrNameS
+                   Foreign.LibFFI.Internal.$trModule4) -}
+91c2da4b40f82d5bb432a770503780f7
+  $trModule4 :: GHC.Prim.Addr#
+  {- HasNoCafRefs,
+     Unfolding: ("libffi-0.2-LFHFrVpfC6KAgELjP9tfdc"#) -}
+5fee06e66b1883039b8466b6ed5b5d41
+  data CIF
+7358696d5ed5a0a1b006ff123e28ca6e
+  data CType
+4b26fc5d67299b53437742987b7b5995
+  data CValue
+1553abc6cc4f3f9eb925ba7d06fc4e30
+  type C_ffi_abi = GHC.Word.Word32
+50af81141bc5ed6e03e36da0dbd95a64
+  type C_ffi_status = GHC.Word.Word32
+2aabe09bf2825e285441ded40752064f
+  ffi_call ::
+    GHC.Ptr.Ptr Foreign.LibFFI.Internal.CIF
+    -> GHC.Ptr.FunPtr a
+    -> GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue
+    -> GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue)
+    -> GHC.Types.IO ()
+  {- Arity: 5, HasNoCafRefs,
+     Strictness: <S(S),1*U(U)><S(S),1*U(U)><S(S),1*U(U)><S(S),1*U(U)><S,U>,
+     Unfolding: InlineRule (4, False, False)
+                (\ @ a
+                   (ds :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CIF)
+                   (ds1 :: GHC.Ptr.FunPtr a)
+                   (ds2 :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue)
+                   (ds3 :: GHC.Ptr.Ptr
+                             (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CValue)) ->
+                 case ds of ds4 { GHC.Ptr.Ptr ds5 ->
+                 case ds1 of ds6 { GHC.Ptr.FunPtr ds7 ->
+                 case ds2 of ds8 { GHC.Ptr.Ptr ds9 ->
+                 case ds3 of ds10 { GHC.Ptr.Ptr ds11 ->
+                 (\ (ds12 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                  case {__pkg_ccall_GC libffi-0.2-LFHFrVpfC6KAgELjP9tfdc GHC.Prim.Addr#
+                                                                         -> GHC.Prim.Addr#
+                                                                         -> GHC.Prim.Addr#
+                                                                         -> GHC.Prim.Addr#
+                                                                         -> GHC.Prim.State#
+                                                                              GHC.Prim.RealWorld
+                                                                         -> (# GHC.Prim.State#
+                                                                                 GHC.Prim.RealWorld #)}
+                         ds5
+                         ds7
+                         ds9
+                         ds11
+                         ds12 of wild { Unit# ds13 ->
+                  (# ds13, GHC.Tuple.() #) })
+                   `cast`
+                 (Sym (GHC.Types.N:IO[0] <()>_R)) } } } }) -}
+ae92ca7485ac977533ab037fdfacfbe5
+  ffi_default_abi :: Foreign.LibFFI.Internal.C_ffi_abi
+  {- HasNoCafRefs, Strictness: m, Unfolding: (GHC.Word.W32# 2##) -}
+24288fe8cb6c90223b616ffea16fa34c
+  ffi_ok :: Foreign.LibFFI.Internal.C_ffi_status
+  {- HasNoCafRefs, Strictness: m, Unfolding: (GHC.Word.W32# 0##) -}
+319c25b07d6979ad38ddf1ff5c0e1aec
+  ffi_prep_cif ::
+    GHC.Ptr.Ptr Foreign.LibFFI.Internal.CIF
+    -> Foreign.LibFFI.Internal.C_ffi_abi
+    -> Foreign.C.Types.CUInt
+    -> GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+    -> GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType)
+    -> GHC.Types.IO Foreign.LibFFI.Internal.C_ffi_status
+  {- Arity: 6, HasNoCafRefs,
+     Strictness: <S(S),1*U(U)><S(S),1*U(U)><S(S),1*U(U)><S(S),1*U(U)><S(S),1*U(U)><S,U>,
+     Unfolding: InlineRule (5, False, False)
+                (\ (ds :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CIF)
+                   (ds1 :: GHC.Word.Word32)
+                   (ds2 :: GHC.Word.Word32)
+                   (ds3 :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType)
+                   (ds4 :: GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType)) ->
+                 case ds of ds5 { GHC.Ptr.Ptr ds6 ->
+                 case ds1 of ds7 { GHC.Word.W32# ds8 ->
+                 case ds2 of ds9 { GHC.Word.W32# ds10 ->
+                 case ds3 of ds11 { GHC.Ptr.Ptr ds12 ->
+                 case ds4 of ds13 { GHC.Ptr.Ptr ds14 ->
+                 (\ (ds15 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                  case {__pkg_ccall_GC libffi-0.2-LFHFrVpfC6KAgELjP9tfdc GHC.Prim.Addr#
+                                                                         -> GHC.Prim.Word#
+                                                                         -> GHC.Prim.Word#
+                                                                         -> GHC.Prim.Addr#
+                                                                         -> GHC.Prim.Addr#
+                                                                         -> GHC.Prim.State#
+                                                                              GHC.Prim.RealWorld
+                                                                         -> (# GHC.Prim.State#
+                                                                                 GHC.Prim.RealWorld,
+                                                                               GHC.Prim.Word# #)}
+                         ds6
+                         ds8
+                         ds10
+                         ds12
+                         ds14
+                         ds15 of wild { (#,#) ds16 ds17 ->
+                  (# ds16, GHC.Word.W32# (GHC.Prim.narrow32Word# ds17) #) })
+                   `cast`
+                 (Sym (GHC.Types.N:IO[0] <GHC.Word.Word32>_R)) } } } } })
+                  `cast`
+                (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CIF>_R
+                 ->_R <GHC.Word.Word32>_R
+                 ->_R Sym (Foreign.C.Types.N:CUInt[0])
+                 ->_R <GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+                       -> GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType)
+                       -> GHC.Types.IO GHC.Word.Word32>_R) -}
+9ebdab07fd8683ff8830f2850a102d9d
+  init_ffi_type ::
+    GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+    -> GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType)
+    -> GHC.Types.IO ()
+  {- Arity: 3, HasNoCafRefs,
+     Strictness: <S(S),1*U(U)><S(S),1*U(U)><S,U>,
+     Unfolding: InlineRule (0, True, True)
+                Foreign.LibFFI.Internal.init_ffi_type1
+                  `cast`
+                (<GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType>_R
+                 ->_R <GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType)>_R
+                 ->_R Sym (GHC.Types.N:IO[0] <()>_R)) -}
+32384cfc59020859c45db3fa8a3cce3a
+  init_ffi_type1 ::
+    GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType
+    -> GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType)
+    -> GHC.Prim.State# GHC.Prim.RealWorld
+    -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
+  {- Arity: 3, HasNoCafRefs,
+     Strictness: <S(S),1*U(U)><S(S),1*U(U)><S,U>,
+     Unfolding: InlineRule (3, True, False)
+                (\ (cType :: GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType)
+                   (cTypes :: GHC.Ptr.Ptr (GHC.Ptr.Ptr Foreign.LibFFI.Internal.CType))
+                   (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+                 case cType of wild { GHC.Ptr.Ptr addr ->
+                 case GHC.Prim.writeWord64OffAddr#
+                        @ GHC.Prim.RealWorld
+                        addr
+                        0#
+                        0##
+                        s of s2 { DEFAULT ->
+                 case GHC.Prim.writeWord16OffAddr#
+                        @ GHC.Prim.RealWorld
+                        (GHC.Prim.plusAddr# addr 8#)
+                        0#
+                        0##
+                        s2 of s1 { DEFAULT ->
+                 case GHC.Prim.writeWord16OffAddr#
+                        @ GHC.Prim.RealWorld
+                        (GHC.Prim.plusAddr# addr 10#)
+                        0#
+                        13##
+                        s1 of s3 { DEFAULT ->
+                 case cTypes of wild2 { GHC.Ptr.Ptr x ->
+                 case GHC.Prim.writeAddrOffAddr#
+                        @ GHC.Prim.RealWorld
+                        (GHC.Prim.plusAddr# addr 16#)
+                        0#
+                        x
+                        s3 of s4 { DEFAULT ->
+                 (# s4, GHC.Tuple.() #) } } } } } }) -}
+8c848bb0497f4153c9e19aae92f25b65
+  sizeOf_cif :: GHC.Types.Int
+  {- HasNoCafRefs, Strictness: m, Unfolding: (GHC.Types.I# 32#) -}
+29ef640e605c0bebe1b52e66665cdd94
+  sizeOf_ffi_type :: GHC.Types.Int
+  {- HasNoCafRefs, Strictness: m, Unfolding: (GHC.Types.I# 24#) -}
+vectorised variables:
+vectorised tycons:
+vectorised reused tycons:
+parallel variables:
+parallel tycons:
+trusted: safe
+require own pkg trusted: False
+

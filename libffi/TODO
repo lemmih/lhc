@@ -1,0 +1,17 @@
+- things are not exception-safe right now
+- new api based on something like:
+
+	mkFun :: Fun a -> IO a
+
+	argBool :: Fun a -> Fun (Bool -> a)
+	argInt  :: Fun a -> Fun (Int -> a)
+
+	retBool :: Fun (IO Bool)
+	retInt  :: Fun (IO Int)
+
+	mkFun (argInt . argInt $ retBool) :: IO (Int -> Int -> IO Bool)
+
+	Then, mkFun would call ffi_prep_cif, and the function it returns would call ffi_call,
+	which could be much more efficient.
+	However, I don't currently see how to implement mkFun without the function it returns
+	having to traverse the Fun GADT on each call.
