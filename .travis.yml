@@ -18,6 +18,8 @@ cache:
     - .stack-work/
 
 before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update          ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install llvm; fi
   - mkdir -p ~/.local/bin
   - export PATH=$HOME/.local/bin:$PATH
   - |
