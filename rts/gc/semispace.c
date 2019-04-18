@@ -105,8 +105,8 @@ word *_lhc_semi_end() {
   assert(hp!=NULL);
   from_space = hp;
   hp_limit = hp+size;
-  if(_lhc_rts_verbose)
-    fprintf(stderr, "SemiSpace done. Live: %d (%d), size: %d, allocated: %lu\n", live, compacted, size, _lhc_stats_allocated);
+  //if(_lhc_rts_verbose)
+  //  fprintf(stderr, "SemiSpace done. Live: %d (%d), size: %d, allocated: %lu\n", live, compacted, size, _lhc_stats_allocated);
   _lhc_stats_live(live*sizeof(word));
   _lhc_stats_copy((live-compacted)*sizeof(word));
   _lhc_stats_heap((live-compacted+size)*sizeof(word));

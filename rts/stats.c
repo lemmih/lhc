@@ -50,7 +50,7 @@ uint64_t clock_gettime_nsec(clockid_t clk_id) {
   return (uint64_t)t.tv_sec*1e9 + t.tv_nsec;
 }
 
-void _lhc_stats_finish(int status, void* data) {
+void _lhc_stats_finish() {
   if(_lhc_enable_gc_stats) {
     fprintf(stderr, "Collections: %d\n", _lhc_stats_collections);
     fprintf(stderr, "Copied:      %s\n", format(1,_lhc_stats_copied));
@@ -77,7 +77,8 @@ void _lhc_stats_finish(int status, void* data) {
 }
 
 void _lhc_stats_init(void) {
-  on_exit(&_lhc_stats_finish, NULL);
+  //on_exit(&_lhc_stats_finish, NULL);
+  atexit(&_lhc_stats_finish);
   realtime_start = clock_gettime_nsec(CLOCK_MONOTONIC_RAW);
 }
 
@@ -140,7 +141,7 @@ char* format(int precision, uint64_t number) {
   static char buffer[1024];
   double n = (double)number;
   if(_lhc_enable_machine_readable) {
-    sprintf(buffer, "%lu b", number);
+    sprintf(buffer, "%llu b", number);
   } else if(number < 1024) {
     sprintf(buffer, "%.*f b", precision, n);
   } else if(number < 1024*1024) {

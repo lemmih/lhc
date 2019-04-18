@@ -88,7 +88,7 @@ void _lhc_checkNode(word *ptr) {
     header=*ptr;
   }
   if(_lhc_getTag(header) > _lhc_info_table_size) {
-    fprintf(stderr, "Invalid heap object: %lu %lx\n", _lhc_getTag(header), header);
+    //fprintf(stderr, "Invalid heap object: %lu %lx\n", _lhc_getTag(header), header);
     abort();
   }
 }
@@ -102,14 +102,14 @@ void _lhc_pprintNode(word *ptr) {
     header=*ptr;
   }
   if(_lhc_getTag(header) > _lhc_info_table_size) {
-    fprintf(stderr, "Invalid heap object: %lu %lx\n", _lhc_getTag(header), header);
+    //fprintf(stderr, "Invalid heap object: %lu %lx\n", _lhc_getTag(header), header);
     abort();
   }
 
   table = &_lhc_info_tables[_lhc_getTag(header)];
 
-  fprintf(stderr, "Node: %s, prims: %d, ptrs: %d, tail: %lu\n",
-    table->node, table->nPrimitives, table->nHeapPointers, _lhc_getTail(header));
+  //fprintf(stderr, "Node: %s, prims: %d, ptrs: %d, tail: %lu\n",
+  //  table->node, table->nPrimitives, table->nHeapPointers, _lhc_getTail(header));
 }
 
 
