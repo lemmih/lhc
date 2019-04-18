@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <inttypes.h>
 
 #include "stats.h"
 #include "api.h"
@@ -141,7 +142,7 @@ char* format(int precision, uint64_t number) {
   static char buffer[1024];
   double n = (double)number;
   if(_lhc_enable_machine_readable) {
-    sprintf(buffer, "%llu b", number);
+    sprintf(buffer, "%" PRIu64 " b", number);
   } else if(number < 1024) {
     sprintf(buffer, "%.*f b", precision, n);
   } else if(number < 1024*1024) {
