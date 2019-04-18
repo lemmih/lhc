@@ -2,25 +2,25 @@ sudo: false
 
 language: generic
 
-os:
-  - linux
-  - osx
-
-addons:
-  apt:
-    packages:
-      - llvm
-
 cache:
   directories:
     - $HOME/.stack
     - $HOME/.local/bin
     - .stack-work/
 
+matrix:
+  include:
+    - os: linux
+      env:
+        - LLVM_PACKAGE="clang+llvm-8.0.0-x86_64-linux-gnu-ubuntu-14.04"
+    - os: osx
+      env:
+        - LLVM_PACKAGE="clang+llvm-8.0.0-x86_64-apple-darwin"
+
 before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update          ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install llvm; fi
-  - llvm-link --version
+  - wget http://releases.llvm.org/8.0.0/${LLVM_PACKAGE}.tar.xz
+  - tar -xf ${LLVM_PACKAGE}.tar.xz
+  - export PATH=${TRAVIS_BUILD_DIR}/${LLVM_PACKAGE}/bin:$PATH
   - mkdir -p ~/.local/bin
   - export PATH=$HOME/.local/bin:$PATH
   - |
