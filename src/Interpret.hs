@@ -1,20 +1,24 @@
+{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ParallelListComp           #-}
 {-# LANGUAGE RecordWildCards            #-}
 module Interpret (interpret) where
 
 import           Control.Monad.Reader
 import           Data.Char
+import           Data.Int
 import           Data.IORef
 import           Data.Map                          (Map)
 import qualified Data.Map                          as Map
 import           Data.Maybe
+import           Data.Word
 import           Foreign.LibFFI
 import           Foreign.Ptr
 import           Language.Haskell.Crux
 import           Language.Haskell.Scope            (QualifiedName (..))
 import           Language.Haskell.TypeCheck
 import           Language.Haskell.TypeCheck.Pretty (displayIO, pretty,
-                                                    renderPretty)
+                                                    renderCompact, renderPretty)
 import           System.IO
 import           System.IO.Unsafe
 import           System.Posix.DynamicLinker
@@ -106,8 +110,66 @@ deepSeq e = do
       App a <$> deepSeq b
     _ -> pure e'
 
+{-
+PushCode [PushLit "name", Enter unpackString]
+PushRef putStrLn
+Enter (0 -> hp, 1 -> s)
+-- (1 -> s', 0 -> ())
+Dead 0
+PushRef getLine
+Enter
+-- (1 -> s', 0 -> name)
+Hoist 1 -- (1 -> name)
+PushCode [PushLit "Hi ", Enter unpackString]
+PushRef putStr
+Enter
+-- (2 -> name, 1 -> s'', 0 -> ())
+Dead 0 -- (1 -> name, 0 -> s'')
+Hoist 1 -- (1 -> s'', 0 -> name)
+PushRef putStr
+Enter
+-- (1 -> s''', 0 -> ())
+Dead 0 -- (0 -> s''')
+PushCode [PushLit ".", Enter unpackString])
+PushRef putStrLn
+Enter
+-}
+
+{-
+\b ->
+  case b of
+    True -> False
+    False -> True
+
+Enter
+SwitchCon True [PushCon False]
+SwitchCon False [PushCon True]
+-}
+data Element
+  = ElementRef (HP [Instruction])
+  | ElementLit Literal
+  | ElementCon Variable
+
+data Instruction
+  = PushCode [Instruction]
+  | PushLit Literal
+  | PushCon Variable
+  | PushRef Reference
+  | Enter
+  | Hoist Int
+  | Dead Int
+  | Copy Int
+  | SwitchCon Variable [Instruction]
+  | SwitchLit Variable [Instruction]
+  deriving (Show)
+
+data Reference = Reference Variable (HP [Instruction])
+
+instance Show Reference where
+  show (Reference v _) = show v
+
 eval :: Expr -> IM Expr
-eval e = do
+eval !e = do
   case e of
     Var v -> do
       hp <- requireHP v
@@ -131,6 +193,14 @@ eval e = do
     Let (NonRec key val) body -> do
       val' <- lazyEval val
       bind key val' $ eval body
+    Let (Rec binds) body -> do
+      let (vs, es) = unzip binds
+      bindMany [ (v, Con $ blackhole v) | v <- vs ] $ do
+        forM_ binds $ \(v,expr) -> do
+          hp <- requireHP v
+          expr' <- lazyEval expr
+          liftIO $ writeIORef hp expr'
+        eval body
     -- ret, sOut, fn, args, sIn, body
     WithExternal ret sOut fn args _sIn body ->
       bind sOut (Lit LitVoid) $
@@ -152,6 +222,26 @@ eval e = do
       Lit (LitI64 offset) <- eval n
       bind ret (Lit $ LitString $ drop (fromIntegral offset) str) $
         eval body
+    ExternalPure ret "+#" [a, b] body -> do
+      Lit (LitI32 a') <- eval a
+      Lit (LitI32 b') <- eval b
+      bind ret (Lit $ LitI32 $ a' + b') $
+        eval body
+    ExternalPure ret "-#" [a, b] body -> do
+      a' <- expectI32 a
+      b' <- expectI32 b
+      bind ret (Lit $ LitI32 $ a' - b') $
+        eval body
+    ExternalPure ret "sdiv#" [a, b] body -> do
+      Lit (LitI32 a') <- eval a
+      Lit (LitI32 b') <- eval b
+      bind ret (Lit $ LitI32 $ fromIntegral $ div (fromIntegral a' :: Int32) (fromIntegral b')) $
+        eval body
+    ExternalPure ret "srem#" [a, b] body -> do
+      Lit (LitI32 a') <- eval a
+      Lit (LitI32 b') <- eval b
+      bind ret (Lit $ LitI32 $ fromIntegral $ rem (fromIntegral a' :: Int32) (fromIntegral b')) $
+        eval body
     Lam [] body -> eval body
     Convert body ty -> do
       body' <- eval body
@@ -164,6 +254,14 @@ eval e = do
 
 lazyEval :: Expr -> IM Expr
 lazyEval = interleaveIM . eval
+
+expectI32 :: Expr -> IM Word32
+expectI32 e = do
+  e' <- eval e
+  case e' of
+    Lit (LitI32 i)  -> pure i
+    Lit (LitChar c) -> pure (fromIntegral $ ord c)
+    _               -> error $ "Expected I32: " ++ show e'
 
 matchAlts :: Maybe Expr -> Expr -> [Alt] -> IM Expr
 matchAlts mbDef val alts = go alts
@@ -189,21 +287,23 @@ matchAlts mbDef val alts = go alts
     splitApp (App a b) args = splitApp a (b:args)
     splitApp e args         = (e, args)
 
-    lowerLit (LitChar c) = LitI64 (fromIntegral $ ord c)
-    lowerLit (LitI8 w) = LitI64 (fromIntegral w)
-    lowerLit (LitI16 w) = LitI64 (fromIntegral w)
-    lowerLit (LitI32 w) = LitI64 (fromIntegral w)
-    lowerLit (LitI64 w) = LitI64 (fromIntegral w)
-    lowerLit (LitFloat r) = LitDouble r
+    lowerLit (LitChar c)   = LitI64 (fromIntegral $ ord c)
+    lowerLit (LitI8 w)     = LitI64 (fromIntegral w)
+    lowerLit (LitI16 w)    = LitI64 (fromIntegral w)
+    lowerLit (LitI32 w)    = LitI64 (fromIntegral w)
+    lowerLit (LitI64 w)    = LitI64 (fromIntegral w)
+    lowerLit (LitFloat r)  = LitDouble r
     lowerLit (LitDouble r) = LitDouble r
-    lowerLit (LitVoid) = LitI64 0
+    lowerLit (LitVoid)     = LitI64 0
 
 toFFIRet :: Type -> RetType Expr
 toFFIRet (TyCon (QualifiedName "LHC.Prim" "I32")) =
   fmap (\w -> Lit $ LitI32 w) retWord32
 
 toFFIArg :: Expr -> Arg
-toFFIArg (Lit (LitI32 n)) = argWord32 n
+toFFIArg (Lit (LitI32 n))  = argWord32 n
+toFFIArg (Lit (LitChar c)) = argWord32 (fromIntegral $ ord c)
+toFFIArg e                 = error $ "toFFIArg: " ++ show e
 
 blackhole (Variable n t) =
   Variable (Name [] "Blackhole" 0) t
