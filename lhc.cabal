@@ -45,8 +45,8 @@ Executable lhc
                      binary,
                      directory,
                      llvm-hs-pure,
-                     serialise,
-                     unix, libffi >= 0.2,
+                     serialise, primitive,
+                     unix, libffi >= 0.2, vector,
 
                      bedrock,
                      haskell-crux,

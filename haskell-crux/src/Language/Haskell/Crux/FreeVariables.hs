@@ -55,3 +55,51 @@ freeVariablesAlt (Alt pattern e) =
       freeVariablesExpr e Set.\\ Set.fromList (map varName vars)
     ConPat _con vars ->
       freeVariablesExpr e Set.\\ Set.fromList (map varName vars)
+
+
+-- XXX: TypeChecker isn't working 100% so sometimes the types are wrong. :-/
+freeVariablesExpr_ :: Expr -> Set Variable
+freeVariablesExpr_ expr =
+  case expr of
+    Var var -> Set.singleton var
+    Con{} -> Set.empty
+    UnboxedTuple args -> Set.unions (map freeVariablesExpr_ args)
+    Lit{} -> Set.empty
+    WithExternal outV retS _name args st e ->
+      Set.unions (map freeVariablesExpr_ (st:args)) `Set.union`
+      Set.delete retS (Set.delete outV (freeVariablesExpr_ e))
+    -- WithExternal outV _name args _st e ->
+    --   Set.fromList (map varName args) `Set.union`
+    --   Set.delete (varName outV) (freeVariablesExpr e)
+    ExternalPure outV _name args e ->
+      Set.unions (map freeVariablesExpr_ args) `Set.union`
+      Set.delete outV (freeVariablesExpr_ e)
+    -- ExternalPure outV _name args e ->
+    --   Set.fromList (map varName args) `Set.union`
+    --   Set.delete (varName outV) (freeVariablesExpr e)
+    App a b -> freeVariablesExpr_ a `Set.union` freeVariablesExpr_ b
+    Lam binds e ->
+      freeVariablesExpr_ e Set.\\
+      Set.fromList binds
+    Let (NonRec var e) scope -> Set.delete var $
+      freeVariablesExpr_ e `Set.union` freeVariablesExpr_ scope
+    Let (Rec binds) scope ->
+      Set.unions (map freeVariablesExpr_ (scope : map snd binds)) Set.\\
+      Set.fromList (map fst binds)
+    LetStrict var e scope -> Set.delete var $
+      freeVariablesExpr_ e `Set.union` freeVariablesExpr_ scope
+    Case scrut scrutVar mbDefault alts -> Set.delete scrutVar $
+      freeVariablesExpr_ scrut `Set.union`
+      maybe Set.empty freeVariablesExpr_ mbDefault `Set.union`
+      Set.unions (map freeVariablesAlt_ alts)
+    Convert e _ty -> freeVariablesExpr_ e
+    Cast -> Set.empty
+
+freeVariablesAlt_ :: Alt -> Set Variable
+freeVariablesAlt_ (Alt pattern e) =
+  case pattern of
+    LitPat{} -> freeVariablesExpr_ e
+    UnboxedPat vars ->
+      freeVariablesExpr_ e Set.\\ Set.fromList vars
+    ConPat _con vars ->
+      freeVariablesExpr_ e Set.\\ Set.fromList vars

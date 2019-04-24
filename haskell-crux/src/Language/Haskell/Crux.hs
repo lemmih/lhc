@@ -195,9 +195,9 @@ instance Pretty Expr where
         parens (pretty scrut <+> text ":::" <+> pretty ty)
       Cast ->
         text "cast"
-      WithExternal outV outS cName args _st cont ->
+      WithExternal outV outS cName args st cont ->
         ppTypedVariable outV <> comma <+> pretty outS <+> text "←" <+>
-          text "external" <+> text cName <+> ppVars args <$$>
+          text "external" <+> text cName <+> ppVars (args++[st]) <$$>
         pretty cont
       ExternalPure outV cName args cont ->
         ppTypedVariable outV <+> text "←" <+>
