@@ -57,7 +57,7 @@ LHC.Prim.unsafePerformIO =
 LHC.Prim.c_putchar : LHC.Prim.I32 →  LHC.Prim.IO LHC.Prim.Int32
 LHC.Prim.c_putchar =
   λ arg^24:LHC.Prim.I32 s^25:LHC.Prim.RealWorld# → 
-  primOut^26:LHC.Prim.I32, s'^27 ← external putchar arg^24
+  primOut^26:LHC.Prim.I32, s'^27 ← external putchar arg^24 s^25
   (# s'^27, LHC.Prim.Int32
     primOut^26 #)
 LHC.Prim.indexI8# : LHC.Prim.Addr LHC.Prim.I8 →  LHC.Prim.I8
@@ -106,7 +106,7 @@ LHC.Prim.unpackString# =
 LHC.Prim.c_getchar : LHC.Prim.IO LHC.Prim.Int32
 LHC.Prim.c_getchar =
   λ s^40:LHC.Prim.RealWorld# → 
-  primOut^41:LHC.Prim.I32, s'^42 ← external getchar 
+  primOut^41:LHC.Prim.I32, s'^42 ← external getchar s^40
   (# s'^42, LHC.Prim.Int32
     primOut^41 #)
 LHC.Prim.getChar : LHC.Prim.IO LHC.Prim.Char
