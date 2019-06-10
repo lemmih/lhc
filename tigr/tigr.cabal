@@ -1,0 +1,19 @@
+name:                tigr
+version:             0.0.0.1
+synopsis:            Tigr's Interpretative Graph Reduction
+category:            Compiler
+license:             PublicDomain
+author:              David Himmelstrup
+maintainer:          https://github.com/Lemmih/lhc/issues
+homepage:            https://github.com/Lemmih/lhc
+build-type:          Simple
+cabal-version:	     >= 1.10
+
+Source-repository head
+  type:          git
+  location:      https://github.com/Lemmih/lhc.git
+
+library
+  hs-source-dirs:  src
+  exposed-modules: Interpreter
+  build-depends:   base, mtl, array, containers
