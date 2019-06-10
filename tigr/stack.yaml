@@ -1,0 +1,6 @@
+resolver: lts-12.26
+
+allow-newer: true
+
+packages:
+  - '.'
