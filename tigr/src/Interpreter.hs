@@ -1,12 +1,13 @@
 module Interpreter where
 
-import Control.Exception (Exception(..), handle, throwIO, SomeException(..))
-import Data.Typeable
-import Data.Map (Map)
-import qualified Data.Map as Map
-import Control.Monad.State
-import Control.Monad.Reader
-import Data.IORef
+import           Control.Exception    (Exception (..), SomeException (..),
+                                       handle, throwIO)
+import           Control.Monad.Reader
+import           Control.Monad.State
+import           Data.IORef
+import           Data.Map             (Map)
+import qualified Data.Map             as Map
+import           Data.Typeable
 
 data CodeException = CodeException (IORef Thunk)
   deriving (Typeable)
