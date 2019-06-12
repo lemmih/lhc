@@ -7,14 +7,13 @@ import Data.IORef
 
 type Name = String
 
-type Context = Map Name (IORef Closure)
+type Context = Map Name (IORef Thunk)
 data Closure = Closure Context GCode
 
-data Whnf
-  = WhnfVar Name [IORef Closure]
-  | WhnfCon Name [IORef Closure]
-  | WhnfLit Int
-  | WhnfClosure Closure
+data Thunk
+  = ThunkCon Name [IORef Thunk]
+  | ThunkLit Int
+  | ThunkClosure Closure
 
 data GCode
   = Var Name [Name]
@@ -35,25 +34,27 @@ data Pattern
 
 type M a = StateT Context IO a
 
-lookupName :: Name -> M (IORef Closure)
+lookupName :: Name -> M (IORef Thunk)
 lookupName name = do
   st <- get
   case Map.lookup name st of
     Nothing      -> error $ "Missing name: " ++ name
     Just closure -> pure closure
 
-lookupWhnf :: Name -> M Closure
+lookupWhnf :: Name -> M Thunk
 lookupWhnf name = do
   ref <- lookupName name
-  c <- liftIO $ readIORef ref
-  c' <- runWithClosure c evaluate
-  liftIO $ writeIORef ref c'
-  return c'
+  t <- liftIO $ readIORef ref
+  t' <- case t of
+          ThunkClosure c -> runWithClosure c evaluate
+          _ -> pure t
+  liftIO $ writeIORef ref t'
+  return t'
 
 toClosure :: [Name] -> GCode -> M Closure
 toClosure vars code = do
-  closures <- mapM lookupName vars
-  return $ Closure (Map.fromList $ zip vars closures) code
+  thunks <- mapM lookupName vars
+  return $ Closure (Map.fromList $ zip vars thunks) code
 
 runWithClosure :: Closure -> (GCode -> M a) -> M a
 runWithClosure (Closure bound gcode) fn = do
@@ -63,59 +64,100 @@ runWithClosure (Closure bound gcode) fn = do
   put st
   return val
 
-evaluate :: GCode -> M Closure
+evaluate :: GCode -> M Thunk
 evaluate gcode =
   case gcode of
-    Var "expensive#" [] -> toClosure [] (Lit 0)
+    Var "expensive#" [] -> pure $ ThunkLit 0
     Var fn args -> do
-      Closure ctx fn' <- lookupWhnf fn
-      apply (toClosure (fn:args) gcode) fn' args
-    Con _con args -> toClosure args gcode
+      thunk <- lookupWhnf fn
+      apply thunk =<< mapM lookupName args
+    Con con args ->
+      ThunkCon con <$> mapM lookupName args
     Let bind free rhs body -> do
-      c <- liftIO . newIORef =<< toClosure free rhs
-      modify $ Map.insert bind c
+      c <- toClosure free rhs
+      thunk <- liftIO $ newIORef $ ThunkClosure c
+      modify $ Map.insert bind thunk
       evaluate body
-    Lit{} -> toClosure [] gcode
+    Lit i -> pure $ ThunkLit i
     Case scrut (Just def) [] -> do
-      Closure ctx scrut' <- lookupWhnf scrut
+      _thunk <- lookupWhnf scrut
       evaluate def
-    Lam free _bound _body -> toClosure free gcode
+    Lam free _bound _body -> ThunkClosure <$> toClosure free gcode
 
-apply :: M Closure -> GCode -> [Name] -> M Closure
-apply susp fn args = do
-  case fn of
-    Con con conArgs -> evaluate (Con con (conArgs ++ args))
-    Lam free bound body
-      | length args < length bound -> susp
-      | length args == length bound -> do
-        args' <- mapM lookupName args
-        free' <- mapM lookupName free
-        modify $ const $ Map.fromList (zip bound args' ++ zip free free')
-        evaluate body
-      | length args > length bound -> do
-        args' <- mapM lookupName (take (length bound) args)
-        args'' <- mapM lookupName (drop (length bound) args)
-        free' <- mapM lookupName free
-        modify $ const $ Map.fromList (zip bound args' ++ zip free free')
-        Closure ctx newFn <- evaluate body
-        modify $ const $ Map.union ctx (Map.fromList (zip (drop (length bound) args) args''))
-        apply susp newFn (drop (length bound) args)
-    _ -> error "Bad function application"
+-- Invariant: thunk is in whnf
+apply :: Thunk -> [IORef Thunk] -> M Thunk
+apply thunk args =
+  case thunk of
+    ThunkCon con params -> do
+      pure $ ThunkCon con (params ++ args)
+    ThunkLit{} -> error "Lit apply?"
+    ThunkClosure (Closure ctx gcode) ->
+      case gcode of
+        Lam free bound body | length bound == length args -> do
+          put ctx
+          free' <- mapM lookupName free
+          put $ Map.fromList $ zip (bound++free) (args++free')
+          evaluate body
+        Lam free bound body | length bound > length args -> do
+          put ctx
+          free' <- mapM lookupName free
+          pure $ ThunkClosure $ Closure (Map.fromList $ zip (bound++free) (args++free')) (Lam free (drop (length args) bound) body)
+        Lam free bound body | length bound < length args -> do
+          let (nowArgs, laterArgs) = splitAt (length bound) args
+          put ctx
+          free' <- mapM lookupName free
+          put $ Map.fromList $ zip (bound++free) (nowArgs++free')
+          thunk' <- evaluate body
+          apply thunk' laterArgs
+        _ -> error "Closure apply?"
+-- apply :: M Closure -> GCode -> [Name] -> M Closure
+-- apply susp fn args = do
+--   case fn of
+--     Con con conArgs -> evaluate (Con con (conArgs ++ args))
+--     Lam free bound body
+--       | length args < length bound -> susp
+--       | length args == length bound -> do
+--         args' <- mapM lookupName args
+--         free' <- mapM lookupName free
+--         modify $ const $ Map.fromList (zip bound args' ++ zip free free')
+--         evaluate body
+--       | length args > length bound -> do
+--         args' <- mapM lookupName (take (length bound) args)
+--         args'' <- mapM lookupName (drop (length bound) args)
+--         free' <- mapM lookupName free
+--         modify $ const $ Map.fromList (zip bound args' ++ zip free free')
+--         Closure ctx newFn <- evaluate body
+--         modify $ const $ Map.union ctx (Map.fromList (zip (drop (length bound) args) args''))
+--         apply susp newFn (drop (length bound) args)
+--     _ -> error "Bad function application"
 
-run :: GCode -> IO Closure
+run :: GCode -> IO Thunk
 run gcode = evalStateT (evaluate gcode) Map.empty
 
-printClosure :: Closure -> IO ()
-printClosure = worker 0
-  where
-    worker i (Closure ctx gcode) = do
-      forM_ (Map.toList ctx) $ \(name, ref) -> do
-        putStrLn (replicate i ' ' ++ name ++ ":")
-        worker (i+2) =<< liftIO (readIORef ref)
-      putStrLn (replicate i ' '  ++ show gcode)
+printClosure :: Int -> Closure -> IO ()
+printClosure i (Closure ctx gcode) = do
+  forM_ (Map.toList ctx) $ \(name, ref) -> do
+    putStrLn (replicate i ' ' ++ name ++ ":")
+    printThunk (i+2) =<< liftIO (readIORef ref)
+  putStrLn (replicate i ' '  ++ "Closure: " ++ show gcode)
+
+printThunk :: Int -> Thunk -> IO ()
+printThunk i thunk =
+  case thunk of
+    ThunkCon n refs -> do
+      thunks <- mapM readIORef refs
+      mapM (printThunk i) thunks
+      putStrLn $ replicate i ' ' ++ "Con: " ++ n
+    ThunkLit n -> putStrLn $ replicate i ' ' ++ show n
+    ThunkClosure c -> printClosure i c
 
 runTest :: GCode -> IO ()
-runTest x = printClosure =<< run x
+runTest x = printThunk 0 =<< run x
+
+test0 :: GCode
+test0 =
+  Let "y" [] (Lit 10) $
+  Con "Just" ["y"]
 
 test1 :: GCode
 test1 =
