@@ -1,4 +1,6 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Interpreter where
+
 
 import           Control.Exception    (Exception (..), SomeException (..),
                                        handle, throwIO)
@@ -23,10 +25,15 @@ data Closure = Closure Context GCode
 
 data Thunk
   = ThunkCon Name [IORef Thunk]
-  | ThunkLit Int
+  | ThunkLit Literal
   | ThunkClosure Closure
 
+data Literal
+  = LiteralI64 Int
+  deriving (Show, Eq)
+
 {- Common patterns:
+Var topLevelFn args
 Let var [] (Lit lit) $ ...
 LetStrict "" (Var builtin args) $ ...
 LetStrict bind (Lit lit) $ ...
@@ -43,7 +50,7 @@ data GCode
   | Let Name [Name] GCode GCode
   | LetRec [(Name, [Name], GCode)] GCode
   | LetStrict Name GCode GCode
-  | Lit Int
+  | Lit Literal
   | Case Name (Maybe GCode) [Alt]
   | Lam [Name] [Name] GCode
   | Throw Name
@@ -55,16 +62,45 @@ data Alt = Alt Pattern GCode
 
 data Pattern
   = ConPattern Name [Name]
-  | LitPattern Int
+  | LitPattern Literal
     deriving (Show)
 
-type M a = ReaderT Context IO a
+newtype M a = M { unM :: Context -> Context -> IO a }
+
+instance Functor M where
+  fmap f (M g) = M $ \global local -> fmap f (g global local)
+
+instance Applicative M where
+  pure a = M $ \_ _ -> pure a
+  f <*> g = M $ \global local -> unM f global local <*> unM g global local
+
+instance Monad M where
+  f >>= g = M $ \global local -> unM f global local >>= \a -> unM (g a) global local
+
+instance MonadIO M where
+  liftIO io = M $ \_global _local -> io
+
+askLocal :: M Context
+askLocal = M $ \_global local -> pure local
+
+askGlobal :: M Context
+askGlobal = M $ \global _local -> pure global
+
+withLocal :: Context -> M a -> M a
+withLocal local f = M $ \global _local -> unM f global local
+
+modifyLocal :: (Context -> Context) -> M a -> M a
+modifyLocal m f = M $ \global local -> unM f global (m local)
 
 lookupName :: Name -> M (IORef Thunk)
 lookupName name = do
-  st <- ask
-  case Map.lookup name st of
-    Nothing      -> error $ "Missing name: " ++ name
+  local <- askLocal
+  global <- askGlobal
+  case Map.lookup name local of
+    Nothing      ->
+      case Map.lookup name global of
+        Nothing -> error $ "Missing name: " ++ name
+        Just closure -> pure closure
     Just closure -> pure closure
 
 lookupWhnf :: Name -> M Thunk
@@ -86,16 +122,20 @@ toClosure vars code = do
   return $ Closure (Map.fromList $ zip vars thunks) code
 
 runWithClosure :: Closure -> (GCode -> M a) -> M a
-runWithClosure (Closure bound gcode) fn = local (const bound) (fn gcode)
+runWithClosure (Closure bound gcode) fn = withLocal bound (fn gcode)
+
+handleM :: (CodeException -> M a) -> M a -> M a
+handleM handler f = M $ \global local ->
+  handle (\e -> unM (handler e) global Map.empty) (unM f global local)
 
 evaluate :: GCode -> M Thunk
 evaluate gcode =
   case gcode of
-    Var "expensive#" [] -> pure $ ThunkLit 0
+    Var "expensive#" [] -> pure $ ThunkLit $ LiteralI64 0
     Var "printLit#" [thunk] -> do
       ThunkLit lit <- lookupWhnf thunk
       liftIO $ print lit
-      pure $ ThunkLit 0
+      pure $ ThunkLit $ LiteralI64 0
     Var fn args -> do
       thunk <- lookupWhnf fn
       apply thunk =<< mapM lookupName args
@@ -104,12 +144,12 @@ evaluate gcode =
     Let bind free rhs body -> do
       c <- toClosure free rhs
       thunk <- liftIO $ newIORef $ ThunkClosure c
-      local (Map.insert bind thunk)
+      modifyLocal (Map.insert bind thunk)
         (evaluate body)
     LetRec binds body -> do
       let names = [ name | (name, _, _) <- binds ]
       refs <- liftIO $ replicateM (length binds) $ newIORef undefined
-      local (Map.union $ Map.fromList $ zip names refs) $ do
+      modifyLocal (Map.union $ Map.fromList $ zip names refs) $ do
         forM_ (zip binds refs) $ \((name, free, rhs), ref) -> do
           c <- toClosure free rhs
           liftIO $ writeIORef ref $ ThunkClosure c
@@ -117,7 +157,7 @@ evaluate gcode =
     LetStrict bind rhs body -> do
       thunk_ <- evaluate rhs
       thunk <- liftIO $ newIORef thunk_
-      local (Map.insert bind thunk)
+      modifyLocal (Map.insert bind thunk)
         (evaluate body)
     Lit i -> pure $ ThunkLit i
     Case scrut mbDef alts -> do
@@ -131,8 +171,8 @@ evaluate gcode =
       free' <- mapM lookupName free
       let outerCtx = Map.fromList $ zip free free'
           helper (CodeException thunk) =
-            runReaderT (evaluate handler) (Map.insert bound thunk outerCtx)
-      ReaderT $ \ctx -> handle helper (runReaderT (evaluate body) ctx)
+            withLocal (Map.insert bound thunk outerCtx) (evaluate handler)
+      handleM helper (evaluate body)
 
 runCase :: Thunk -> Maybe GCode -> [Alt] -> M Thunk
 runCase thunk Nothing [] = error "Case fell through"
@@ -141,7 +181,7 @@ runCase thunk mbDef (Alt pattern branch : alts) =
   case (thunk, pattern) of
     (ThunkLit lit, LitPattern pLit) | lit == pLit -> evaluate branch
     (ThunkCon con args, ConPattern pCon pArgs) | con == pCon ->
-      local (Map.union (Map.fromList $ zip pArgs args))
+      modifyLocal (Map.union (Map.fromList $ zip pArgs args))
         (evaluate branch)
     (ThunkCon{}, LitPattern{}) -> error "Con/Lit pattern match"
     (ThunkLit{}, ConPattern{}) -> error "Lit/Con pattern match"
@@ -155,49 +195,27 @@ apply thunk args =
     ThunkCon con params -> do
       pure $ ThunkCon con (params ++ args)
     ThunkLit{} -> error "Lit apply?"
-    ThunkClosure (Closure ctx gcode) -> local (const ctx) $
+    ThunkClosure (Closure ctx gcode) -> withLocal ctx $
       case gcode of
         Lam free bound body | length bound == length args ->
-          local (Map.union $ Map.fromList $ zip bound args)
+          modifyLocal (Map.union $ Map.fromList $ zip bound args)
             (evaluate body)
         Lam free bound body | length bound > length args ->
           pure $ ThunkClosure $ Closure (Map.union ctx $ Map.fromList $ zip bound args) (Lam free (drop (length args) bound) body)
         Lam free bound body | length bound < length args -> do
           let (nowArgs, laterArgs) = splitAt (length bound) args
-          local (Map.union $ Map.fromList $ zip bound nowArgs) $ do
+          modifyLocal (Map.union $ Map.fromList $ zip bound nowArgs) $ do
             thunk' <- evaluate body
             apply thunk' laterArgs
         _ -> error "Closure apply?"
--- apply :: M Closure -> GCode -> [Name] -> M Closure
--- apply susp fn args = do
---   case fn of
---     Con con conArgs -> evaluate (Con con (conArgs ++ args))
---     Lam free bound body
---       | length args < length bound -> susp
---       | length args == length bound -> do
---         args' <- mapM lookupName args
---         free' <- mapM lookupName free
---         modify $ const $ Map.fromList (zip bound args' ++ zip free free')
---         evaluate body
---       | length args > length bound -> do
---         args' <- mapM lookupName (take (length bound) args)
---         args'' <- mapM lookupName (drop (length bound) args)
---         free' <- mapM lookupName free
---         modify $ const $ Map.fromList (zip bound args' ++ zip free free')
---         Closure ctx newFn <- evaluate body
---         modify $ const $ Map.union ctx (Map.fromList (zip (drop (length bound) args) args''))
---         apply susp newFn (drop (length bound) args)
---     _ -> error "Bad function application"
 
 run :: GCode -> IO Thunk
-run gcode = runReaderT (evaluate gcode) Map.empty
+run gcode = unM (evaluate gcode) Map.empty Map.empty
 
 printClosure :: Int -> Closure -> IO ()
 printClosure i _ | i > 10 = putStrLn (replicate i ' ' ++ "snip")
 printClosure i (Closure ctx gcode) = do
-  forM_ (Map.toList ctx) $ \(name, ref) -> do
-    putStrLn (replicate i ' ' ++ name ++ ":")
-    printThunk (i+2) =<< liftIO (readIORef ref)
+  printContext i ctx
   putStrLn (replicate i ' '  ++ "Closure: " ++ show gcode)
 
 printThunk :: Int -> Thunk -> IO ()
@@ -211,18 +229,24 @@ printThunk i thunk =
     ThunkLit n -> putStrLn $ replicate i ' ' ++ show n
     ThunkClosure c -> printClosure i c
 
+printContext :: Int -> Context -> IO ()
+printContext i ctx = do
+  forM_ (Map.toList ctx) $ \(name, ref) -> do
+    putStrLn (replicate i ' ' ++ name ++ ":")
+    printThunk (i+2) =<< liftIO (readIORef ref)
+
 runTest :: GCode -> IO ()
 runTest x = printThunk 0 =<< run x
 
 test0 :: GCode
 test0 =
-  Let "y" [] (Lit 10) $
+  Let "y" [] (Lit $ LiteralI64 10) $
   Con "Just" ["y"]
 
 test1 :: GCode
 test1 =
   Let "x" [] (Con "Just" []) $
-  Let "y" [] (Lit 10) $
+  Let "y" [] (Lit $ LiteralI64 10) $
   (Var "x" ["y"])
 
 test2 :: GCode
@@ -248,45 +272,45 @@ test4 =
 test5 :: GCode
 test5 =
   Let "fn" [] (Lam [] ["x"] $ Con "Just" ["x"]) $
-  Let "i" [] (Lit 10) $
+  Let "i" [] (Lit $ LiteralI64 10) $
   Var "fn" ["i"]
 
 test6 :: GCode
 test6 =
   Let "fn" [] (Lam [] ["x", "y"] $ Con "Just" ["x", "y"]) $
-  Let "i" [] (Lit 10) $
+  Let "i" [] (Lit $ LiteralI64 10) $
   Var "fn" ["i"]
 
 test7 :: GCode
 test7 =
   Let "fn" [] (Con "Just" []) $
-  Let "i" [] (Lit 10) $
+  Let "i" [] (Lit $ LiteralI64 10) $
   Var "fn" ["i"]
 
 test8 :: GCode
 test8 =
   Let "fn" [] (Lam [] ["x"] $ Con "Just" []) $
-  Let "i" [] (Lit 10) $
+  Let "i" [] (Lit $ LiteralI64 10) $
   Var "fn" ["i", "i"]
 
 test9 :: GCode
 test9 =
-  Let "i" [] (Lit 10) $
+  Let "i" [] (Lit $ LiteralI64 10) $
   Let "fn" ["i"] (Con "Just" ["i"]) $
-  Let "i" [] (Lit 12) $
+  Let "i" [] (Lit $ LiteralI64 12) $
   Var "fn" ["i"]
 
 test10 :: GCode
 test10 =
-  Let "i" [] (Lit 0) $
+  Let "i" [] (Lit $ LiteralI64 0) $
   Case "i" Nothing
     []
 
 test11 :: GCode
 test11 =
-  Let "i" [] (Lit 1) $
+  Let "i" [] (Lit $ LiteralI64 1) $
   Case "i" (Just $ Con "NonZero" [])
-    [Alt (LitPattern 0) $ Con "Zero" []]
+    [Alt (LitPattern $ LiteralI64 0) $ Con "Zero" []]
 
 test12 :: GCode
 test12 = -- isNothing
@@ -303,19 +327,19 @@ test13 = -- fromJust
 
 test14 :: GCode
 test14 =
-  Let "i" [] (Lit 10) $
+  Let "i" [] (Lit $ LiteralI64 10) $
   Let "_" ["i"] (Var "printLit#" ["i"]) $
   Case "_" (Just $ Con "Done" []) []
 
 test15 :: GCode
 test15 =
-  Let "i" [] (Lit 10) $
+  Let "i" [] (Lit $ LiteralI64 10) $
   LetStrict "" (Var "printLit#" ["i"]) $
   Con "Done" []
 
 test16 :: GCode
 test16 =
-  LetStrict "i" (Lit 1) $
+  LetStrict "i" (Lit $ LiteralI64 1) $
   LetRec [("ones", ["ones", "i"], Con "Cons" ["i", "ones"])] $
   Var "ones" []
 

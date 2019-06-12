@@ -24,7 +24,7 @@ Executable lhc
  main-is:            Main.hs
  other-modules:
    RTS
-   Interpret
+   Interactive
    Compiler.CoreToBedrock
    Paths_lhc
  Hs-Source-Dirs:     src
@@ -49,6 +49,7 @@ Executable lhc
                      unix, libffi >= 0.2, vector,
 
                      bedrock,
+                     tigr,
                      haskell-crux,
                      haskell-scope,
                      haskell-tc

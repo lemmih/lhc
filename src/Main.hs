@@ -22,7 +22,7 @@ import           Data.IORef
 import           Data.List                          (intercalate)
 import           Data.Monoid                        (mconcat, (<>))
 import qualified Distribution.ModuleName            as Dist
-import           Interpret
+import           Interactive
 import qualified Language.Haskell.Crux              as Core
 import qualified Language.Haskell.Crux.DCE          as Core
 import qualified Language.Haskell.Crux.FromHaskell  as Haskell
@@ -271,4 +271,4 @@ runInterpreter verbose file = do
     displayIO stdout (renderPretty 1 100 (pretty complete))
     putStr "\n"
 
-  interpret complete
+  Interactive.interpret complete
