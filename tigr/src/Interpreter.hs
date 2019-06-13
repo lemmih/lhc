@@ -30,6 +30,7 @@ data Thunk
 
 data Literal
   = LiteralI64 Int
+  | LiteralString String
   deriving (Show, Eq)
 
 {- Common patterns:
@@ -41,12 +42,15 @@ LetStrict bind (Con con args) $ ...
 Case scrut_whnf
 Case with all literals
 Case with all constructors
+Var CAF -> Var (IORef Thunk)
+Var GlobalFn -> VarPartial GCode [Name] | VarComplete GCode [Name] | VarSuper GCode [Name]
 
 GCode = Array of lets + endpoint (var,con,lit,case,lam)
 -}
 data GCode
   = Var Name [Name]
   | Con Name [Name]
+  | External String [Name]
   | Let Name [Name] GCode GCode
   | LetRec [(Name, [Name], GCode)] GCode
   | LetStrict Name GCode GCode
