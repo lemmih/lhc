@@ -99,4 +99,8 @@ toName (Crux.Name m i u) = intercalate "." m ++ "." ++ i ++ "_" ++ show u
 
 interpret :: Crux.Module -> IO ()
 interpret m = do
-  printContext 0 =<< toGCode m
+  ctx <- toGCode m
+  finalize ctx
+  printContext 0 ctx
+  putStrLn "\n\nRunning:"
+  runThunk ctx "Main.entrypoint"

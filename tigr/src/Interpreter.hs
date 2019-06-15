@@ -7,8 +7,11 @@ import           Control.Exception    (Exception (..), SomeException (..),
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.IORef
+import Data.Char
 import           Data.Map             (Map)
 import qualified Data.Map             as Map
+import qualified Data.Set as Set
+import Data.Set (Set)
 import           Data.Typeable
 
 data CodeException = CodeException (IORef Thunk)
@@ -133,13 +136,19 @@ handleM handler f = M $ \global local ->
   handle (\e -> unM (handler e) global Map.empty) (unM f global local)
 
 evaluate :: GCode -> M Thunk
-evaluate gcode =
+evaluate gcode = do
+  liftIO $ putStrLn $ "Eval step: " ++ show gcode
   case gcode of
     Var "expensive#" [] -> pure $ ThunkLit $ LiteralI64 0
+    Var "_cast" [arg] -> lookupWhnf arg
+    External "indexI8#" [arg] -> do
+      ThunkLit (LiteralString (c:cs)) <- lookupWhnf arg
+      pure $ ThunkLit $ LiteralI64 (ord c)
     Var "printLit#" [thunk] -> do
       ThunkLit lit <- lookupWhnf thunk
       liftIO $ print lit
       pure $ ThunkLit $ LiteralI64 0
+    Var val [] -> lookupWhnf val
     Var fn args -> do
       thunk <- lookupWhnf fn
       apply thunk =<< mapM lookupName args
@@ -177,6 +186,7 @@ evaluate gcode =
           helper (CodeException thunk) =
             withLocal (Map.insert bound thunk outerCtx) (evaluate handler)
       handleM helper (evaluate body)
+    _ -> error $ "Unhandled gcode: " ++ show gcode
 
 runCase :: Thunk -> Maybe GCode -> [Alt] -> M Thunk
 runCase thunk Nothing [] = error "Case fell through"
@@ -239,8 +249,93 @@ printContext i ctx = do
     putStrLn (replicate i ' ' ++ name ++ ":")
     printThunk (i+2) =<< liftIO (readIORef ref)
 
+finalize :: Context -> IO ()
+finalize ctx =
+    forM_ (Map.elems ctx) $ \ref ->
+      modifyIORef ref finalizeThunk
+  where
+    finalizeThunk :: Thunk -> Thunk
+    finalizeThunk (ThunkClosure (Closure env gcode)) = ThunkClosure (Closure env $ finalizeGCode gcode)
+    finalizeThunk t = t
+    finalizeGCode :: GCode -> GCode
+    finalizeGCode gcode =
+      case gcode of
+        Var{} -> gcode
+        Con{} -> gcode
+        External{} -> gcode
+        Let bind _free rhs body ->
+          Let bind (Set.toList $ free rhs)
+            (finalizeGCode rhs)
+            (finalizeGCode body)
+        LetRec binds body ->
+          let bound = Set.fromList [ name | (name, _, _) <- binds ]
+          in LetRec
+              [ (bind, Set.toList $ free rhs `Set.difference` bound, finalizeGCode rhs)
+              | (bind, _free, rhs) <- binds ]
+              (finalizeGCode body)
+        LetStrict bind rhs body ->
+          LetStrict bind (finalizeGCode rhs) (finalizeGCode body)
+        Lit{} -> gcode
+        Case scrut mbDef alts ->
+          Case scrut (fmap finalizeGCode mbDef)
+            [ Alt pattern (finalizeGCode branch) | Alt pattern branch <- alts ]
+        Lam _free bound body ->
+          Lam (Set.toList $ free gcode)
+            bound (finalizeGCode body)
+        Throw{} -> gcode
+        Catch _free bound handler body ->
+          Catch (Set.toList $ Set.delete bound $ free handler)
+            bound (finalizeGCode handler) (finalizeGCode body)
+    free gcode = Set.delete "_cast" (freeVars gcode) `Set.difference` Map.keysSet ctx
+    freeVars :: GCode -> Set Name
+    freeVars (Var v args) = Set.fromList (v:args)
+    freeVars (Con _ args) = Set.fromList (args)
+    freeVars (External _cName args) = Set.fromList args
+    freeVars (Let name _free rhs body) = Set.delete name (freeVars body) `Set.union` freeVars rhs
+    freeVars (LetRec binds body) =
+      let bound = [ name | (name, _, _) <- binds ]
+          rhss = [ rhs | (_, _, rhs) <- binds ]
+      in Set.unions (freeVars body : map freeVars rhss) `Set.difference` Set.fromList bound
+    freeVars (LetStrict name rhs body) =
+      Set.delete name (freeVars body) `Set.union` freeVars rhs
+    freeVars Lit{} = Set.empty
+    freeVars (Case scrut mbDef alts) =
+      Set.insert scrut (maybe Set.empty freeVars mbDef) `Set.union`
+      Set.unions (map freeVarsAlt alts)
+    freeVars (Lam _free bound body) = freeVars body `Set.difference` Set.fromList bound
+    freeVars (Throw name) = Set.singleton name
+    freeVars (Catch _free bound handler body) =
+      Set.delete bound (freeVars handler) `Set.union` freeVars body
+
+    freeVarsAlt (Alt LitPattern{} branch) = freeVars branch
+    freeVarsAlt (Alt (ConPattern _con args) branch) = freeVars branch `Set.difference` Set.fromList args
+{-
+= Var Name [Name]
+| Con Name [Name]
+| External String [Name]
+| Let Name [Name] GCode GCode
+| LetRec [(Name, [Name], GCode)] GCode
+| LetStrict Name GCode GCode
+| Lit Literal
+| Case Name (Maybe GCode) [Alt]
+| Lam [Name] [Name] GCode
+| Throw Name
+| Catch [Name] Name GCode GCode
+  deriving (Show)
+
+data Alt = Alt Pattern GCode
+deriving (Show)
+
+data Pattern
+= ConPattern Name [Name]
+| LitPattern Literal
+  deriving (Show)
+-}
 runTest :: GCode -> IO ()
 runTest x = printThunk 0 =<< run x
+
+runThunk :: Context -> Name -> IO ()
+runThunk ctx name = printThunk 0 =<< unM (lookupWhnf name) ctx Map.empty
 
 test0 :: GCode
 test0 =
