@@ -1,10 +1,12 @@
 {-# LANGUAGE ParallelListComp #-}
 module Interactive where
 
+import Data.Char
 import           Data.IORef
 import           Data.List
 import qualified Data.Map              as Map
-import           Interpreter
+import           Tigr.Interpreter
+import           Tigr.Types
 import qualified Language.Haskell.Crux as Crux
 
 toGCode :: Crux.Module -> IO Context
@@ -37,6 +39,9 @@ exprToGCode e =
           (map altToGCode alts))
     Crux.Let (Crux.NonRec var e) body ->
       Let (varName var) [] (exprToGCode e) (exprToGCode body)
+    Crux.Let (Crux.Rec binds) body ->
+      LetRec [ (varName var, [], exprToGCode e) | (var, e) <- binds ]
+        (exprToGCode body)
     Crux.Convert body _ty ->
       LetStrict "tmp_arg" (exprToGCode body) $
       Var "_cast" ["tmp_arg"]
@@ -51,7 +56,7 @@ exprToGCode e =
       exprToGCode cont
     Crux.UnboxedTuple exprs -> bindExprs exprs $ \names ->
       Con "" names
-    _ -> Con "Missing" []
+    _ -> error ("No gcode for: " ++ show e)
   where
     bindExprs exprs rest =
       let names = [ "tmp_"++show nth | nth <- [1 .. length exprs] ] in
@@ -71,8 +76,10 @@ altToGCode (Crux.Alt (Crux.UnboxedPat vars) branch) =
 litToGCode :: Crux.Literal -> Literal
 litToGCode Crux.LitVoid = LiteralI64 0
 litToGCode (Crux.LitI64 n) = LiteralI64 (fromIntegral n)
+litToGCode (Crux.LitI32 n) = LiteralI64 (fromIntegral n)
+litToGCode (Crux.LitChar c) = LiteralI64 (fromIntegral $ ord c)
 litToGCode (Crux.LitString s) = LiteralString s
-litToGCode _ = LiteralI64 0
+litToGCode lit = error ("Unhandled lit: " ++ show lit)
 
 -- data Expr
 --     = Var Variable

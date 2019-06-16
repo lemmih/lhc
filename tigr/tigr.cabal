@@ -15,5 +15,8 @@ Source-repository head
 
 library
   hs-source-dirs:  src
-  exposed-modules: Interpreter
-  build-depends:   base, mtl, array, containers
+  exposed-modules: Tigr.Interpreter
+                   Tigr.Types
+                   Tigr.Monad
+                   Tigr.Pretty
+  build-depends:   base, mtl, array, containers, ansi-wl-pprint

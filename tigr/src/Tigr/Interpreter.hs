@@ -1,7 +1,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Interpreter where
+module Tigr.Interpreter where
 
+import Tigr.Types
+import Tigr.Monad
+import Tigr.Pretty
 
+import Text.PrettyPrint.ANSI.Leijen (indent)
 import           Control.Exception    (Exception (..), SomeException (..),
                                        handle, throwIO)
 import           Control.Monad.Reader
@@ -14,101 +18,8 @@ import qualified Data.Set as Set
 import Data.Set (Set)
 import           Data.Typeable
 
-data CodeException = CodeException (IORef Thunk)
-  deriving (Typeable)
-instance Show CodeException where
-  show _ = "CodeException"
-instance Exception CodeException where
-  toException = SomeException
 
-type Name = String
 
-type Context = Map Name (IORef Thunk)
-data Closure = Closure Context GCode
-
-data Thunk
-  = ThunkCon Name [IORef Thunk]
-  | ThunkLit Literal
-  | ThunkClosure Closure
-
-data Literal
-  = LiteralI64 Int
-  | LiteralString String
-  deriving (Show, Eq)
-
-{- Common patterns:
-Var topLevelFn args
-Let var [] (Lit lit) $ ...
-LetStrict "" (Var builtin args) $ ...
-LetStrict bind (Lit lit) $ ...
-LetStrict bind (Con con args) $ ...
-Case scrut_whnf
-Case with all literals
-Case with all constructors
-Var CAF -> Var (IORef Thunk)
-Var GlobalFn -> VarPartial GCode [Name] | VarComplete GCode [Name] | VarSuper GCode [Name]
-
-GCode = Array of lets + endpoint (var,con,lit,case,lam)
--}
-data GCode
-  = Var Name [Name]
-  | Con Name [Name]
-  | External String [Name]
-  | Let Name [Name] GCode GCode
-  | LetRec [(Name, [Name], GCode)] GCode
-  | LetStrict Name GCode GCode
-  | Lit Literal
-  | Case Name (Maybe GCode) [Alt]
-  | Lam [Name] [Name] GCode
-  | Throw Name
-  | Catch [Name] Name GCode GCode
-    deriving (Show)
-
-data Alt = Alt Pattern GCode
-  deriving (Show)
-
-data Pattern
-  = ConPattern Name [Name]
-  | LitPattern Literal
-    deriving (Show)
-
-newtype M a = M { unM :: Context -> Context -> IO a }
-
-instance Functor M where
-  fmap f (M g) = M $ \global local -> fmap f (g global local)
-
-instance Applicative M where
-  pure a = M $ \_ _ -> pure a
-  f <*> g = M $ \global local -> unM f global local <*> unM g global local
-
-instance Monad M where
-  f >>= g = M $ \global local -> unM f global local >>= \a -> unM (g a) global local
-
-instance MonadIO M where
-  liftIO io = M $ \_global _local -> io
-
-askLocal :: M Context
-askLocal = M $ \_global local -> pure local
-
-askGlobal :: M Context
-askGlobal = M $ \global _local -> pure global
-
-withLocal :: Context -> M a -> M a
-withLocal local f = M $ \global _local -> unM f global local
-
-modifyLocal :: (Context -> Context) -> M a -> M a
-modifyLocal m f = M $ \global local -> unM f global (m local)
-
-lookupName :: Name -> M (IORef Thunk)
-lookupName name = do
-  local <- askLocal
-  global <- askGlobal
-  case Map.lookup name local of
-    Nothing      ->
-      case Map.lookup name global of
-        Nothing -> error $ "Missing name: " ++ name
-        Just closure -> pure closure
-    Just closure -> pure closure
 
 lookupWhnf :: Name -> M Thunk
 lookupWhnf name = do
@@ -123,27 +34,48 @@ lookupWhnf name = do
     ThunkCon "Whitehole" [] -> error "Whitehole loop"
     _ -> return t
 
-toClosure :: [Name] -> GCode -> M Closure
-toClosure vars code = do
-  thunks <- mapM lookupName vars
-  return $ Closure (Map.fromList $ zip vars thunks) code
-
-runWithClosure :: Closure -> (GCode -> M a) -> M a
-runWithClosure (Closure bound gcode) fn = withLocal bound (fn gcode)
-
-handleM :: (CodeException -> M a) -> M a -> M a
-handleM handler f = M $ \global local ->
-  handle (\e -> unM (handler e) global Map.empty) (unM f global local)
-
 evaluate :: GCode -> M Thunk
 evaluate gcode = do
-  liftIO $ putStrLn $ "Eval step: " ++ show gcode
+  -- liftIO $ putStrLn $ "Eval step: " ++ show (ppGCode gcode)
   case gcode of
     Var "expensive#" [] -> pure $ ThunkLit $ LiteralI64 0
     Var "_cast" [arg] -> lookupWhnf arg
     External "indexI8#" [arg] -> do
-      ThunkLit (LiteralString (c:cs)) <- lookupWhnf arg
+      ThunkLit (LiteralString str) <- lookupWhnf arg
+      case str of
+        []     -> pure $ ThunkLit $ LiteralI64 0
+        (c:cs) -> pure $ ThunkLit $ LiteralI64 (ord c)
+    External "addrAdd#" [ptr, offset] -> do
+      ThunkLit (LiteralString str) <- lookupWhnf ptr
+      ThunkLit (LiteralI64 n) <- lookupWhnf offset
+      pure $ ThunkLit $ LiteralString (drop n str)
+    External "putchar" [arg] -> do
+      ThunkLit (LiteralI64 c) <- lookupWhnf arg
+      liftIO $ putChar (chr c)
+      pure $ ThunkLit $ LiteralI64 0
+    External "getchar" [] -> do
+      c <- liftIO getChar
       pure $ ThunkLit $ LiteralI64 (ord c)
+    External "sdiv#" [arg0, arg1] -> do
+      ThunkLit (LiteralI64 a) <- lookupWhnf arg0
+      ThunkLit (LiteralI64 b) <- lookupWhnf arg1
+      pure $ ThunkLit $ LiteralI64 $ a `div` b
+    External "srem#" [arg0, arg1] -> do
+      ThunkLit (LiteralI64 a) <- lookupWhnf arg0
+      ThunkLit (LiteralI64 b) <- lookupWhnf arg1
+      pure $ ThunkLit $ LiteralI64 $ a `rem` b
+    External "+#" [arg0, arg1] -> do
+      ThunkLit (LiteralI64 a) <- lookupWhnf arg0
+      ThunkLit (LiteralI64 b) <- lookupWhnf arg1
+      pure $ ThunkLit $ LiteralI64 $ a + b
+    External "-#" [arg0, arg1] -> do
+      ThunkLit (LiteralI64 a) <- lookupWhnf arg0
+      ThunkLit (LiteralI64 b) <- lookupWhnf arg1
+      pure $ ThunkLit $ LiteralI64 $ a - b
+    External "*#" [arg0, arg1] -> do
+      ThunkLit (LiteralI64 a) <- lookupWhnf arg0
+      ThunkLit (LiteralI64 b) <- lookupWhnf arg1
+      pure $ ThunkLit $ LiteralI64 $ a * b
     Var "printLit#" [thunk] -> do
       ThunkLit lit <- lookupWhnf thunk
       liftIO $ print lit
@@ -230,7 +162,7 @@ printClosure :: Int -> Closure -> IO ()
 printClosure i _ | i > 10 = putStrLn (replicate i ' ' ++ "snip")
 printClosure i (Closure ctx gcode) = do
   printContext i ctx
-  putStrLn (replicate i ' '  ++ "Closure: " ++ show gcode)
+  putStrLn (show (indent i (ppGCode gcode)))
 
 printThunk :: Int -> Thunk -> IO ()
 printThunk i _ | i > 10 = putStrLn (replicate i ' ' ++ "snip")
@@ -270,7 +202,7 @@ finalize ctx =
         LetRec binds body ->
           let bound = Set.fromList [ name | (name, _, _) <- binds ]
           in LetRec
-              [ (bind, Set.toList $ free rhs `Set.difference` bound, finalizeGCode rhs)
+              [ (bind, Set.toList $ free rhs, finalizeGCode rhs)
               | (bind, _free, rhs) <- binds ]
               (finalizeGCode body)
         LetStrict bind rhs body ->
