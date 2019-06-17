@@ -9,36 +9,59 @@ packages:
 - tigr
 - libffi
 
-- location:
-    git: https://github.com/haskell-suite/haskell-tc.git
-    commit: d16b838fa98f2bf7d32b8ba464c68394b2c73704
-  extra-dep: true
-
-- location:
-    git: https://github.com/haskell-suite/haskell-scope.git
-    commit: 6f0082be2d906927372c1279e730dcf04a0765fc
-  extra-dep: true
-
-- location:
-    git: https://github.com/haskell/cabal.git
-    commit: b58b315835895b6c03311bc604f901f0939df02e
-  subdirs:
-    - cabal-install
-    - Cabal
-  extra-dep: true
-
-- location:
-    git: https://github.com/Lemmih/llvm-hs-pretty.git
-    commit: 7e0ccd633195797e946699c4dbf8b1c741487c6e
-  extra-dep: true
-
-- location:
-    git: https://github.com/haskell-suite/haskell-packages.git
-    commit: 9131a0b737e352393e94351dd63c495f2e9ff3e6
-  extra-dep: true
+# - location:
+#     git: https://github.com/haskell-suite/haskell-tc.git
+#     commit: d16b838fa98f2bf7d32b8ba464c68394b2c73704
+#   extra-dep: true
+#
+# - location:
+#     git: https://github.com/haskell-suite/haskell-scope.git
+#     commit: 6f0082be2d906927372c1279e730dcf04a0765fc
+#   extra-dep: true
+#
+# - location:
+#     git: https://github.com/haskell/cabal.git
+#     commit: b58b315835895b6c03311bc604f901f0939df02e
+#   subdirs:
+#     - cabal-install
+#     - Cabal
+#   extra-dep: true
+#
+# - location:
+#     git: https://github.com/Lemmih/llvm-hs-pretty.git
+#     commit: 7e0ccd633195797e946699c4dbf8b1c741487c6e
+#   extra-dep: true
+#
+# - location:
+#     git: https://github.com/haskell-suite/haskell-packages.git
+#     commit: 9131a0b737e352393e94351dd63c495f2e9ff3e6
+#   extra-dep: true
 
 
 extra-deps:
+- github: haskell-suite/haskell-tc
+  commit: d16b838fa98f2bf7d32b8ba464c68394b2c73704
+  size: 31796
+  sha256: 4805963a5cf55be12d8b0389b1ffc1e26e202af3ddc0a4ac737b6254fd0fbb74
+- github: haskell-suite/haskell-scope
+  commit: 6f0082be2d906927372c1279e730dcf04a0765fc
+  size: 35048
+  sha256: cb430679cab3f3b3956a03b9408d95fb363cd7165456b0b79d6978ce9e5d4794
+- github: haskell/cabal
+  commit: b58b315835895b6c03311bc604f901f0939df02e
+  size: 1715825
+  sha256: 12bc417223a6fbab9d9cc5943282bc017432dc67e54dba5e42681f52b3c70619
+  subdirs:
+    - cabal-install
+    - Cabal
+- github: Lemmih/llvm-hs-pretty
+  commit: 7e0ccd633195797e946699c4dbf8b1c741487c6e
+  size: 32016
+  sha256: 323f6886cfa314f2ee9907109a4c5942c001065caa58068be7ed0fb548af59d8
+- github: haskell-suite/haskell-packages
+  commit: 9131a0b737e352393e94351dd63c495f2e9ff3e6
+  size: 13037
+  sha256: c6bde3e8277775b2596e5ef7800ffe6bc20c3d12096b870a7b79a4451d231afc
 - haskell-src-exts-1.21.0
 - llvm-hs-pure-6.0.0
 - cabal-helper-0.7.3.0
