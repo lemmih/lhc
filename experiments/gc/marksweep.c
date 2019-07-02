@@ -86,14 +86,14 @@ void ms_print_stats(MarkSweep *ms) {
   }
 
   printf(
-    "Blocks used:     %4ld\n"
+    "Blocks used:     %4" PRIu64 "\n"
     "Resident mem:    %s\n"
     "Traced mem:      %s\n"
     "Heap mem:        %s (new: %s)\n"
     "Marked mem:      %s\n"
-    "Traced/Marked:   %4ld%%\n"
-    "Traced/Resident: %4ld%%\n"
-    "Heap/Resident:   %4ld%%\n"
+    "Traced/Marked:   %4" PRIu64 "%%\n"
+    "Traced/Resident: %4" PRIu64 "%%\n"
+    "Heap/Resident:   %4" PRIu64 "%%\n"
     , blocks
     , pp_bytes(blocks*MS_BLOCK_SIZE/sizeof(word))
     , pp_bytes(used)
@@ -167,7 +167,7 @@ static void ms_mark_one(MarkSweep *ms) {
   const uint8_t ptrs = getObjectPtrs(header);
   const word obj_size = 1+prims+ptrs;
 
-  printf("Mark one: Unpacked object: %ld %d %d %d\n", obj_size, prims, ptrs, header.data.gen);
+  printf("Mark one: Unpacked object: %" PRIu64 " %d %d %d\n", obj_size, prims, ptrs, header.data.gen);
   switch( header.data.gen ) {
     case 0:
       return;

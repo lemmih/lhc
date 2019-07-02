@@ -327,6 +327,7 @@ void print_usage(char *prog) {
 
 void enable_lowlatency() {
   struct sched_param param;
+  #if defined(__linux__) || defined(_WIN32)
   cpu_set_t set;
   CPU_ZERO(&set);
   CPU_SET(sched_getcpu(), &set);
@@ -339,6 +340,7 @@ void enable_lowlatency() {
   if(sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
     // printf("Failed to set scheduler.\n");
   }
+  #endif
 
   if(nice(-19) == -1) {
     // printf("Failed to set priority.\n");

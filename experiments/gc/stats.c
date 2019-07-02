@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
+#include <inttypes.h>
 
 void stats_init(Stats *s) {
   s->allocated = 0;
@@ -52,12 +53,12 @@ void stats_pprint(Stats *s) {
     "Time:         %-15s%-15s%s\n"
     "Rate:         %-15s%-15s%s\n"
     "Written:      %-15s%-15s%s\n"
-    "Survival:                     %3lu%%           %3lu%%\n"
+    "Survival:                     %3" PRIu64 "%%           %3" PRIu64 "%%\n"
     "Productivity: %3.0f%%           %-15s%s\n"
     "\n"
     "Pauses:        50%%     90%%     99%%     100%%\n"
     "              %-8s%-8s%-8s%-8s\n"
-    "Collections:                                %4lu\n"
+    "Collections:                                %4" PRIu64 "\n"
     "\n"
     , pp_time(s->timers[MutTimer])
     , pp_time(s->timers[Gen0Timer])
@@ -82,6 +83,6 @@ void stats_pprint(Stats *s) {
 
   printf("Total time:         %s\n", pp_time(s->timers[MutTimer]+s->timers[Gen0Timer]+s->timers[Gen1Timer]));
   printf("Misc time:          %s\n", pp_time(s->timers[MiscTimer]));
-  printf("Max heap:           %lu MB\n", s->max_heap*8/1024/1024);
-  printf("Max residency:      %lu MB (%lu sample(s))\n", s->max_residency*8/1024/1024,s->gen1_collections);
+  printf("Max heap:           %" PRIu64 " MB\n", s->max_heap*8/1024/1024);
+  printf("Max residency:      %" PRIu64 " MB (%" PRIu64 " sample(s))\n", s->max_residency*8/1024/1024,s->gen1_collections);
 }

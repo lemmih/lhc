@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <inttypes.h>
 
 #include <gsl/gsl_rstat.h>
 
@@ -71,9 +72,9 @@ static char *pp_speed(uint64_t words, uint64_t time) {
   uint64_t rate = words*8/1024 / (time/1e9);
   i = (i+1) % 10;
   if(rate < 1024) {
-    snprintf(buffer[i], 128, "%4lu KB/s", rate);
+    snprintf(buffer[i], 128, "%4" PRIu64 " KB/s", rate);
   } if(rate < 1024*1024*10) { // Less than 10000 MB/s
-    snprintf(buffer[i], 128, "%4lu MB/s", rate/1024);
+    snprintf(buffer[i], 128, "%4" PRIu64 " MB/s", rate/1024);
   } else {
     snprintf(buffer[i], 128, "%4.1f GB/s", (double)rate/1024/1024);
   }
@@ -86,11 +87,11 @@ static char *pp_bytes(uint64_t words) {
   uint64_t bytes = words * 8;
   i = (i+1) % 10;
   if(bytes < 1024) {
-    snprintf(buffer[i], 128, "%4lu B", bytes);
+    snprintf(buffer[i], 128, "%4" PRIu64 " B", bytes);
   } else if(bytes < 1024*1024) {
-    snprintf(buffer[i], 128, "%4lu KB", bytes/1024);
+    snprintf(buffer[i], 128, "%4" PRIu64 " KB", bytes/1024);
   } else if(bytes < (uint64_t)1024*1024*1024*10) {
-    snprintf(buffer[i], 128, "%4lu MB", bytes/1024/1024);
+    snprintf(buffer[i], 128, "%4" PRIu64 " MB", bytes/1024/1024);
   } else {
     snprintf(buffer[i], 128, "%4.1f GB", ((double)bytes)/1024/1024/1024);
   }
