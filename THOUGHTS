@@ -156,3 +156,29 @@ How to add special closures?
   IORef
   Array
   ByteArray
+
+
+Garbage collection:
+  Three generations:
+    nursery
+    semi-space
+    mark-and-sweep (and compact? immix?)
+
+  Nursery
+    Fixed size. Space reused. Lives entirely in cache.
+    Per-OS-thread
+  Semi-space
+    Large allocation area size
+    Incremental
+    Concurrent
+  Mark-and-sweep
+    Incremental
+    Concurrent
+
+  Let's say we have 4 threads. Semi-space gen decides it is time for a collection.
+  It sets a flag and waits. One thread fills its nursery, copies over the live
+  objects and evacuates any object from gen 1 that are reachable.
+  Garbage collector thread can begin scavenging. Scavenging is not done until
+  all threads have finished evacuating.
+  Only use per-object lock for mutable objects. Evacuation might duplicate some
+  objects.
