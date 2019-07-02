@@ -1,5 +1,5 @@
 CC=clang
-CFLAGS=-O3 -DNDEBUG -DCLANG
+CFLAGS=-O3 -DNDEBUG -DCLANG `gsl-config --cflags`
 DEPS=common.h header.h nursery.h objects.h semispace.h stats.h utils.h \
 		 marksweep.h
 SHARED=stats.o header.o nursery.o utils.o objects.o semispace.o \
@@ -15,7 +15,7 @@ SHARED=stats.o header.o nursery.o utils.o objects.o semispace.o \
 	$(CC) $(CFLAGS) -S -emit-llvm $<
 
 bench: benchmark.o $(SHARED)
-	$(CC) -lgsl -o bench benchmark.o $(SHARED)
+	$(CC) -o bench benchmark.o $(SHARED) `gsl-config --libs`
 
 test: FORCE
 	@$(CC) -lcriterion -o test test.c $(SHARED:.o=.c)
