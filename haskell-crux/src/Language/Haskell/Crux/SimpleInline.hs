@@ -9,7 +9,6 @@ import           Data.Array
 import           Data.Graph
 import           Data.Map                            (Map)
 import qualified Data.Map                            as Map
-import           Data.Semigroup                      (Semigroup (..))
 import           Data.Set                            (Set)
 import qualified Data.Set                            as Set
 

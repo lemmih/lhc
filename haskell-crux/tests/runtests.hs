@@ -2,8 +2,7 @@
 module Main (main) where
 
 import           Control.Exception
-import           Control.Monad                     (fmap, unless, when)
-import           Control.Monad
+import           Control.Monad                     (unless, when, forM)
 import qualified Data.ByteString.Lazy              as BL
 import           Data.Graph                        (SCC (..), stronglyConnComp)
 import           Data.IORef

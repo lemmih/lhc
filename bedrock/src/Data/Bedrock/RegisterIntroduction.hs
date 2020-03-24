@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NoMonadFailDesugaring #-}
 module Data.Bedrock.RegisterIntroduction
     ( registerIntroduction ) where
 

@@ -13,7 +13,6 @@ import           Data.Graph                          (SCC (..),
                                                       stronglyConnComp)
 import           Data.Map                            (Map)
 import qualified Data.Map                            as Map
-import           Data.Semigroup                      (Semigroup (..))
 import qualified Data.Set                            as Set
 
 -- 1. order by scc

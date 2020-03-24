@@ -1,0 +1,6 @@
+*.o
+*~
+*.hi
+result
+dist/
+dist-newstyle/

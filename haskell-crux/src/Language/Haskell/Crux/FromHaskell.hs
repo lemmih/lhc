@@ -12,7 +12,6 @@ import           Data.List                  (transpose)
 import           Data.Map                   (Map)
 import qualified Data.Map                   as Map
 import           Data.Maybe
-import           Data.Semigroup             (Semigroup (..))
 import           Data.Typeable
 import qualified Language.Haskell.Exts      as HS
 
