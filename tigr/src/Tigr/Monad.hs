@@ -1,13 +1,15 @@
 module Tigr.Monad where
 
-import Tigr.Types
+import           Tigr.Types
 
-import qualified Data.Map as Map
 import           Control.Exception    (Exception (..), SomeException (..),
                                        handle, throwIO)
+import qualified Control.Monad.Fail   as M
+import           Control.Monad.Fail   (MonadFail)
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.IORef
+import qualified Data.Map             as Map
 
 
 newtype M a = M { unM :: Context -> Context -> IO a }
@@ -24,6 +26,9 @@ instance Monad M where
 
 instance MonadIO M where
   liftIO io = M $ \_global _local -> io
+
+instance MonadFail M where
+  fail str = M $ \_global local -> M.fail str
 
 askLocal :: M Context
 askLocal = M $ \_global local -> pure local

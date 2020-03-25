@@ -1,3 +1,4 @@
+{-# LANGUAGE NoMonadFailDesugaring #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Compiler.CoreToBedrock where
 

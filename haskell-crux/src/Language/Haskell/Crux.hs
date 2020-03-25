@@ -4,7 +4,6 @@ module Language.Haskell.Crux where
 
 import           Codec.Serialise
 import           Data.List
-import qualified Data.Semigroup                    as Semigroup
 import           Data.Word
 import           GHC.Generics
 import           Language.Haskell.Exts             (SrcSpan, SrcSpanInfo)
@@ -12,7 +11,6 @@ import qualified Language.Haskell.Scope            as Scope
 import           Language.Haskell.TypeCheck        (Type (..))
 import qualified Language.Haskell.TypeCheck        as TC
 import           Language.Haskell.TypeCheck.Pretty
-import qualified LLVM.AST                          as LLVM (Type)
 import qualified LLVM.AST                          as LLVM
 import qualified LLVM.AST.AddrSpace                as LLVM (AddrSpace)
 import qualified Text.PrettyPrint.ANSI.Leijen      as Doc
@@ -102,7 +100,7 @@ data Literal
 -- Instances
 
 
-instance Semigroup.Semigroup Module where
+instance Semigroup Module where
   a <> b = Module
     { cruxForeigns = cruxForeigns a ++ cruxForeigns b
     , cruxDecls = cruxDecls a ++ cruxDecls b
@@ -112,7 +110,7 @@ instance Semigroup.Semigroup Module where
     }
 instance Monoid Module where
     mempty = Module [] [] [] [] []
-    mappend = (Semigroup.<>)
+    mappend = (<>)
 
 instance Pretty Module where
     pretty m = vsep $ concat

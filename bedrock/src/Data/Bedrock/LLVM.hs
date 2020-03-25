@@ -1,3 +1,4 @@
+{-# LANGUAGE NoMonadFailDesugaring #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 module Data.Bedrock.LLVM ( compile ) where
